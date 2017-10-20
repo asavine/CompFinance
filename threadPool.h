@@ -59,11 +59,13 @@ public:
 	ThreadPool(const size_t nThread = thread::hardware_concurrency() - 1)
 		: myInterrupt(false)
 	{
+        
 		myThreads.reserve(nThread);
 		
 		//	Launch threads on threadFunc and keep handles in a vector
 		for (size_t i = 0; i<nThread; i++)
 			myThreads.push_back(thread(&ThreadPool::threadFunc, this, i+1));
+        
 	}
 
 	//	Destructor
