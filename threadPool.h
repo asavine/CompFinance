@@ -22,6 +22,9 @@ class ThreadPool
 	//	The threads
 	vector<thread> myThreads;
 
+    //  Active indicator
+    bool myActive;
+
 	//	Interruption indicator
 	bool myInterrupt;
 
@@ -44,6 +47,9 @@ class ThreadPool
 		}
 	}
 
+    //  The constructor stays private, ensuring single instance
+    ThreadPool() : myActive(false), myInterrupt(false) {}
+
 public:
 
 	//	Access the instance
@@ -55,17 +61,19 @@ public:
 	//	The number of the caller thread
 	static size_t threadNum() { return myTLSNum; }
 
-	//	Constructor
-	ThreadPool(const size_t nThread = thread::hardware_concurrency() - 1)
-		: myInterrupt(false)
+	//	Starter
+	void start(const size_t nThread = thread::hardware_concurrency() - 1)
 	{
-        
-		myThreads.reserve(nThread);
-		
-		//	Launch threads on threadFunc and keep handles in a vector
-		for (size_t i = 0; i<nThread; i++)
-			myThreads.push_back(thread(&ThreadPool::threadFunc, this, i+1));
-        
+        if (!myActive)  //  Only start once
+        {
+            myThreads.reserve(nThread);
+
+            //	Launch threads on threadFunc and keep handles in a vector
+            for (size_t i = 0; i < nThread; i++)
+                myThreads.push_back(thread(&ThreadPool::threadFunc, this, i + 1));
+
+            myActive = true;
+        }
 	}
 
 	//	Destructor

@@ -21,8 +21,10 @@ inline double uocDupire(
     const double            maturity,
     const double            monitorFreq,
     //  numerical parameters
+    const bool              parallel,
     const bool              useSobol,
     const int               numPath,
+    const bool              antithetic,
     const int               seed1 = 12345,
     const int               seed2 = 12346)
 {
@@ -32,8 +34,11 @@ inline double uocDupire(
     unique_ptr<RNG> rng = useSobol ? unique_ptr<RNG>(new Sobol) : unique_ptr<RNG>(new mrg32k3a(seed1, seed2));
 
     //  Simulate
-    auto results = mcSimul(product, model, *rng, numPath);
+    auto results = parallel
+        ? mcParallelSimul(product, model, *rng, numPath, antithetic)
+        : mcSimul(product, model, *rng, numPath, antithetic);
 
     //  Return average
-    return accumulate(results.begin(), results.end(), 0.0) / results.size();
+    return accumulate(results.begin(), results.end(), 0.0) 
+        / results.size();
 }

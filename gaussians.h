@@ -40,10 +40,8 @@ inline double normalCdf( const double x)
 inline double invNormalCdf( const double p)
 {
 	//	to ensure symmetry
-	if (p>0.5) return -invNormalCdf(1.0 - p);
-
-	//	to avoid perfect zero
-	double up = p<1.0e-15? 1.0e-15 : p;
+    const bool sup = p > 0.5;
+    const double up = sup ? 1.0 - p : p;
 
 	//	constants
 	static const double a0 = 2.50662823884;
@@ -75,7 +73,7 @@ inline double invNormalCdf( const double p)
 	{
 		r = x*x;
 		r = x*(((a3*r + a2)*r + a1)*r + a0) / ((((b3*r + b2)*r + b1)*r + b0)*r + 1.0);
-		return r;
+		return sup ? -r: r;
 	}
 
 	//	log log approx
@@ -83,11 +81,10 @@ inline double invNormalCdf( const double p)
 	r = log(-log(r));
 	r = c0 + r*(c1 + r*(c2 + r*(c3 + r*(c4 + r*(c5 + r*(c6 + r*(c7 + r*c8)))))));
 
-	//	flip sign  // if(x<0.0) r = -r;
-	r = -r;
+	//	flip sign 
 
 	//	done
-	return r;
+	return sup? r: -r;
 }
 
 //  turn a uniform vector into a gaussian vector

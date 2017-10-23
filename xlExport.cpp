@@ -3,6 +3,8 @@
 #include "xlcall.h"
 #include "framework.h"
 
+#include "threadPool.h"
+
 #include "mcDriver.h"
 
 //	Wrappers
@@ -22,9 +24,26 @@ inline double xUocDupire(
     double              monitorFreq,
     //  numerical parameters
     double              useSobol,
-    double              numPath)
+    double              useAnti,
+    double              seed1,
+    double              seed2,
+    double              numPath,
+    double              parallel)
 {
-	//  Unpack
+    //  Make sure the last input is given
+    if (!numPath) return 0;
+
+    //  MaxDt = 0 crashes
+    if (maxDt <= 0) return 0;
+
+    //  Same thing for frequency
+    if (monitorFreq <= 0) return 0;
+    
+    //  Default seeds
+    if (seed1 <= 0) seed1 = 12345;
+    if (seed2 <= 0) seed2 = 12346;
+
+    //  Unpack
 
     vector<double> vspots;
     {
@@ -42,8 +61,8 @@ inline double xUocDupire(
         size_t cols = times->columns;
         double* numbers = times->array;
 
-        vtimes.resize(rows);
-        copy(numbers, numbers + rows, vtimes.begin());
+        vtimes.resize(cols);
+        copy(numbers, numbers + cols, vtimes.begin());
     }
 
     matrix<double> vvols;
@@ -58,8 +77,8 @@ inline double xUocDupire(
 
     //  Call and return
 
-    return uocDupire(spot, vspots, vtimes, vvols, maxDt, strike, barrier, maturity, monitorFreq, 
-        useSobol > 0, static_cast<int>(numPath));
+    return uocDupire(spot, vspots, vtimes, vvols, maxDt, strike, barrier, maturity, monitorFreq, parallel>0,
+        useSobol > 0, static_cast<int>(numPath), useAnti > 0, static_cast<int>(seed1), static_cast<int>(seed2));
 
 }
 
@@ -73,9 +92,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
 	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
 		(LPXLOPER12)TempStr12(L"xUocDupire"),
-		(LPXLOPER12)TempStr12(L"BBK%K%K%BBBBBBB"),
+		(LPXLOPER12)TempStr12(L"BBK%K%K%BBBBBBBBBBB"),
 		(LPXLOPER12)TempStr12(L"xUocDupire"),
-		(LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, N"),
+		(LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, useAnti, [seed1], [seed2], N, [Parallel]"),
 		(LPXLOPER12)TempStr12(L"1"),
 		(LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
 		(LPXLOPER12)TempStr12(L""),
@@ -85,6 +104,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
 	/* Free the XLL filename */
 	Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);
+
+    /*  Start the thread pool   */
+    ThreadPool::getInstance()->start();
 
 	return 1;
 }

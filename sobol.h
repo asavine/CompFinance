@@ -26,7 +26,6 @@ class Sobol : public RNG
 
     //	Cached Uniforms
     vector<unsigned long>	    myIntegerSequence;  //  The current numbers, as integers
-    vector<double>			    myGaussians;        //  The Gaussian vector, cached
 
     //  The current point number
     unsigned long				mySimCount;
@@ -121,14 +120,12 @@ public:
 
         //	Resize
         myIntegerSequence.resize(myDim);
-        myGaussians.resize(myDim);
 
         //  Generate the first point
         unsigned i;
         for (i = 0; i<myDim; ++i)
         {
             myIntegerSequence[i] = myDirectionIntegers[i][0];
-            myGaussians[i] = invNormalCdf(myIntegerSequence[i]*ONEOVER2POW32);
         }
 
         //	Set the count
@@ -136,7 +133,7 @@ public:
     }
 	
 	//	next point
-    const vector<double>& nextG() override
+    void nextG(vector<double>& gaussVec) override
     {
         //	For the n'th draw use the gray code
         unsigned long n = mySimCount;
@@ -152,14 +149,57 @@ public:
         for (i = 0; i<myDim; ++i)
         {
             myIntegerSequence[i] ^= myDirectionIntegers[i][j];
-            myGaussians[i] = invNormalCdf(myIntegerSequence[i]*ONEOVER2POW32);
+            
+            //  Result, only if required
+            if(gaussVec.size())
+                gaussVec[i] = invNormalCdf(myIntegerSequence[i]*ONEOVER2POW32);
         }
 
         //	Update count
         ++mySimCount;
+    }
 
-        //  Return
-        return myGaussians;
+    //  Access dimension
+    size_t simDim() const override
+    {
+        return myDim;
+    }
+
+    //  Skip ahead
+    void skipTo(const long b) override
+    {
+        //	Check skip
+        if (b <= 0) return;
+
+        //	Reset Sobol to entry 0 
+        //  (not 1, hence must reset even though reset has already been called in init)
+        for (size_t i = 0; i<myDim; ++i) myIntegerSequence[i] = 0;
+
+        //	The actual Sobol skipping algo
+        unsigned long long im = static_cast<unsigned long long>(b);
+        unsigned int	   two_i = 1, two_i_plus_one = 2;
+
+        unsigned i = 0;
+        while (two_i <= im)
+        {
+            if (((im + two_i) / two_i_plus_one) & 1)
+            {
+                for (unsigned int k = 0; k<myDim; ++k)
+                {
+                    myIntegerSequence[k] ^= myDirectionIntegers[k][i];
+                }
+            }
+
+            two_i <<= 1;
+            two_i_plus_one <<= 1;
+            ++i;
+        }
+
+        //	End of skipping algo
+
+        //	Update next entry
+        mySimCount = unsigned long(b);
+        nextG(vector<double>());
     }
 };
 

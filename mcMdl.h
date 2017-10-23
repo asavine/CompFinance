@@ -14,33 +14,38 @@ inline void fillTimeline(
     //  The filled timeline
     //      Has all original steps 
     //      Plus additional ones so maxDt is not exceeded
+    //  Size in unknown to the caller, hence allocation occurs inside
     vector<Time>&                   filled,
     //  True if the point was on the original timeline
     //  We use vector<int> because vector<bool> is broken in C++
     vector<int>&                    common)
 {
+    //  Position on the start of the product timeline
+    auto it = original.begin();
+
+    //  Skip before today
+    while (it != original.end() && *it < systemTime) ++it;
+    if (it == original.end())
+        throw runtime_error
+        ("All dates on the timeline are in the past");
 
     //  Clear
     filled.clear();
     common.clear();
-    //  Position on the start of the product timeline
-    auto it = original.begin();
 
     //  Include today
     filled.push_back(systemTime);
-    //  Skip before today
-    while (it != original.end() && *it < systemTime) ++it;
-    if (it != original.end())
+
+    //  Is today on the product timeline?
+    if (*it == systemTime)
     {
-        //  Is today on the product timeline?
-        common.push_back(*it == systemTime);
+        common.push_back(true);
         //  Advance
         ++it;
     }
     else
     {
-        throw runtime_error
-            ("All dates on the timeline are in the past");
+        common.push_back(false);
     }
 
     //  Futures dates
@@ -108,7 +113,7 @@ class Dupire : public Model<T>
     //  here time major: iv(time i, spot j) = myInterpVols[i][j]
     matrix<T>           myInterpVols;
     //  volatilities as stored are multiplied by sqrt(dt) 
-    //  so there is no need to do that when generating paths
+    //  so there is no need to do that during paths generation
 
 public:
 
@@ -155,13 +160,15 @@ public:
         }
     }
 
-    //  Timeline
+    //  MC Dimension
     size_t simDim() const override
     {
         return myTimeline.size() - 1;
     }
 
-    //  Generate the path
+    //  Generate one path, consume Gaussian vector
+    //  path must be pre-allocated 
+    //  with the same size as the product timeline
     void generatePath(const vector<double>& gaussVec, vector<scenario<T>>& path) const override
     {
         //  The starting spot
@@ -183,6 +190,7 @@ public:
                 myInterpVols[i-1], 
                 myInterpVols[i-1] + mySpots.size(), 
                 spot);
+            //  vol comes out * sqrt(dt)
 
             //  Apply Euler's scheme
             spot += vol * gaussVec[i - 1];
