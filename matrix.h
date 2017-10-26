@@ -28,6 +28,23 @@ public:
         return *this;
     }
 
+    //  Copy, assign from different type
+    template <class U>
+    matrix(const matrix<U>& rhs)
+        : myRows(rhs.rows()), myCols(rhs.cols())
+    {
+        myVector.resize(rhs.rows() * rhs.cols());
+        copy(rhs.begin(), rhs.end(), myVector.begin());
+    }
+    template <class U>
+    matrix& operator=(const matrix<U>& rhs)
+    {
+        if (this == &rhs) return *this;
+        matrix<T> temp(rhs);
+        swap(temp);
+        return *this;
+    }
+
     //  Move, move assign
     matrix(matrix&& rhs) : myRows(rhs.myRows), myCols(rhs.myCols), myVector(move(rhs.myVector)) {}
     matrix& operator=(matrix&& rhs)

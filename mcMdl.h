@@ -118,10 +118,12 @@ class Dupire : public Model<T>
 public:
 
     //  Constructor: store data
-    Dupire(const T spot,
+    
+    template <class U>
+    Dupire(const U spot,
         const vector<double> spots, 
         const vector<Time> times, 
-        const matrix<T> vols,
+        const matrix<U> vols,
         const Time maxDt = 0.25)
         : mySpot(spot), 
         mySpots(spots), 
@@ -129,6 +131,17 @@ public:
         myVols(vols), 
         myMaxDt(maxDt)
     { }
+
+    //  Read access to parameters
+    T spot() const
+    {
+        return mySpot;
+    }
+
+    const matrix<T>&vols()
+    {
+        return myVols;
+    }
 
     //  Virtual copy constructor
     unique_ptr<Model<T>> clone() const override
@@ -198,5 +211,38 @@ public:
             //  Store on the path?
             if (myCommonSteps[i]) path[idx++].spot = spot;
         }
+    }
+
+    //  Access to all parameters by copy
+    vector<T> parameters() const override
+    {
+        vector<T> params;
+        params.reserve(myVols.rows() * myVols.cols() + 1);
+        params.push_back(mySpot);
+        for (auto& vol : myVols) params.push_back(vol);
+
+        return params;
+    }
+
+    //  AAD enabled
+private:
+    //  Implementation, for Number instances only
+
+    //  Put parameters on tape 
+    template <class U> void putOnTapeI() {}
+    template<> void putOnTapeI<Number>()
+    {
+        mySpot.putOnTape();
+        //  Free function putOnTape in AADNumber.h
+        ::putOnTape(myVols.begin(), myVols.end());
+    }
+
+public:
+    //  Interface    
+
+    //  Put parameters on tape 
+    void putOnTape() override
+    {
+        putOnTapeI<T>();
     }
 };

@@ -43,7 +43,7 @@ class ThreadPool
 		{
 			//	Pop and executes tasks
 			myQueue.pop(t);
-			t();			
+			if (!myInterrupt) t();			
 		}
 	}
 
@@ -77,16 +77,26 @@ public:
 	}
 
 	//	Destructor
-	~ThreadPool()
+    ~ThreadPool()
+    {
+        stop();
+    }
+        
+    void stop()
 	{
-		//	Interrupt mode
-		myInterrupt = true;
+        if (myActive)
+        {
+            //	Interrupt mode
+            myInterrupt = true;
 
-		//	Interrupt all waiting threads
-		myQueue.interrupt();
+            //	Interrupt all waiting threads
+            myQueue.interrupt();
 
-		//	Wait for them all to join
-		for_each(myThreads.begin(), myThreads.end(), mem_fn(&thread::join));
+            //	Wait for them all to join
+            for_each(myThreads.begin(), myThreads.end(), mem_fn(&thread::join));
+
+            myActive = false;
+        }
 	}
 
 	//	Forbid copies etc

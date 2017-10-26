@@ -79,8 +79,10 @@ public:
 
 	void interrupt()
 	{
-		lock_guard<mutex> lk(myMutex);
-		myInterrupt = true;
+        {
+            lock_guard<mutex> lk(myMutex);
+            myInterrupt = true;
+        }
 		myCV.notify_all();
 	}
 };

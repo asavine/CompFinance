@@ -78,6 +78,15 @@
     <ClInclude Include="mcDriver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="AADNode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AADTape.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AADNumber.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -114,6 +123,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="initializers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AADNumber.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

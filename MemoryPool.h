@@ -16,7 +16,7 @@
 // Total amount of memory to allocate for all temporary XLOPERs
 //
 
-#define MEMORYSIZE 10240
+#define MEMORYSIZE 52500
 
 class MemoryPool
 {

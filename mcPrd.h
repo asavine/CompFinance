@@ -5,8 +5,8 @@
 template <class T>
 class UOC : public Product<T>
 {
-    T               myStrike;
-    T               myBarrier;
+    double          myStrike;
+    double          myBarrier;
     Time            myMaturity;
     vector<Time>    myTimeline;
 
@@ -14,7 +14,7 @@ public:
 
     //  Constructor: store data and build timeline
     //  Timeline = system date to maturity, with steps every monitoring frequency
-    UOC(const T strike, const T barrier, const Time maturity, const Time monitorFreq)
+    UOC(const double strike, const double barrier, const Time maturity, const Time monitorFreq)
         : myStrike(strike), myBarrier(barrier), myMaturity(maturity)
     {
         myTimeline.push_back(systemTime);
@@ -50,16 +50,16 @@ public:
         //  Or Andreasen and Savine's publication on scripting, part IV
 
         //  We apply a smoothing factor of 1% of the spot both ways, untemplated
-        const double smooth = path[0].spot * 0.01;
+        const double smooth = convert<double>(path[0].spot * 0.01);
 
         //  We start alive
-        T alive = 1.0;
+        T alive = convert<T>(1.0);
 
         //  Go through path, update alive status
         for (size_t i = 0; i < path.size(); ++i)
         {
             //  Breached
-            if (path[i].spot > myBarrier + smooth) return 0.0;
+            if (path[i].spot > myBarrier + smooth) return convert<T>(0.0);
 
             //  Semi-breached: apply smoothing
             if (path[i].spot > myBarrier - smooth)
@@ -69,6 +69,6 @@ public:
         }
 
         //  Payoff
-        return alive * max(path.back().spot - myStrike, 0);
+        return alive * max(path.back().spot - convert<T>(myStrike), convert<T>(0.0));
     }
 };
