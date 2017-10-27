@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define DEFAULT_BLOCK_SIZE 1048576
+#define DEFAULT_BLOCK_SIZE 524288
 #define DEFAULT_INDEX_SIZE 32768
 
 using Ptr = char*;
@@ -35,6 +35,16 @@ public:
         myEnd = myBegin + size;
     }
 
+    //	Provides the requested amount of memory if avail it or nullptr
+    Ptr requestMemory(const size_t size)
+    {
+        if (myNext + size > myEnd) return nullptr;
+
+        Ptr prevNext = myNext;
+        myNext += size;
+        return prevNext;
+    }
+
     //	Disable copy construction and assignment
     MemoryBlock(const MemoryBlock& rhs) = delete;
     MemoryBlock& operator=(const MemoryBlock& rhs) = delete;
@@ -55,6 +65,13 @@ public:
         myEnd = rhs.myEnd;
         rhs.myBegin = rhs.myNext = rhs.myEnd = nullptr;
         return *this;
+    }
+
+    //	Release the block
+    void free()
+    {
+        if (myBegin) ::free(myBegin);
+        myBegin = nullptr;
     }
 
     //	Destructor frees the allocated memory
@@ -83,23 +100,6 @@ public:
     void rewindToMark()
     {
         myNext = myMark;
-    }
-
-    //	Release the block
-    void free()
-    {
-        if (myBegin) ::free(myBegin);
-        myBegin = nullptr;
-    }
-
-    //	Provides the requested amount of memory if avail it or nullptr
-    Ptr requestMemory(const size_t size)
-    {
-        if (myNext + size > myEnd) return nullptr;
-
-        Ptr prevNext = myNext;
-        myNext += size;
-        return prevNext;
     }
 };
 
@@ -230,7 +230,7 @@ public:
 
     //  Mark the current position
 private:
-    State                                   myMark;
+    State myMark;
 public:
     void mark()
     {

@@ -186,7 +186,7 @@
     <ClInclude Include="xlcall.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AADNumber.cpp" />
+    <ClCompile Include="AAD.cpp" />
     <ClCompile Include="initializers.cpp" />
     <ClCompile Include="mcBase.cpp" />
     <ClCompile Include="primitivepolynomials.cpp" />
