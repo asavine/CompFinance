@@ -103,11 +103,16 @@ inline vector<double> mcSimul(
     auto cMdl = mdl.clone();
     auto cRng = rng.clone();
 
-    vector<double> res(nPath);	                           //	Allocate results
-    cMdl->init(prd.timeline());                        //  Init the simulation timeline
-    cRng->init(cMdl->simDim());                        //  Init the RNG
-    vector<double> gaussVec(cMdl->simDim());           //  Allocate Gaussian vector
-    vector<scenario<double>> path(prd.timeline().size());   //  Allocate path
+    //	Allocate results
+    vector<double> res(nPath);
+    //  Init the simulation timeline
+    cMdl->init(prd.timeline());              
+    //  Init the RNG
+    cRng->init(cMdl->simDim());                        
+    //  Allocate Gaussian vector
+    vector<double> gaussVec(cMdl->simDim());           
+    //  Allocate path
+    vector<scenario<double>> path(prd.timeline().size());   
 
     //	Iterate through paths	
     bool antiPath = false;
@@ -133,8 +138,10 @@ inline vector<double> mcSimul(
             }
 
         }
-        cMdl->generatePath(gaussVec, path);       //  Generate path, consume Gaussian vector
-        res[i] = prd.payoff(path);              //	Compute result
+        //  Generate path, consume Gaussian vector
+        cMdl->generatePath(gaussVec, path);     
+        //	Compute result
+        res[i] = prd.payoff(path);              
     }
 
     return res;	//	C++11: move
@@ -317,7 +324,7 @@ mcSimulAAD(
         //  Propagate adjoints
         //  do not reset: we accumulate parameters adjoint
         //  the rest are 0 as they are
-        res[i].propagateToMark(false);
+        res[i].propagateToMark();
         //
     }
 
@@ -341,16 +348,14 @@ mcSimulAAD(
     return results;
 }
 
-//  Extract initialization
+//  Extract initialization, except RNG
 template<class T>
 void initSimul(
     //  Inputs
     const Product<T>& prd,
     const Model<T>& mdl,
-    const RNG& rng,
     //  Stuff to init
     unique_ptr<Model<T>>& mdlClone,
-    unique_ptr<RNG>& rngClone,
     //  Stuff to allocate
     vector<double>& gaussVec,
     vector<scenario<T>>& path)
@@ -359,9 +364,7 @@ void initSimul(
     //      which are modified when we set up the simulation
     //  Copies are OK at high level
     mdlClone = mdl.clone();
-    rngClone = rng.clone();
 
-    //  AAD - 1
     //  Access to tape
     Tape& tape = *Number::tape;
     //  Rewind tape
@@ -378,8 +381,6 @@ void initSimul(
     //
 
     //  Other init / allocate
-    //  Init the RNG
-    rngClone->init(mdlClone->simDim());
     //  Allocate Gaussian vector
     gaussVec.resize(mdlClone->simDim());     
     //  Allocate path
@@ -413,7 +414,6 @@ mcParallelSimulAAD(
 
     //  Clones
     vector<unique_ptr<Model<Number>>> cMdl(nThread + 1);
-    vector<unique_ptr<RNG>> cRng(nThread + 1);
 
     //  Space for Gaussian vectors and paths 
     vector<vector<double>> gaussVecs(nThread + 1);   
@@ -427,7 +427,11 @@ mcParallelSimulAAD(
     vector<int> init(nThread + 1, false);
 
     //  Initialize main thread
-    initSimul(prd, mdl, rng, cMdl[0], cRng[0], gaussVecs[0], paths[0]);
+    initSimul(prd, mdl, cMdl[0], gaussVecs[0], paths[0]);
+
+    //  Init the RNG
+    auto cRng = rng.clone();
+    cRng->init(cMdl[0]->simDim());
 
     //  Mark as initialized
     init[0] = true;
@@ -459,9 +463,8 @@ mcParallelSimulAAD(
             if (!init[threadNum])
             {
                 //  Initialize
-                initSimul(prd, mdl, rng, 
+                initSimul(prd, mdl, 
                     cMdl[threadNum], 
-                    cRng[threadNum], 
                     gaussVecs[threadNum], 
                     paths[threadNum]);
 
@@ -470,7 +473,7 @@ mcParallelSimulAAD(
             }
 
             //  Get a RNG and position it correctly
-            auto taskRng = cRng[threadNum]->clone();
+            auto taskRng = cRng->clone();
             taskRng->skipTo(antithetic ? firstPath / 2 : firstPath);
 
             //  And conduct the simulations, exactly same as sequential
@@ -509,7 +512,7 @@ mcParallelSimulAAD(
                 //  Propagate adjoints
                 //  do not reset: we accumulate parameters adjoint
                 //  the rest are 0 as they are
-                res[firstPath + i].propagateToMark(false);
+                res[firstPath + i].propagateToMark();
             }
 
             //  Remember tasks must return bool

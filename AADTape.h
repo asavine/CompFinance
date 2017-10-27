@@ -262,19 +262,15 @@ public:
     }
 
     //	Free all the allocated memory
-    void clear(const bool reAllocateOneBlock = true) 
+    void clear() 
     {
 
         myBlocks.clear();
         myPointers.clear();
 
-        if (reAllocateOneBlock) 
-        {
-
-            //  Create one block on construction
-            myBlocks.push_back(MemoryBlock(myBlockSize));
-            myPointers.push_back(vector<Node*>(myVectorSize));
-        }
+        //  Create one block so the tape is usable
+        myBlocks.push_back(MemoryBlock(myBlockSize));
+        myPointers.push_back(vector<Node*>(myVectorSize));
 
         myState.block = myBlocks.begin();
         myState.vector = myPointers.begin();

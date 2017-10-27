@@ -28,7 +28,7 @@ public:
         return *this;
     }
 
-    //  Copy, assign from different type
+    //  Copy, assign from different (convertibale) type
     template <class U>
     matrix(const matrix<U>& rhs)
         : myRows(rhs.rows()), myCols(rhs.cols())

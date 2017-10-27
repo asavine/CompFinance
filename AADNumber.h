@@ -106,15 +106,30 @@ public:
     {
         for (Node& node : *tape) node.adjoint = 0.0;
     }
+    //  Propagate adjoints
+    //      from and to both INCLUSIVE
+    static void propagateAdjoints(
+        Tape::iterator propagateFrom,
+        Tape::iterator propagateTo)
+    {
+        auto it = propagateFrom;
+        while (it != propagateTo)
+        {
+            it->propagate();
+            --it;
+        }
+        it->propagate();
+    }
 
-    //  From this node to the beggining of the tape
+    //  Convenient overloads
+
+    //  Set the adjoint on this node to 1,
+    //  Then propagate from the node
     void propagateAdjoints(
         //  We start on this number's node
-        //  Where to stop? 
-        //  We stop on propagateTo (inclusive)
-        const Tape::iterator propagateTo,
+        Tape::iterator propagateTo,
         //  reset adjoints first?
-        const bool reset)
+        const bool reset = false)
     {
         //  Reset
         if (reset) resetAdjoints();
@@ -131,27 +146,22 @@ public:
         it->propagate();
     }
 
-    //  Convenient overloads
+    //  These 2 set the adjoint to 1 on this node
     void propagateToStart(
-        const bool reset = true)
+        const bool reset = false)
     {
         propagateAdjoints(tape->begin(), reset);
     }
     void propagateToMark(
-        const bool reset = true)
+        const bool reset = false)
     {
         propagateAdjoints(tape->markIt(), reset);
     }
+
+    //  This one leaves the adjoints untouched
     static void propagateMarkToStart()
     {
-        auto it = tape->markIt();
-        //  Reverse and propagate until we hit the start
-        while (it != tape->begin())
-        {
-            it->propagate();
-            --it;
-        }
-        it->propagate();
+        propagateAdjoints(tape->markIt(), tape->begin());
     }
 
     //  Operator overloading
