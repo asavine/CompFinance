@@ -4,6 +4,9 @@
 #include "mcBase.h"
 #include "interp.h"
 
+//  Calibration helper
+static const struct CalibrationType {} calibrate;
+
 #define EPS 1.0e-08
 //  Utility for filling schedules
 inline void fillTimeline(
@@ -246,3 +249,70 @@ public:
         putOnTapeI<T>();
     }
 };
+
+//  Calibration
+
+#include "ivs.h"
+
+//  Returns spots, times and local vols
+template<class T>
+inline tuple<vector<double>, vector<Time>, matrix<T>> 
+    dupireCalib(
+        //  The IVS we calibrate to
+        const IVS<T>& ivs,
+        //  The local vol grid
+        const double& lowSpot,
+        const double& highSpot,
+        const size_t numSpots,
+        const Time& finalMat,
+        const size_t numTimes)
+{
+    //  Spots and times
+    
+    const double spot = convert<double>(ivs.spot());
+
+    vector<double> spots(numSpots + 1);
+    const double ds = (highSpot - lowSpot) / numSpots;
+    spots[0] = lowSpot;
+    for (size_t i = 0; i < numSpots; ++i) spots[i + 1] = spots[i] + ds;
+
+    vector<Time> times(numTimes);
+    const double dt = finalMat / numTimes;
+    times[0] = dt;
+    for (size_t i = 0; i < numTimes - 1; ++i) times[i + 1] = times[i] + dt;
+
+    //  Allocate local vols
+    matrix<T> lVol(spots.size(), times.size());
+
+    //  Maturity by maturity
+    for (j = 0; j < times.size(); ++j)
+    {
+        //  ATM
+        const double atmCall = convert<double>(ivs.call(spot, times[j]);
+        //  Standard deviation, approx. atm call * sqrt(2pi)
+        const double std = atmCall * 2.506628274631;
+
+        //  Skip spots below and above 3 std
+        size_t il = 0;
+        while (spots[il] < spot - 3 * std) ++il;
+        size_t ih = spots.size() - 1;
+        while (spots[ih] > spot + 3 * std) --ih;
+
+        //  Loop on spots
+        for (size_t i = il; i <= ih; ++i)
+        {
+            //  Dupire's formula
+            lVol[i][j] = sqrt(2.0 * ivs.cT(strikes[i], mat[j]) 
+                / ivs.cKK(strikes[i], mat[j]));
+        }
+
+        //  Extrapolate flat outside std
+        for (size_t i = 0; i < il - 1; ++i) 
+            lVol[i][j] = lVol[il][j];
+        for (size_t i = ih + 1; i < spots.size().rows(); ++i)
+            lVol[i][j] = lVol[ih - 1][j - j0];
+
+    }
+
+    return make_tuple(spots, times, lVol);
+}

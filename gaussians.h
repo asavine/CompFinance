@@ -5,6 +5,12 @@
 #include <algorithm>
 using namespace std;
 
+//  Normal density
+inline double normalDens(const double x)
+{
+    return x<-10.0 || 10.0<x ? 0.0 : exp(-0.5*x*x) / 2.506628274631;
+}
+
 //	Normal CDF (N in Black-Scholes)
 inline double normalCdf( const double x)
 {
@@ -92,3 +98,92 @@ inline void u2g(const vector<double>& u, vector<double>& g)
 {
     transform(u.begin(), u.end(), g.begin(), invNormalCdf);
 }
+
+//  Bachelier's formula and implied volatility
+
+inline double bachelier(
+    const double spot,
+    const double strike,
+    const double vol,
+    const double mat)
+{
+    const double std = vol * sqrt(mat);
+    if (std <= 0) return spot - strike;
+    const double d = (spot - strike) / std;
+    return (spot - strike) * normalCdf(d) + std * normalDens(d);
+}
+
+inline double bachelierIvol(
+    const double spot,
+    const double strike,
+    const double prem,
+    const double mat)
+    {
+    if (prem <= spot - strike) return 0.0;
+    double u = 0.5 * spot;
+    while (bachelier(spot, strike, u, mat) < prem) u *= 2;
+    double l = 0.05 * spot;
+    while (bachelier(spot, strike, l, mat) > prem) u /= 2;
+
+    while (u - l > 1.e-06)
+    {
+        const double m = 0.5 * (u + l);
+        if (bachelier(spot, strike, m, mat) > prem)
+        {
+            u = m;
+        }
+        else
+        {
+            l = m;
+        }
+    }
+
+    return 0.5 * (u + l);
+}
+
+inline double blackScholes(
+    const double spot,
+    const double strike,
+    const double vol,
+    const double mat)
+{
+    const double std = vol * sqrt(mat);
+    if (std <= 0) return spot - strike;
+    const double d2 = log(spot/strike) / std - 0.5 * std;
+    const double d1 = d2 + std;
+    return spot * normalCdf(d1) - strike * normalCdf(d2);
+}
+
+inline double merton(
+    const double spot,
+    const double strike,
+    const double vol,
+    const double mat,
+    const double intens,
+    const double meanJmp,
+    const double stdJmp)
+{
+    const double varJmp = stdJmp * stdJmp;
+    const double mv2 = meanJmp + 0.5 * varJmp;
+    const double comp = intens * (exp(mv2) - 1);
+    const double var = vol * vol;
+    const double intensT = intens * mat;
+
+    unsigned fact = 1;
+    double iT = 1;
+    const size_t cut = 10;
+    double result = 0.0;
+    for (size_t n = 0; n < cut; ++n)
+    {
+        const double s = spot*exp(n*mv2 - comp*mat);
+        const double v = sqrt(var + n * varJmp / mat);
+        const double prob = exp(-intensT) * iT / fact;
+        result += prob * blackScholes(s, strike, v, mat);
+        fact *= n + 1;
+        iT *= intensT;
+    }
+
+    return result;
+}
+
+

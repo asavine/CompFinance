@@ -277,7 +277,7 @@ mcSimulAAD(
     //  CAREFUL: simulation timeline must be on tape
     //  Hence moved here
     cMdl->init(prd.timeline());                        
-    //  Mark the tape straight after parameters
+    //  Mark the tape straight after initialization
     tape.mark();
     //
 
@@ -317,8 +317,10 @@ mcSimulAAD(
             }
 
         }
-        cMdl->generatePath(gaussVec, path);     //  Generate path, consume Gaussian vector
-        res[i] = prd.payoff(path);              //	Compute result
+        //  Generate path, consume Gaussian vector
+        cMdl->generatePath(gaussVec, path);     
+        //	Compute result
+        res[i] = prd.payoff(path);              
 
         //  AAD - 3
         //  Propagate adjoints
@@ -340,7 +342,7 @@ mcSimulAAD(
     //  Pathwise payoffs
     results.first.resize(nPath);
     //  Copy and convert
-    convert(res.begin(), res.end(), results.first.begin());
+    convertCollection(res.begin(), res.end(), results.first.begin());
     
     //  Model with accumulated adjoints
     results.second = move(cMdl);
@@ -569,10 +571,13 @@ mcParallelSimulAAD(
     //  Pathwise payoffs
     results.first.resize(nPath);
     //  Copy and convert
-    convert(res.begin(), res.end(), results.first.begin());
+    convertCollection(res.begin(), res.end(), results.first.begin());
 
     //  Model with accumulated adjoints
     results.second = move(cMdl[0]);
 
     return results;
 }
+
+
+

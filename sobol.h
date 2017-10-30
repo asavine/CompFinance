@@ -6,6 +6,22 @@
 #include "primitivepolynomials.h"
 #include "initializers.h"
 
+//	content:	generatees sobol sequences up to dimension 21200
+//	
+//				Joe and Kou directional numbers guarantee Sobol property A to be satisfied
+//
+//				Code is based on QuantLib 0.3.6 and routines from Jackel
+//	
+//				
+//
+//				References:
+//
+//				Jackel (2002): Monte-Carlo Methods in Finance, Wiley
+//
+//				Joe & Kuo (2003): Remark on Algorithm 659: Implementing Sobol's 
+//				Quasirandom Sequence Generator. ACM Transactions on Mathematical Software 29, 1, 43-57
+//
+
 #define ONEOVER2POW32 2.32830643653870E-10
 
 class Sobol : public RNG

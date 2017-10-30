@@ -557,13 +557,13 @@ inline To convert(const From from)
 }
 
 template<class It1, class It2>
-inline void convert(It1 srcBegin, It1 srcEnd, It2 destBegin)
+inline void convertCollection(It1 srcBegin, It1 srcEnd, It2 destBegin)
 {
+    using destType = remove_reference<decltype(*destBegin)>::type;
+
     while (srcBegin != srcEnd)
     {
-        *destBegin = convert<remove_reference<decltype(*destBegin)>::type>(*srcBegin);
-        ++srcBegin;
-        ++destBegin;
-    }
+        *destBegin++ = convert<destType>(*srcBegin++);
+    } 
 }
 

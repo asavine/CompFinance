@@ -296,7 +296,7 @@ public:
             : myVector(vec), myIdx(idx) {}
 
         //	Pre-increment (we do not provide post)
-        void operator++()
+        iterator& operator++()
         {
             ++myIdx;
             if (myIdx >= myVector->size()) 
@@ -304,10 +304,12 @@ public:
                 ++myVector;
                 myIdx = 0;
             }
+
+            return *this;
         }
 
         //	Pre-decrement 
-        void operator--()
+        iterator& operator--()
         {
             if (myIdx > 0) 
             {
@@ -318,6 +320,8 @@ public:
                 --myVector;
                 myIdx = myVector->size() - 1;
             }
+
+            return *this;
         }
 
         //	Access to the node by dereferencing
@@ -358,6 +362,14 @@ public:
     iterator end()
     {
         return iterator(myState.vector, myState.idx);
+    }
+
+    //  Iterator on last
+    iterator back()
+    {
+        iterator it = end();
+        --it;
+        return it;
     }
 
     //  Iterator on mark

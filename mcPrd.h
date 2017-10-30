@@ -69,6 +69,6 @@ public:
         }
 
         //  Payoff
-        return alive * max(path.back().spot - convert<T>(myStrike), convert<T>(0.0));
+        return alive * max(path.back().spot - myStrike, convert<T>(0.0));
     }
 };

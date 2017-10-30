@@ -12,13 +12,13 @@ inline double uocDupire(
     //  model parameters
     const double            spot,
     const vector<double>    spots,
-    const vector<double>    times,
+    const vector<Time>      times,
     const matrix<double>    vols,   //  spot major
     const double            maxDt,
     //  product parameters
     const double            strike,
     const double            barrier,
-    const double            maturity,
+    const Time              maturity,
     const double            monitorFreq,
     //  numerical parameters
     const bool              parallel,
@@ -43,26 +43,24 @@ inline double uocDupire(
         / results.size();
 }
 
-inline double uocDupireBumpRisk(
+//  Returns price, delta and matrix of vegas
+inline tuple<double, double, matrix<double>> uocDupireBumpRisk(
     //  model parameters
     const double            spot,
     const vector<double>    spots,
-    const vector<double>    times,
+    const vector<Time>      times,
     const matrix<double>    vols,   //  spot major
     const double            maxDt,
     //  product parameters
     const double            strike,
     const double            barrier,
-    const double            maturity,
+    const Time              maturity,
     const double            monitorFreq,
     //  numerical parameters
     const bool              parallel,
     const bool              useSobol,
     const int               numPath,
     const bool              antithetic,
-    //  risk outputs
-    double&                 delta,
-    matrix<double>&         vega,
     //  optionals
     const int               seed1 = 12345,
     const int               seed2 = 12346)
@@ -104,11 +102,11 @@ inline double uocDupireBumpRisk(
         antithetic,
         seed1,
         seed2);
-    delta = 1.e+08 * (v1 - v0);
+    const double delta = 1.e+08 * (v1 - v0);
 
     //  Vega
     matrix<double> newVols = vols;
-    vega.resize(vols.rows(), vols.cols());
+    matrix<double> vega(vols.rows(), vols.cols());
     for (auto i = 0; i < newVols.rows(); ++i)
     {
         for (auto j = 0; j < newVols.cols(); ++j)
@@ -135,29 +133,27 @@ inline double uocDupireBumpRisk(
         }
     }
 
-    return v0;
+    return make_tuple(v0, delta, vega);
 }
 
-inline double uocDupireAADRisk(
+//  Returns price, delta and matrix of vegas
+inline tuple<double, double, matrix<double>> uocDupireAADRisk(
     //  model parameters
     const double            spot,
     const vector<double>    spots,
-    const vector<double>    times,
+    const vector<Time>      times,
     const matrix<double>    vols,   //  spot major
     const double            maxDt,
     //  product parameters
     const double            strike,
     const double            barrier,
-    const double            maturity,
+    const Time              maturity,
     const double            monitorFreq,
     //  numerical parameters
     const bool              parallel,
     const bool              useSobol,
     const int               numPath,
     const bool              antithetic,
-    //  risk outputs
-    double&                 delta,
-    matrix<double>&         vega,
     //  optionals
     const int               seed1 = 12345,
     const int               seed2 = 12346)
@@ -165,7 +161,9 @@ inline double uocDupireAADRisk(
     //  Build model, product and rng
     Dupire<Number> model(spot, spots, times, vols, maxDt);
     UOC<Number> product(strike, barrier, maturity, monitorFreq);
-    unique_ptr<RNG> rng = useSobol ? unique_ptr<RNG>(new Sobol) : unique_ptr<RNG>(new mrg32k3a(seed1, seed2));
+    unique_ptr<RNG> rng = useSobol 
+        ? unique_ptr<RNG>(new Sobol) 
+        : unique_ptr<RNG>(new mrg32k3a(seed1, seed2));
 
     //  Simulate
 
@@ -175,16 +173,18 @@ inline double uocDupireAADRisk(
 
     //  Value
 
-    const double value = accumulate(results.first.begin(), results.first.end(), 0.0)
-        / numPath;
+    const double value = accumulate(results.first.begin(), 
+        results.first.end(), 
+        0.0)
+            / numPath;
 
     //  Risks
 
     //  Downcast the model, we know it is a Dupire
     Dupire<Number>& resMdl = *dynamic_cast<Dupire<Number>*>(results.second.get());
 
-    delta = resMdl.spot().adjoint();
-    vega.resize(resMdl.vols().rows(), resMdl.vols().cols());
+    double delta = resMdl.spot().adjoint();
+    matrix<double> vega(resMdl.vols().rows(), resMdl.vols().cols());
     transform(resMdl.vols().begin(), resMdl.vols().end(), vega.begin(),
         [](const Number& vol)
     {
@@ -198,5 +198,102 @@ inline double uocDupireAADRisk(
     Number::tape->clear();
 
     //  Return value
-    return value;
+    return make_tuple(value, delta, vega);
 }
+
+//  Returns price, delta and matrix of vegas
+inline tuple<double, double, matrix<double>> uocDupireCheckPointedRisk(
+    //  market parameters
+    const double            spot,
+    const vector<double>    strikes,
+    const vector<Time>      mats,
+    const matrix<double>    calls,   //  strike major
+    const double            maxDt,
+    //  product parameters
+    const double            strike,
+    const double            barrier,
+    const Time              maturity,
+    const double            monitorFreq,
+    //  numerical parameters
+    const bool              parallel,
+    const bool              useSobol,
+    const int               numPath,
+    const bool              antithetic,
+    //  optionals
+    const int               seed1 = 12345,
+    const int               seed2 = 12346)
+{
+    //  Start with a clean tape
+    auto* tape = Number::tape;
+    tape->rewind();
+
+    //  Calibrate the model
+    auto params = dupireCalib(spot, strikes, mats, calls);
+    const vector<double>& spots = get<0>(params);
+    const vector<Time>& times = get<1>(params);
+    const matrix<double>& lvols = get<2>(params);
+
+    //  Find delta and microbucket
+    auto mdlDerivs = uocDupireAADRisk(
+        spot,
+        spots,
+        times,
+        lvols,
+        maxDt,
+        strike,
+        barrier,
+        maturity,
+        monitorFreq,
+        parallel,
+        useSobol,
+        numPath,
+        antithetic,
+        seed1,
+        seed2);
+    const double value = get<0>(mdlDerivs);
+    const double modelDelta = get<1>(mdlDerivs);
+    const matrix<double>& microbucket = get<2>(mdlDerivs);
+
+    //  Clear tape
+    tape->rewind();
+
+    //  Convert market inputs to numbers, put on tape
+    Number nSpot(spot);
+    matrix<Number> nCalls(calls.rows(), calls.cols());
+    convertCollection(calls.begin(), calls.end(), nCalls.begin());
+
+    //  Calibrate again, in AAD mode, make tape
+    auto nParams = dupireCalib(nSpot, strikes, mats, nCalls);
+    matrix<Number>& nLvols = get<2>(nParams);
+
+    //  Seed tape
+    nSpot.adjoint() = modelDelta;
+    for (size_t i = 0; i < microbucket.rows(); ++i)
+    {
+        for (size_t j = 0; j < microbucket.cols(); ++j)
+        {
+            nLvols[i][j].adjoint() = microbucket[i][j];
+        }
+    }
+    
+    //  Propagate
+    Number::propagateAdjoints(tape->back(), tape->begin());
+
+    //  Pack results
+    double marketDelta = nSpot.adjoint();
+    matrix<double> superbucket(calls.rows(), calls.cols());
+    for (size_t i = 0; i < calls.rows(); ++i)
+    {
+        for (size_t j = 0; j < calls.cols(); ++j)
+        {
+            superbucket[i][j] = nCalls[i][j].adjoint();
+        }
+    }
+
+    //  Clear tape
+    tape->clear();
+
+    //  Return results
+    return make_tuple(value, marketDelta, superbucket);
+}    
+
