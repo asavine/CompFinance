@@ -3,83 +3,9 @@
 #include "matrix.h"
 #include "mcBase.h"
 #include "interp.h"
+#include "utility.h"
 
-//  Calibration helper
-static const struct CalibrationType {} calibrate;
-
-#define EPS 1.0e-08
-//  Utility for filling schedules
-inline void fillTimeline(
-    //  The original timeline
-    const vector<Time>&             original,
-    //  The maximum spacing allowed
-    const Time&                     maxDt,
-    //  The filled timeline
-    //      Has all original steps 
-    //      Plus additional ones so maxDt is not exceeded
-    //  Size in unknown to the caller, hence allocation occurs inside
-    vector<Time>&                   filled,
-    //  True if the point was on the original timeline
-    //  We use vector<int> because vector<bool> is broken in C++
-    vector<int>&                    common)
-{
-    //  Position on the start of the product timeline
-    auto it = original.begin();
-
-    //  Skip before today
-    while (it != original.end() && *it < systemTime) ++it;
-    if (it == original.end())
-        throw runtime_error
-        ("All dates on the timeline are in the past");
-
-    //  Clear
-    filled.clear();
-    common.clear();
-
-    //  Include today
-    filled.push_back(systemTime);
-
-    //  Is today on the product timeline?
-    if (*it == systemTime)
-    {
-        common.push_back(true);
-        //  Advance
-        ++it;
-    }
-    else
-    {
-        common.push_back(false);
-    }
-
-    //  Futures dates
-    while (it != original.end())
-    {
-        Time current = filled.back();
-        Time next = *it;
-        //  Must supplement?
-        if (next - current > maxDt)
-        {
-            //  Number of time steps to add
-            int addSteps = int((next - current) / maxDt - EPS) + 1;
-            //  Spacing between supplementary points
-            Time spacing = (next - current) / addSteps;
-            //  Add the steps
-            Time t = current + spacing;
-            while (t < next)
-            {
-                filled.push_back(t);
-                common.push_back(false);
-                t += spacing;
-            }
-        }
-        //  Push the next step on the product timeline and advance
-        filled.push_back(*it);
-        common.push_back(true);
-        ++it;
-    }
-}
-
-//  Model
+#include <iterator>
 
 template <class T>
 class Dupire : public Model<T>
@@ -156,17 +82,33 @@ public:
     void init(const vector<Time>& productTimeline) override
     {
         //  Fill from product timeline
-        fillTimeline(productTimeline, myMaxDt, myTimeline, myCommonSteps);
         
+        //  Do the fill
+        myTimeline = fillData<Time>(
+            productTimeline, // Original (product) timeline
+            myMaxDt, // Maximum space allowed
+            &vector<Time>(1, systemTime), // Include system time
+            0.002739726);  // Minimum distance = 1 day
+        
+        //  Mark steps on timeline that are on the product timeline
+        myCommonSteps.resize(myTimeline.size());
+        transform(myTimeline.begin(), myTimeline.end(), myCommonSteps.begin(), 
+            [&](const Time t)
+        {
+            return binary_search(productTimeline.begin(), productTimeline.end(), t);
+        });
+
+        //
+
         //  Allocate and compute the local volatilities
-        //      pre-interpolated in time
+        //      pre-interpolated in time and multiplied by sqrt(dt)
         myInterpVols.resize(myTimeline.size() - 1, mySpots.size());
         for (size_t i = 0; i < myTimeline.size() - 1; ++i)
         {
             const double sqrtdt = sqrt(myTimeline[i+1] - myTimeline[i]);
             for (size_t j = 0; j < mySpots.size(); ++j)
             {
-                myInterpVols[i][j] = sqrtdt * linterp(
+                myInterpVols[i][j] = sqrtdt * interp(
                     myTimes.begin(), 
                     myTimes.end(), 
                     myVols[j], 
@@ -199,8 +141,8 @@ public:
         //  Iterate through timeline
         for(size_t i=1; i<myTimeline.size(); ++i)
         {
-            //  Interpolate volatility
-            const T vol = linterp(
+            //  Interpolate volatility in spot
+            const T vol = interp(
                 mySpots.begin(), 
                 mySpots.end(), 
                 myInterpVols[i-1], 
@@ -254,65 +196,84 @@ public:
 
 #include "ivs.h"
 
+//  Calibrates one maturity
+//  Main calibration function below
+template <class IT, class T = double>
+inline void dupireCalibMaturity(
+    //  IVS we calibrate to
+    const IVS& ivs,
+    //  Maturity to calibrate
+    const Time maturity,
+    //  Spots for local vol
+    const vector<double> spots,
+    //  Results, by spot
+    //  With (random access) iterator, STL style
+    IT lVolsBegin,
+    //  Risk view
+    const RiskView<T>& riskView = RiskView<double>())
+{
+    //  Estimate ATM so we cut the grid 2 stdevs away to avoid instabilities
+    const double atmCall = convert<double>(ivs.call(ivs.spot(), maturity));
+    //  Standard deviation, approx. atm call * sqrt(2pi)
+    const double std = atmCall * 2.506628274631;
+
+    //  Skip spots below and above 2.5 std
+    int il = 0;
+    while (spots[il] < ivs.spot() - 2.5 * std) ++il;
+    int ih = spots.size() - 1;
+    while (spots[ih] > ivs.spot() + 2.5 * std) --ih;
+
+    //  Loop on spots
+    for (int i = il; i <= ih; ++i)
+    {
+        //  Dupire's formula
+        lVolsBegin[i] = ivs.localVol(spots[i], maturity, riskView);
+    }
+
+    //  Extrapolate flat outside std
+    for (int i = 0; i <= il - 1; ++i)
+        lVolsBegin[i] = lVolsBegin[il];
+    for (int i = ih + 1; i < spots.size(); ++i)
+        lVolsBegin[i] = lVolsBegin[ih - 1];
+}
+
 //  Returns spots, times and local vols
-template<class T>
+template<class T = double>
 inline tuple<vector<double>, vector<Time>, matrix<T>> 
     dupireCalib(
         //  The IVS we calibrate to
-        const IVS<T>& ivs,
+        const IVS& ivs,
         //  The local vol grid
-        const double& lowSpot,
-        const double& highSpot,
-        const size_t numSpots,
-        const Time& finalMat,
-        const size_t numTimes)
+        //  The spots to include
+        const vector<double>& inclSpots,
+        //  Maximum space between spots
+        const double maxDs,
+        //  The times to include, note NOT 0
+        const vector<Time>& inclTimes,
+        //  Maximum space between times
+        const double maxDt,
+        //  Risk view if required
+        //  omitted: T = double , no risk view
+        const RiskView<T>& riskView = RiskView<double>())
 {
     //  Spots and times
-    
-    const double spot = convert<double>(ivs.spot());
+    vector<double> spots = fillData(inclSpots, maxDs);
+    vector<Time> times = fillData(inclTimes, maxDt, &vector<Time>(1, maxDt));
 
-    vector<double> spots(numSpots + 1);
-    const double ds = (highSpot - lowSpot) / numSpots;
-    spots[0] = lowSpot;
-    for (size_t i = 0; i < numSpots; ++i) spots[i + 1] = spots[i] + ds;
-
-    vector<Time> times(numTimes);
-    const double dt = finalMat / numTimes;
-    times[0] = dt;
-    for (size_t i = 0; i < numTimes - 1; ++i) times[i + 1] = times[i] + dt;
-
-    //  Allocate local vols
-    matrix<T> lVol(spots.size(), times.size());
+    //  Allocate local vols, transposed maturity first
+    matrix<T> lVolsT(times.size(), spots.size());
 
     //  Maturity by maturity
-    for (j = 0; j < times.size(); ++j)
+    for (size_t j = 0; j < times.size(); ++j)
     {
-        //  ATM
-        const double atmCall = convert<double>(ivs.call(spot, times[j]);
-        //  Standard deviation, approx. atm call * sqrt(2pi)
-        const double std = atmCall * 2.506628274631;
-
-        //  Skip spots below and above 3 std
-        size_t il = 0;
-        while (spots[il] < spot - 3 * std) ++il;
-        size_t ih = spots.size() - 1;
-        while (spots[ih] > spot + 3 * std) --ih;
-
-        //  Loop on spots
-        for (size_t i = il; i <= ih; ++i)
-        {
-            //  Dupire's formula
-            lVol[i][j] = sqrt(2.0 * ivs.cT(strikes[i], mat[j]) 
-                / ivs.cKK(strikes[i], mat[j]));
-        }
-
-        //  Extrapolate flat outside std
-        for (size_t i = 0; i < il - 1; ++i) 
-            lVol[i][j] = lVol[il][j];
-        for (size_t i = ih + 1; i < spots.size().rows(); ++i)
-            lVol[i][j] = lVol[ih - 1][j - j0];
-
+        dupireCalibMaturity(
+            ivs, 
+            times[j], 
+            spots, 
+            lVolsT[j], 
+            riskView);
     }
 
-    return make_tuple(spots, times, lVol);
+    //  transpose is defined in matrix.h
+    return make_tuple(spots, times, transpose(lVolsT));
 }

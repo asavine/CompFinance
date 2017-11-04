@@ -161,7 +161,7 @@ public:
     //  This one leaves the adjoints untouched
     static void propagateMarkToStart()
     {
-        propagateAdjoints(tape->markIt(), tape->begin());
+        propagateAdjoints(--tape->markIt(), tape->begin());
     }
 
     //  Operator overloading
@@ -297,6 +297,8 @@ public:
         result.node<UnaryNode>()->argument = rhs.node();
         //  Eagerly compute derivatives
         result.node<UnaryNode>()->derivative = -lhs / rhs.value() / rhs.value();
+
+        return result;
     }
 
     Number& operator+=(const Number& arg)
@@ -344,11 +346,11 @@ public:
     }
 
     //  Unary +/-
-    Number operator-()
+    Number operator-() const
     {
         return 0.0 - *this;
     }
-    Number operator+()
+    Number operator+() const 
     {
         return *this;
     }

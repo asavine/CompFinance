@@ -300,6 +300,51 @@ extern "C" __declspec(dllexport)
 }
 
 extern "C" __declspec(dllexport)
+    inline double xLinterp2D(
+        FP12*               xs,
+        FP12*               ys,
+        FP12*               zs,
+        double              x0,
+        double              y0)
+{
+    vector<double> x;
+    {
+        size_t rows = xs->rows;
+        size_t cols = xs->columns;
+        double* numbers = xs->array;
+
+        x.resize(rows);
+        copy(numbers, numbers + rows, x.begin());
+    }
+
+    vector<double> y;
+    {
+        size_t rows = ys->rows;
+        size_t cols = ys->columns;
+        double* numbers = ys->array;
+
+        y.resize(cols);
+        copy(numbers, numbers + cols, y.begin());
+    }
+
+    matrix<double> z;
+    {
+        size_t rows = zs->rows;
+        size_t cols = zs->columns;
+        double* numbers = zs->array;
+
+        z.resize(rows, cols);
+        copy(numbers, numbers + rows * cols, z.begin());
+    }
+
+    //  Call 
+    return interp2D(x, y, z, x0, y0);
+}
+
+
+/*
+
+extern "C" __declspec(dllexport)
     inline FP12* xUocDupireSuperbucket(
         //  model parameters
         double              spot,
@@ -407,61 +452,60 @@ extern "C" __declspec(dllexport)
     // Return it
     return result;
 }
+*/
 
 extern "C" __declspec(dllexport)
-    inline FP12* xDupireCalib(
-        //  model parameters
-        double              spot,
-        FP12*               strikes,
-        FP12*               mats,
-        FP12*               calls)
+inline FP12* xDupireCalib(
+    //  model parameters
+    const double ivsType, //  0: Bach, 1: BS, 2: Merton
+    const double spot,
+    const double vol,
+    const double jmpIntens,
+    const double jmpAverage,
+    const double jmpStd,
+    //  Discretization
+    FP12* spots,
+    const double maxDs,
+    FP12* times,
+    const double maxDt)
 {
     //  Make sure the last input is given
-    if (calls->rows != strikes->rows || calls->columns != mats->columns) return 0;
+    if (maxDs == 0 || maxDt == 0) return 0;
 
     //  Unpack
-
-    vector<double> vstrikes;
+    vector<double> vspots;
     {
-        size_t rows = strikes->rows;
-        size_t cols = strikes->columns;
-        double* numbers = strikes->array;
+        size_t rows = spots->rows;
+        size_t cols = spots->columns;
+        double* numbers = spots->array;
 
-        vstrikes.resize(rows);
-        copy(numbers, numbers + rows, vstrikes.begin());
+        vspots.resize(rows*cols);
+        copy(numbers, numbers + rows*cols, vspots.begin());
     }
 
-    vector<double> vmats;
+    vector<double> vtimes;
     {
-        size_t rows = mats->rows;
-        size_t cols = mats->columns;
-        double* numbers = mats->array;
+        size_t rows = times->rows;
+        size_t cols = times->columns;
+        double* numbers = times->array;
 
-        vmats.resize(cols);
-        copy(numbers, numbers + cols, vmats.begin());
+        vtimes.resize(rows*cols);
+        copy(numbers, numbers + rows*cols, vtimes.begin());
     }
 
-    matrix<double> vcalls;
-    {
-        size_t rows = calls->rows;
-        size_t cols = calls->columns;
-        double* numbers = calls->array;
+    auto results = dupireCalib(vspots, maxDs, vtimes, maxDt,
+        ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
+        spot, vol, jmpIntens, jmpAverage, jmpStd);
 
-        vcalls.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vcalls.begin());
-    }
-
-    //  Call 
-    auto results = dupireCalib(spot, vstrikes, vmats, vcalls);
-    auto& spots = get<0>(results);
-    auto& times = get<1>(results);
-    auto& vols = get<2>(results);
+    auto& rspots = get<0>(results);
+    auto& rtimes = get<1>(results);
+    auto& rvols = get<2>(results);
 
     //  Build return
 
     // Allocate result
     // Calculate size
-    size_t resultRows = spots.size()+1, resultCols = times.size()+1, resultSize = resultRows * resultCols;
+    size_t resultRows = rspots.size() + 1, resultCols = rtimes.size() + 1, resultSize = resultRows * resultCols;
 
     // Return an error if size is 0
     if (resultSize <= 0) return nullptr;
@@ -480,16 +524,16 @@ extern "C" __declspec(dllexport)
     result->rows = resultRows;
     result->columns = resultCols;
     result->array[0] = 0.0;
-    for (size_t j = 0; j < times.size(); ++j)
+    for (size_t j = 0; j < rtimes.size(); ++j)
     {
-        result->array[j+1] = times[j];
+        result->array[j + 1] = rtimes[j];
     }
-    for (size_t i = 0; i < spots.size(); ++i)
+    for (size_t i = 0; i < rspots.size(); ++i)
     {
-        result->array[(i+1)*resultCols] = spots[i];
-        for (size_t j = 0; j < times.size(); ++j)
+        result->array[(i + 1)*resultCols] = rspots[i];
+        for (size_t j = 0; j < rtimes.size(); ++j)
         {
-            result->array[(i+1)*resultCols + j+1] = vols[i][j];
+            result->array[(i + 1)*resultCols + j + 1] = rvols[i][j];
         }
     }
 
@@ -498,100 +542,24 @@ extern "C" __declspec(dllexport)
 }
 
 extern "C" __declspec(dllexport)
-inline FP12* xDupireCalibFromModel(
+inline FP12* xDupireSuperbucket(
     //  model parameters
-    const double model, //  0: Bach, 1: BS, 2: Merton
+    const double ivsType, //  0: Bach, 1: BS, 2: Merton
     const double spot,
     const double vol,
     const double jmpIntens,
     const double jmpAverage,
     const double jmpStd,
-    //  Discretization
-    const double lowStrike,
-    const double highStrike,
-    const double numStrikes,
-    const double lowMat,
-    const double highMat,
-    const double numMats)
-{
-    //  Make sure the last input is given
-    if (numMats == 0 || numStrikes == 0) return 0;
-
-    //  Unpack
-    const size_t nStrikes = static_cast<size_t>(numStrikes);
-    const size_t nMats = static_cast<size_t>(numMats);
-
-    //  Call 
-    auto calls = model < 0.5
-        ? bachelierCalls(spot, vol, lowStrike, highStrike, nStrikes, lowMat, highMat, nMats)
-        : model < 1.5
-        ? blackScholesCalls(spot, vol, lowStrike, highStrike, nStrikes, lowMat, highMat, nMats)
-        : mertonCalls(spot, vol, jmpIntens, jmpAverage, jmpStd, lowStrike, highStrike, nStrikes, lowMat, highMat, nMats);
-
-    auto results = dupireCalib(spot, get<0>(calls), get<1>(calls), get<2>(calls));
-
-    auto& spots = get<0>(results);
-    auto& times = get<1>(results);
-    auto& vols = get<2>(results);
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = spots.size() + 1, resultCols = times.size() + 1, resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    result->array[0] = 0.0;
-    for (size_t j = 0; j < times.size(); ++j)
-    {
-        result->array[j + 1] = times[j];
-    }
-    for (size_t i = 0; i < spots.size(); ++i)
-    {
-        result->array[(i + 1)*resultCols] = spots[i];
-        for (size_t j = 0; j < times.size(); ++j)
-        {
-            result->array[(i + 1)*resultCols + j + 1] = vols[i][j];
-        }
-    }
-
-    // Return it
-    return result;
-}
-
-extern "C" __declspec(dllexport)
-inline FP12* xDupireSuperbucketFromModel(
-    //  model parameters
-    const double model, //  0: Bach, 1: BS, 2: Merton
-    const double spot,
-    const double vol,
-    const double jmpIntens,
-    const double jmpAverage,
-    const double jmpStd,
-    //  Discretization
-    const double lowStrike,
-    const double highStrike,
-    const double numStrikes,
-    const double lowMat,
-    const double highMat,
-    const double numMats,
+    //  risk view
+    FP12* strikes,
+    FP12* mats,
+    //  calibration
+    FP12* spots,
+    const double maxDs,
+    FP12* times,
+    const double maxDtVol,
     //  MC
-    double              maxDt,
+    double              maxDtSimul,
     //  product parameters
     double              strike,
     double              barrier,
@@ -607,49 +575,83 @@ inline FP12* xDupireSuperbucketFromModel(
 
 {
     //  Make sure the last input is given
-    if (numMats == 0 || numStrikes == 0) return 0;
     if (numPath <= 0) return 0;
 
     //  Unpack
-    const size_t nStrikes = static_cast<size_t>(numStrikes);
-    const size_t nMats = static_cast<size_t>(numMats);
+    vector<double> vstrikes;
+    {
+        size_t rows = strikes->rows;
+        size_t cols = strikes->columns;
+        double* numbers = strikes->array;
 
-    //  Call 
-    auto market = model < 0.5
-        ? bachelierCalls(spot, vol, lowStrike, highStrike, nStrikes, lowMat, highMat, nMats)
-        : model < 1.5
-        ? blackScholesCalls(spot, vol, lowStrike, highStrike, nStrikes, lowMat, highMat, nMats)
-        : mertonCalls(spot, vol, jmpIntens, jmpAverage, jmpStd, lowStrike, highStrike, nStrikes, lowMat, highMat, nMats);
+        vstrikes.resize(rows*cols);
+        copy(numbers, numbers + rows*cols, vstrikes.begin());
+    }
 
-    auto& strikes = get<0>(market);
-    auto& mats = get<1>(market);
-    auto& calls = get<2>(market);
+    vector<double> vmats;
+    {
+        size_t rows = mats->rows;
+        size_t cols = mats->columns;
+        double* numbers = mats->array;
 
-    auto results = uocDupireCheckPointedRisk(
+        vmats.resize(rows*cols);
+        copy(numbers, numbers + rows*cols, vmats.begin());
+    }
+
+    vector<double> vspots;
+    {
+        size_t rows = spots->rows;
+        size_t cols = spots->columns;
+        double* numbers = spots->array;
+
+        vspots.resize(rows*cols);
+        copy(numbers, numbers + rows*cols, vspots.begin());
+    }
+
+    vector<double> vtimes;
+    {
+        size_t rows = times->rows;
+        size_t cols = times->columns;
+        double* numbers = times->array;
+
+        vtimes.resize(rows*cols);
+        copy(numbers, numbers + rows*cols, vtimes.begin());
+    }
+
+    auto results = dupireSuperbucket(
         spot,
-        strikes,
-        mats,
-        calls,
-        maxDt,
-        strike, 
-        barrier, 
-        maturity, 
-        monitorFreq, 
+        strike,
+        barrier,
+        maturity,
+        monitorFreq,
+        maxDtSimul,
         parallel>0,
-        useSobol > 0, 
-        static_cast<int>(numPath), useAnti > 0,
+        useSobol > 0,
+        static_cast<int>(numPath), 
+        useAnti > 0,
+        vspots,
+        maxDs,
+        vtimes,
+        maxDtVol,
+        vstrikes,
+        vmats, 
+        ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
+        vol,
+        jmpIntens,
+        jmpAverage,
+        jmpStd,
         static_cast<int>(seed1), 
         static_cast<int>(seed2));
 
     double v = get<0>(results);
     double delta = get<1>(results);
-    matrix<double>& vega = get<2>(results);
+    matrix<double>& vega = get<4>(results);
 
     //  Build return
 
     // Allocate result
     // Calculate size
-    size_t resultRows = vega.rows() + 2, resultCols = vega.cols(), resultSize = resultRows * resultCols;
+    size_t resultRows = vega.rows() + 3, resultCols = vega.cols() + 1, resultSize = resultRows * resultCols;
 
     // Return an error if size is 0
     if (resultSize <= 0) return nullptr;
@@ -670,9 +672,17 @@ inline FP12* xDupireSuperbucketFromModel(
     for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
     result->array[0] = v;
     result->array[resultCols] = delta;
+    for (size_t j = 0; j < vega.cols(); ++j)
+    {
+        result->array[2*resultCols + j + 1] = vmats[j];
+    }
+    for (size_t i = 0; i < vega.rows(); ++i)
+    {
+        result->array[(3 + i) * resultCols] = vstrikes[i];
+    }
     for (size_t i = 0; i < vega.rows(); ++i) for (size_t j = 0; j < vega.cols(); ++j)
     {
-        result->array[(i + 2)*resultCols + j] = vega[i][j];
+        result->array[(3 + i)*resultCols + j + 1] = vega[i][j];
     }
 
     // Return it
@@ -706,6 +716,19 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 		(LPXLOPER12)TempStr12(L"number 1, number 2"));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xLinterp2D"),
+        (LPXLOPER12)TempStr12(L"BK%K%K%BB"),
+        (LPXLOPER12)TempStr12(L"xLinterp2D"),
+        (LPXLOPER12)TempStr12(L"xs, ys, zs, x0, y0"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Linear interpolation"),
+        (LPXLOPER12)TempStr12(L"number 1, number 2"));
+
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xUocDupireBump"),
         (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBBB"),
         (LPXLOPER12)TempStr12(L"xUocDupireBump"),
@@ -730,10 +753,10 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"number 1, number 2"));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xDupireSuperbucketFromModel"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBBBBBBBBBBBBBBBBBB"),
-        (LPXLOPER12)TempStr12(L"xDupireSuperbucketFromModel"),
-        (LPXLOPER12)TempStr12(L"model, spot, vol, jumpIntensity, jumpAverage, jumpStd, lowStrike, highStrike, numStrikes, lowMat, highMat, numMats, maxDt, K, B, T, freq, useSobol, useAnti, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
+        (LPXLOPER12)TempStr12(L"K%BBBBBBK%K%K%BK%BBBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
+        (LPXLOPER12)TempStr12(L"ivs, spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, K, B, T, Bfreq, sobol, anti, s1, s2, numPth, parallel"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -753,7 +776,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"Computes the risk of an up and out call in Dupire"),
         (LPXLOPER12)TempStr12(L"number 1, number 2"));
 
-
+/*
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireCalib"),
         (LPXLOPER12)TempStr12(L"K%BK%K%K%"),
@@ -766,11 +789,13 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"Calibrates Dupire"),
         (LPXLOPER12)TempStr12(L"number 1, number 2"));
 
+        */
+
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xDupireCalibFromModel"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBBBBBBB"),
-        (LPXLOPER12)TempStr12(L"xDupireCalibFromModel"),
-        (LPXLOPER12)TempStr12(L"model, spot, vol, jumpIntensity, jumpAverage, jumpStd, lowStrike, highStrike, numStrikes, lowMat, highMat, numMats"),
+        (LPXLOPER12)TempStr12(L"xDupireCalib"),
+        (LPXLOPER12)TempStr12(L"K%BBBBBBK%BK%B"),
+        (LPXLOPER12)TempStr12(L"xDupireCalib"),
+        (LPXLOPER12)TempStr12(L"type, spot, vol, jumpIntensity, jumpAverage, jumpStd, spots, maxds, times, mxdt"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

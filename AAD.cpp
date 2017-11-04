@@ -82,3 +82,12 @@ inline pair<double, vector<double>> checkPoint(const vector<double>& X)
 
     return results;
 }
+
+#ifdef _DEBUG
+
+bool Node::checkTape(Node* argNode, Node* thisNode)
+{
+    return Number::tape->isOnTape(argNode, thisNode);
+}
+
+#endif

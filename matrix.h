@@ -77,6 +77,7 @@ public:
     //  So we can call matrix [i][j]
     T* operator[] (const size_t row) { return &myVector[row*myCols]; }
     const T* operator[] (const size_t row) const { return &myVector[row*myCols]; }
+    bool empty() const { return myVector.empty(); }
 
     //  Iterators
     typedef typename vector<T>::iterator iterator;
@@ -86,3 +87,18 @@ public:
     const_iterator begin() const { return myVector.begin(); }
     const_iterator end() const { return myVector.end(); }
 };
+
+template <class T>
+inline matrix<T> transpose(const matrix<T>& mat)
+{
+    matrix<T> res(mat.cols(), mat.rows());
+    for (size_t i = 0; i < res.rows(); ++i)
+    {
+        for (size_t j = 0; j < res.cols(); ++j)
+        {
+            res[i][j] = mat[j][i];
+        }
+    }
+
+    return res;
+}

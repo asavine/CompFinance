@@ -5,19 +5,26 @@
 #include <algorithm>
 using namespace std;
 
+#define EPS 1.0e-08
+
+//  Gaussian functions, including Bachelier, BS and Merton
+//  Templated as required
+
 //  Normal density
-inline double normalDens(const double x)
+template<class T>
+inline T normalDens(const T x)
 {
-    return x<-10.0 || 10.0<x ? 0.0 : exp(-0.5*x*x) / 2.506628274631;
+    return x<-10.0 || 10.0<x ? T(0.0) : exp(-0.5*x*x) / 2.506628274631;
 }
 
 //	Normal CDF (N in Black-Scholes)
-inline double normalCdf( const double x)
+template<class T>
+inline T normalCdf( const T x)
 {
 	//	checks
-	if (x<-10.0) return 0.0;
-	if (x>10.0) return 1.0;
-	if (x<0.0) return 1.0 - normalCdf(-x);
+	if (x < -10.0) return T(0.0);
+	if (x > 10.0) return T(1.0);
+    if (x < 0.0) return 1.0 - normalCdf(-x);
 
 	//  calc pol 
 
@@ -30,19 +37,20 @@ inline double normalCdf( const double x)
 	static const double b5 = 1.330274429;
 
 	//	transform
-	double t = 1.0 / (1.0 + p*x);
+	const T t = 1.0 / (1.0 + p*x);
 
 	//	finally pol
-	double pol = t*(b1 + t*(b2 + t*(b3 + t*(b4 + t*b5))));
+    const T pol = t*(b1 + t*(b2 + t*(b3 + t*(b4 + t*b5))));
 
 	//	calc pdf
-	double pdf = x<-10.0 || 10.0<x ? 0.0 : exp(-0.5*x*x) / 2.506628274631; // sqrt (2 * pi())
+    const T pdf = x<-10.0 || 10.0<x ? T(0.0) : exp(-0.5*x*x) / 2.506628274631; // sqrt (2 * pi())
 
 	//	return cdf
 	return 1.0 - pdf * pol;
 }
 
 //	Inverse CDF (for generation of Gaussians out of Uniforms)
+//  Untemplated
 inline double invNormalCdf( const double p)
 {
 	//	to ensure symmetry
@@ -93,91 +101,123 @@ inline double invNormalCdf( const double p)
 	return sup? r: -r;
 }
 
-//  turn a uniform vector into a gaussian vector
-inline void u2g(const vector<double>& u, vector<double>& g)
+//  Bachelier's formula and implied volatility
+template<class T, class U, class V, class W>
+inline T bachelier(
+    const U spot,
+    const V strike,
+    const T vol,
+    const W mat)
 {
-    transform(u.begin(), u.end(), g.begin(), invNormalCdf);
+    const auto std = vol * sqrt(mat);
+    if (std < EPS) return max( T(0.0), T(spot - strike));
+    const auto d = (spot - strike) / std;
+    return (spot - strike) * normalCdf(d) + std * normalDens(d);
 }
 
-//  Bachelier's formula and implied volatility
-
-inline double bachelier(
+//  Vega
+inline double bachelierVega(
     const double spot,
     const double strike,
     const double vol,
     const double mat)
 {
     const double std = vol * sqrt(mat);
-    if (std <= 0) return spot - strike;
+    if (std < EPS) return 0.0;
     const double d = (spot - strike) / std;
-    return (spot - strike) * normalCdf(d) + std * normalDens(d);
+    return sqrt(mat) * normalDens(d);
 }
 
-inline double bachelierIvol(
+//  BS
+template<class T, class U, class V, class W>
+inline T blackScholes(
+    const U spot,
+    const V strike,
+    const T vol,
+    const W mat)
+{
+    const auto std = vol * sqrt(mat);
+    if (std <= EPS) return max(T(0.0), T(spot - strike));
+    const auto d2 = log(spot/strike) / std - 0.5 * std;
+    const auto d1 = d2 + std;
+    return spot * normalCdf(d1) - strike * normalCdf(d2);
+}
+
+//  Implied vol, untemplated
+inline double blackScholesIvol(
     const double spot,
     const double strike,
     const double prem,
     const double mat)
-    {
-    if (prem <= spot - strike) return 0.0;
-    double u = 0.5 * spot;
-    while (bachelier(spot, strike, u, mat) < prem) u *= 2;
-    double l = 0.05 * spot;
-    while (bachelier(spot, strike, l, mat) > prem) u /= 2;
+{
+    if (prem <= max(0.0, spot - strike) + EPS) return 0.0;
+        
+    double p, pu, pl;
+    double u = 0.5;
+    while (blackScholes(spot, strike, u, mat) < prem) u *= 2;
+    double l = 0.05;
+    while (blackScholes(spot, strike, l, mat) > prem) l /= 2;
+    pu = blackScholes(spot, strike, u, mat);
+    blackScholes(spot, strike, l, mat);
 
-    while (u - l > 1.e-06)
+    while (u - l > 1.e-12)
     {
         const double m = 0.5 * (u + l);
-        if (bachelier(spot, strike, m, mat) > prem)
+        p = blackScholes(spot, strike, m, mat);
+        if (p > prem)
         {
             u = m;
+            pu = p;
         }
         else
         {
             l = m;
+            pl = p;
         }
     }
 
-    return 0.5 * (u + l);
+    return l + (prem - pl) / (pu - pl) * (u - l);
 }
 
-inline double blackScholes(
+//  Vega
+inline double blackScholesVega(
     const double spot,
     const double strike,
     const double vol,
     const double mat)
 {
-    const double std = vol * sqrt(mat);
-    if (std <= 0) return spot - strike;
-    const double d2 = log(spot/strike) / std - 0.5 * std;
-    const double d1 = d2 + std;
-    return spot * normalCdf(d1) - strike * normalCdf(d2);
+    const double smat = sqrt(mat), std = vol * smat;
+    if (std < EPS) return 0.0;
+    const double d2 = log(spot / strike) / std - 0.5 * std;
+    return strike * smat * normalDens(d2);
 }
 
-inline double merton(
-    const double spot,
-    const double strike,
-    const double vol,
-    const double mat,
-    const double intens,
-    const double meanJmp,
-    const double stdJmp)
+//  Merton
+template<class T, class U, class V, class W, class X>
+inline T merton(
+    const U spot,
+    const V strike,
+    const T vol,
+    const W mat,
+    const X intens,
+    const X meanJmp,
+    const X stdJmp)
 {
-    const double varJmp = stdJmp * stdJmp;
-    const double mv2 = meanJmp + 0.5 * varJmp;
-    const double comp = intens * (exp(mv2) - 1);
-    const double var = vol * vol;
-    const double intensT = intens * mat;
+    const auto varJmp = stdJmp * stdJmp;
+    const auto mv2 = meanJmp + 0.5 * varJmp;
+    const auto comp = intens * (exp(mv2) - 1);
+    const auto var = vol * vol;
+    const auto intensT = intens * mat;
 
     unsigned fact = 1;
-    double iT = 1;
+    X iT = 1.0;
     const size_t cut = 10;
-    double result = 0.0;
+    T result = 0.0;
     for (size_t n = 0; n < cut; ++n)
     {
-        const double s = spot*exp(n*mv2 - comp*mat);
-        const double v = sqrt(var + n * varJmp / mat);
-        const double prob = exp(-intensT) * iT / fact;
+        const auto s = spot*exp(n*mv2 - comp*mat);
+        const auto v = sqrt(var + n * varJmp / mat);
+        const auto prob = exp(-intensT) * iT / fact;
         result += prob * blackScholes(s, strike, v, mat);
         fact *= n + 1;
         iT *= intensT;
@@ -185,5 +225,3 @@ inline double merton(
 
     return result;
 }
-
-

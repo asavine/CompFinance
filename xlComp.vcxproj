@@ -129,6 +129,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <StructMemberAlignment>16Bytes</StructMemberAlignment>
+      <AdditionalOptions>/Zo %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -184,6 +185,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="threadPool.h" />
+    <ClInclude Include="utility.h" />
     <ClInclude Include="xlcall.h" />
   </ItemGroup>
   <ItemGroup>

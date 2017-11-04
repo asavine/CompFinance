@@ -4,185 +4,171 @@
 #include "matrix.h"
 #include "gaussians.h"
 
-
-template<class T>
-class IVS
+//  Risk view
+template <class T>
+class RiskView
 {
-    //  To avoid refer a linear market
-    T mySpot;
+    bool myEmpty;
 
-    //  Raw call prices
-    virtual double callRaw(const double strike, const Time mat) const = 0;
-
-    //  Risk grid
-    vector<double> myRiskStrikes;
-    vector<Time> myRiskMats;
-    matrix<T> myRiskSpreads;
-    //  ij = applies to strikes between Ki-1 and Ki
-    //  and mats between Tj-1 and Tj
-
-    T riskSpread(const double strike, const Time mat)
-    {
-        size_t i0;
-        auto strIt = lower_bound(myRiskStrikes.begin(), myRiskStrikes.end(), strike);
-        if (strIt == myRiskStrikes.end())
-        {
-            i0 = myRiskStrikes.size();
-        }
-        else
-        {
-            i0 = distance(myRiskStrikes.begin(), strIt);
-        }
-
-        size_t j0;
-        auto matIt = lower_bound(myRiskMats.begin(), myRiskMats.end(), mat);
-        if (matIt == myRiskMats.end())
-        {
-            j0 = myRiskMats.size();
-        }
-        else
-        {
-            j0 = distance(myRiskMats.begin(), matIt);
-        }
-
-        return myRiskSpreads(i0, j0);
-    }
+    vector<double> myStrikes;
+    vector<Time> myMats;
+    matrix<T> mySpreads;
 
 public:
 
-    IVS(const T spot) : mySpot(spot) {}
+    //  Default constructor, empty view
+    RiskView() : myEmpty(true) {}
 
-    T spot() const
+    //  Intializes risk view AND put on tape
+    RiskView(const vector<double>& strikes, const vector<Time>& mats) :
+        myEmpty(false), myStrikes(strikes), myMats(mats), mySpreads(strikes.size(), mats.size())
+    {
+        for (auto& spr : mySpreads) spr = convert<T>(0.0);
+    }
+
+    //  Get spread
+    T spread(const double strike, const Time mat) const
+    {
+        return myEmpty
+            ? convert<T>(0.0) 
+            : interp2D(myStrikes, myMats, mySpreads, strike, mat, true);
+    }
+
+    //  Accessors by const ref
+    bool empty() const { return myEmpty; }
+    size_t rows() const { return myStrikes.size(); }
+    size_t cols() const { return myMats.size(); }
+    const vector<double>& strikes() const { return myStrikes; }
+    const vector<Time>& mats() const { return myMats; }
+    const matrix<T>& risks() const { return mySpreads; }
+
+    //  Iterators
+    typedef typename matrix<T>::iterator iterator;
+    typedef typename matrix<T>::const_iterator const_iterator;
+    iterator begin() { return mySpreads.begin(); }
+    iterator end() { return mySpreads.end(); }
+    const_iterator begin() const { return mySpreads.begin(); }
+    const_iterator end() const { return mySpreads.end(); }
+};
+
+class IVS
+{
+    //  To avoid refer a linear market
+    double mySpot;
+
+public:
+
+    IVS(const double spot) : mySpot(spot) {}
+
+    //  Read access to spot
+    double spot() const
     {
         return mySpot;
     }
 
-    const tuple<const vector<double>&, const vector<Time>&, const matrix<double>&>
-        riskSpreads() const
+    //  Raw implied vol
+    virtual double impliedVol(const double strike, const Time mat) const = 0;
+
+    //  Call price
+    template<class T = double>
+    T call(
+        const double strike, 
+        const Time mat, 
+        const RiskView<T>& risk = RiskView<double>()) const
     {
-        return make_tuple(myRiskStrikes, myRiskMats, myRiskSpreads);
+        return blackScholes(
+            mySpot,
+            strike,
+            impliedVol(strike, mat) + risk.spread(strike, mat),
+            mat);
     }
 
-    T call(const double strike, const double mat) const
+    //  Local vol, dupire's formula
+    template<class T = double>
+    T localVol(
+        const double strike,
+        const double mat,
+        const RiskView<T>& risk = RiskView<double>()) const
     {
-        return convert<T>(callraw(strike, mat)) + riskSpread(strike, mat);
-    }
+        //  Derivative to time
+        const T c00 = call(strike, mat, risk);
+        const T c01 = call(strike, mat - 1.0e-04, risk);
+        const T c02 = call(strike, mat + 1.0e-04, risk);
+        const T ct = (c02 - c01) * 0.5e04;
 
-    //  dC / dT
-    T cT(const double strike, const double mat) const
-    {
-        const double t1 = max(0.0, mat - 0.002739726);   //  1 day
-        const double t2 = 0.0, mat + 0.002739726;
-        const T c1 = call(strike, t1), c2 = call(strike, t2);
-        return (c2 - c1) / (t2 - t1);
-    }
-
-    //  d2C / dK2
-    T cKK(const double strike, const double mat) const
-    {
-        const double k0 = strike;
-        const double k1 = strike - 1.e-04;
-        const double k2 = strike + 1.e-04;
-
-        const T c0 = call(k0 , mat), c1 = call(k1, mat), c2 = call(k2, mat);
-
-        const double dsu = k2 - k0;
-        const double dsd = k0 - k1;
-
-        const T dcu = c2 - c0;
-        const T dcd = c0 - c1;
-
-        return 2.0 * (dsd * dcu - dsu * dcd) / (dsu * dsd * (dsu + dsd));
-    }
-
-    void setRiskGrid(const vector<double>& strikes, const vector<Time>& mats)
-    {
-        myRiskStrikes.resize(max(1, strikes.size() - 1));
-        myRiskMats.resize(max(1, mats.size() - 1));
-
-        if (strikes.size() == 1)
-        {
-            myRiskStrikes[0] = strikes[0];
-        }
-        else
-        {
-            for (size_t i = 0; i < strikes.size() - 1; ++i)
-            {
-                myRiskStrikes[i] = 0.5 * (strikes[i] + strikes[i + 1]);
-            }
-        }
-
-        if (mats.size() == 1)
-        {
-            myRiskMats[0] = mats[0];
-        }
-        else
-        {
-            for (size_t i = 0; i < mats.size() - 1; ++i)
-            {
-                myRiskMats[i] = 0.5 * (mats[i] + mats[i + 1]);
-            }
-        }
-
-        myRiskSpreads.resize(strikes.size(), mats.size());
-        for (auto& spr : myRiskSpreads) spr = convert<T>(0.0);
+        //  Second derivative to strike = density
+        const T c10 = call(strike - 1.0e-04, mat, risk);
+        const T c20 = call(strike + 1.0e-04, mat, risk);
+        const T ckk = (c10 + c20 - 2.0 * c00) * 1.0e08;
+        
+        //  Dupire's formula
+        return sqrt(2.0 * ct / ckk);
     }
 
     virtual ~IVS() {}
 };
 
-template <class T>
-class BachelierIVS : public IVS<T>
-{
-    double mySpot, myVol;
+//  Concrete IVS just override (raw) call prices
 
-    double callRaw(const double strike, const Time mat) const override
-    {
-        return bachelier(mySpot, strike, myVol, mat);
-    }
+class BachelierIVS : public IVS
+{
+    double myBachVol;
 
 public:
 
-    BachelierIVS(const T spot, const T vol)
-        : IVS(spot), mySpot(convert<double>(spot)), myVol(convert<double>(vol)) {}
+    BachelierIVS(const double spot, const double logVol)
+        : IVS(spot), myBachVol(logVol * spot) {}
+
+    double impliedVol(const double strike, const Time mat) const override
+    {
+        const double call = bachelier(spot(), strike, myBachVol, mat);
+        return blackScholesIvol(spot(), strike, call, mat);
+    }
 };
 
-template <class T>
-class BlackScholesIVS : public IVS<T>
+class BlackScholesIVS : public IVS
 {
-    double mySpot, myVol;
-
-    double callRaw(const double strike, const Time mat) const override
-    {
-        return blackScholes(mySpot, strike, myVol, mat);
-    }
+    double myVol;
 
 public:
 
-    BlackScholesIVS(const T spot, const T vol)
-        : IVS(spot), mySpot(convert<double>(spot)), myVol(convert<double>(vol)) {}
+    BlackScholesIVS(const double spot, const double vol)
+        : IVS(spot), myVol(vol) {}
+
+    double impliedVol(const double strike, const Time mat) const override
+    {
+        return myVol;
+    }
 };
 
-template <class T>
-class MertonIVS : public IVS<T>
+class MertonIVS : public IVS
 {
-    double mySpot, myVol;
+    double myVol;
     double myIntensity, myAverageJmp, myJmpStd;
 
-    double callRaw(const double strike, const Time mat) const override
-    {
-        return merton(mySpot, strike, myVol, mat, myIntensity, myAverageJmp, myJmpStd);
-    }
-
 public:
 
-    MertonIVS(const T spot, const T vol, const T intens, const T aveJmp, const T stdJmp)
+    MertonIVS(const double spot, const double vol, 
+        const double intens, const double aveJmp, const double stdJmp)
         : IVS(spot), 
-        mySpot(convert<double>(spot)), 
-        myVol(convert<double>(vol)),
-        myVol(convert<double>(intens)),
-        myVol(convert<double>(aveJmp)),
-        myVol(convert<double>(stdJmp)),
+        myVol(vol),
+        myIntensity(intens),
+        myAverageJmp(aveJmp),
+        myJmpStd(stdJmp)
     {}
-};
 
+    double impliedVol(const double strike, const Time mat) const override
+    {
+        const double call
+            = merton(
+                spot(),
+                strike,
+                myVol,
+                mat,
+                myIntensity,
+                myAverageJmp,
+                myJmpStd);
+
+        return blackScholesIvol(spot(), strike, call, mat);
+    }
+};
