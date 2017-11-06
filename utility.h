@@ -2,41 +2,42 @@
 
 #define EPS 1.0e-08
 //  Utility for filling data
-template<class T>
-//  Returns filled vector 
+template<class CONT, class T, class IT = CONT::iterator>
+//  Returns filled container 
 //      has all original points
 //      plus additional ones if requested
 //      plus additional ones so maxDx is not exceeded
-//  Original vector and addPOints must be sorted
-//  Returned vector is sorted
-inline vector<T>
+//  Original container and addPOints must be sorted
+//  Returned container is sorted
+inline CONT
 fillData(
-    //  The original data
-    const vector<T>&                original,
+    //  The original data, sorted
+    const CONT&                     original,
     //  The maximum spacing allowed
     const T&                        maxDx,
-    //  Specific points to add or nullptr if none
-    const vector<T>*                addPoints = nullptr,
+    //  Specific points to add, by iterator, sorted
+    IT                              addBegin = IT(),
+    IT                              addEnd = IT(),
     //  Minimum distance for equality
     const T&                        minDx = T(0.0))
 {
     //  Results
-    vector<T> filled;
+    CONT filled;
 
     //  Add points?
-    vector<T> added;
-    if (addPoints)
+    CONT added;
+    const size_t addPoints = distance(addBegin, addEnd);
+    if (addPoints > 0)
     {
-        added.reserve(original.size() + addPoints->size());
         set_union(
             original.begin(),
             original.end(),
-            addPoints->begin(),
-            addPoints->end(),
+            addBegin,
+            addEnd,
             back_inserter(added),
             [minDx](const T x, const T y) { return x < y - minDx; });
     }
-    const vector<T>& sequence = addPoints ? added : original;
+    const CONT& sequence = addPoints > 0 ? added : original;
 
     //  Position on the start, add it
     auto it = sequence.begin();

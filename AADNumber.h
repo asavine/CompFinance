@@ -90,15 +90,6 @@ public:
         return myNode->adjoint;
     }
 
-/*
-    //  This may be dangerous, 
-    //  but necessary for templated code to compile
-    operator double() const
-    {
-        return myValue;
-    }
-*/
-
     //  Propagation
 
     //  Reset all adjoints on the tape
@@ -158,7 +149,8 @@ public:
         propagateAdjoints(tape->markIt(), reset);
     }
 
-    //  This one leaves the adjoints untouched
+    //  This one only propagates
+    //  Note: propagation starts at mark - 1
     static void propagateMarkToStart()
     {
         propagateAdjoints(--tape->markIt(), tape->begin());

@@ -395,23 +395,4 @@ public:
 
         return end();
     }
-
-#ifdef _DEBUG
-
-    bool isOnTape(Node* argNode, Node* thisNode) 
-    {
-        auto thisIt = find(thisNode);
-        if (thisIt == end()) return false;
-        if (thisIt == begin()) return false;
-        --thisIt;
-
-        for (auto it = thisIt; it != begin(); --it)
-        {
-            if (&*it == argNode) return true;
-        }
-        if (&*begin() == argNode) return true;
-        return false;
-    }
-
-#endif 
 };

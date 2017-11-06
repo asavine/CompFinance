@@ -84,10 +84,11 @@ public:
         //  Fill from product timeline
         
         //  Do the fill
-        myTimeline = fillData<Time>(
+        myTimeline = fillData(
             productTimeline, // Original (product) timeline
             myMaxDt, // Maximum space allowed
-            &vector<Time>(1, systemTime), // Include system time
+            &systemTime, // Include system time
+            &systemTime + 1,
             0.002739726);  // Minimum distance = 1 day
         
         //  Mark steps on timeline that are on the product timeline
@@ -198,20 +199,25 @@ public:
 
 //  Calibrates one maturity
 //  Main calibration function below
-template <class IT, class T = double>
+template <class IT, class OT, class T = double>
 inline void dupireCalibMaturity(
     //  IVS we calibrate to
     const IVS& ivs,
     //  Maturity to calibrate
     const Time maturity,
     //  Spots for local vol
-    const vector<double> spots,
+    IT spotsBegin,
+    IT spotsEnd,
     //  Results, by spot
     //  With (random access) iterator, STL style
-    IT lVolsBegin,
+    OT  lVolsBegin,
     //  Risk view
     const RiskView<T>& riskView = RiskView<double>())
 {
+    //  Number of spots
+    IT spots = spotsBegin;
+    const size_t nSpots = distance(spotsBegin, spotsEnd);
+
     //  Estimate ATM so we cut the grid 2 stdevs away to avoid instabilities
     const double atmCall = convert<double>(ivs.call(ivs.spot(), maturity));
     //  Standard deviation, approx. atm call * sqrt(2pi)
@@ -220,27 +226,26 @@ inline void dupireCalibMaturity(
     //  Skip spots below and above 2.5 std
     int il = 0;
     while (spots[il] < ivs.spot() - 2.5 * std) ++il;
-    int ih = spots.size() - 1;
+    int ih = nSpots - 1;
     while (spots[ih] > ivs.spot() + 2.5 * std) --ih;
 
     //  Loop on spots
     for (int i = il; i <= ih; ++i)
     {
         //  Dupire's formula
-        lVolsBegin[i] = ivs.localVol(spots[i], maturity, riskView);
+        lVolsBegin[i] = ivs.localVol(spots[i], maturity, &riskView);
     }
 
     //  Extrapolate flat outside std
     for (int i = 0; i <= il - 1; ++i)
         lVolsBegin[i] = lVolsBegin[il];
-    for (int i = ih + 1; i < spots.size(); ++i)
+    for (int i = ih + 1; i < nSpots; ++i)
         lVolsBegin[i] = lVolsBegin[ih - 1];
 }
 
-//  Returns spots, times and local vols
+//  Returns a struct with spots, times and lVols
 template<class T = double>
-inline tuple<vector<double>, vector<Time>, matrix<T>> 
-    dupireCalib(
+inline auto dupireCalib(
         //  The IVS we calibrate to
         const IVS& ivs,
         //  The local vol grid
@@ -256,24 +261,35 @@ inline tuple<vector<double>, vector<Time>, matrix<T>>
         //  omitted: T = double , no risk view
         const RiskView<T>& riskView = RiskView<double>())
 {
+    //  Results
+    struct
+    {
+        vector<double> spots;
+        vector<Time> times;
+        matrix<T> lVols;
+    } results;
+
     //  Spots and times
-    vector<double> spots = fillData(inclSpots, maxDs);
-    vector<Time> times = fillData(inclTimes, maxDt, &vector<Time>(1, maxDt));
+    results.spots = fillData(inclSpots, maxDs);
+    results.times = fillData(inclTimes, maxDt, &maxDt, &maxDt + 1);
 
     //  Allocate local vols, transposed maturity first
-    matrix<T> lVolsT(times.size(), spots.size());
+    matrix<T> lVolsT(results.times.size(), results.spots.size());
 
     //  Maturity by maturity
-    for (size_t j = 0; j < times.size(); ++j)
+    for (size_t j = 0; j < results.times.size(); ++j)
     {
         dupireCalibMaturity(
             ivs, 
-            times[j], 
-            spots, 
+            results.times[j], 
+            results.spots.begin(),
+            results.spots.end(),
             lVolsT[j], 
             riskView);
     }
 
     //  transpose is defined in matrix.h
-    return make_tuple(spots, times, transpose(lVolsT));
+    results.lVols = transpose(lVolsT);
+
+    return results;
 }

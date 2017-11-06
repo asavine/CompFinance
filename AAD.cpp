@@ -1,5 +1,5 @@
 
-#include "AADnumber.h"
+#include "AAD.h"
 #include <algorithm>
 
 const struct Number::LeafType Number::leaf;
@@ -82,12 +82,3 @@ inline pair<double, vector<double>> checkPoint(const vector<double>& X)
 
     return results;
 }
-
-#ifdef _DEBUG
-
-bool Node::checkTape(Node* argNode, Node* thisNode)
-{
-    return Number::tape->isOnTape(argNode, thisNode);
-}
-
-#endif

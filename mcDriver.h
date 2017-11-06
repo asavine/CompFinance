@@ -7,6 +7,8 @@
 #include "sobol.h"
 #include "memory.h"
 #include <numeric>
+#include <fstream>
+using namespace std;
 
 inline double uocDupire(
     //  model parameters
@@ -43,8 +45,8 @@ inline double uocDupire(
         / results.size();
 }
 
-//  Returns price, delta and matrix of vegas
-inline tuple<double, double, matrix<double>> uocDupireBumpRisk(
+//  Returns a struct with price, delta and vega matrix
+inline auto uocDupireBumpRisk(
     //  model parameters
     const double            spot,
     const vector<double>    spots,
@@ -65,8 +67,16 @@ inline tuple<double, double, matrix<double>> uocDupireBumpRisk(
     const int               seed1 = 12345,
     const int               seed2 = 12346)
 {
+    //  Results
+    struct
+    {
+        double value;
+        double delta;
+        matrix<double> vega;
+    } results;
+
     //  base value
-    const double v0 = uocDupire(
+    results.value = uocDupire(
         spot,
         spots,
         times,
@@ -102,11 +112,11 @@ inline tuple<double, double, matrix<double>> uocDupireBumpRisk(
         antithetic,
         seed1,
         seed2);
-    const double delta = 1.e+08 * (v1 - v0);
+    results.delta = 1.e+08 * (v1 - results.value);
 
     //  Vega
     matrix<double> newVols = vols;
-    matrix<double> vega(vols.rows(), vols.cols());
+    results.vega.resize(vols.rows(), vols.cols());
     for (auto i = 0; i < newVols.rows(); ++i)
     {
         for (auto j = 0; j < newVols.cols(); ++j)
@@ -128,16 +138,16 @@ inline tuple<double, double, matrix<double>> uocDupireBumpRisk(
                 antithetic,
                 seed1,
                 seed2);
-            vega[i][j] = 1.e+08 * (v1 - v0);
+            results.vega[i][j] = 1.e+08 * (v1 - results.value);
             newVols[i][j] -= 1.e-08;
         }
     }
 
-    return make_tuple(v0, delta, vega);
+    return results;
 }
 
-//  Returns price, delta and matrix of vegas
-inline tuple<double, double, matrix<double>> uocDupireAADRisk(
+//  Returns a struct with price, delta and vega matrix
+inline auto uocDupireAADRisk(
     //  model parameters
     const double            spot,
     const vector<double>    spots,
@@ -158,6 +168,14 @@ inline tuple<double, double, matrix<double>> uocDupireAADRisk(
     const int               seed1 = 12345,
     const int               seed2 = 12346)
 {
+    //  Results
+    struct
+    {
+        double value;
+        double delta;
+        matrix<double> vega;
+    } results;
+
     //  Build model, product and rng
     Dupire<Number> model(spot, spots, times, vols, maxDt);
     UOC<Number> product(strike, barrier, maturity, monitorFreq);
@@ -167,42 +185,43 @@ inline tuple<double, double, matrix<double>> uocDupireAADRisk(
 
     //  Simulate
 
-    const auto results = parallel
+    const auto simulResults = parallel
         ? mcParallelSimulAAD(product, model, *rng, numPath, antithetic)
         : mcSimulAAD(product, model, *rng, numPath, antithetic);
 
     //  Value
 
-    const double value = accumulate(results.first.begin(), 
-        results.first.end(), 
+    results.value = accumulate(
+        simulResults.payoffs.begin(),
+        simulResults.payoffs.end(),
         0.0)
             / numPath;
 
     //  Risks
 
     //  Downcast the model, we know it is a Dupire
-    Dupire<Number>& resMdl = *dynamic_cast<Dupire<Number>*>(results.second.get());
+    Dupire<Number>& resMdl = *dynamic_cast<Dupire<Number>*>(simulResults.model.get());
 
-    double delta = resMdl.spot().adjoint();
-    matrix<double> vega(resMdl.vols().rows(), resMdl.vols().cols());
-    transform(resMdl.vols().begin(), resMdl.vols().end(), vega.begin(),
+    results.delta = resMdl.spot().adjoint();
+    results.vega.resize(resMdl.vols().rows(), resMdl.vols().cols());
+    transform(resMdl.vols().begin(), resMdl.vols().end(), results.vega.begin(),
         [](const Number& vol)
     {
         return vol.adjoint();
     });
     //  Normalize
-    delta /= numPath;
-    for (auto& risk : vega) risk /= numPath;
+    results.delta /= numPath;
+    for (auto& risk : results.vega) risk /= numPath;
 
     //  Clear the tape
     Number::tape->clear();
 
     //  Return value
-    return make_tuple(value, delta, vega);
+    return results;
 }
 
-//  Returns spots, times and local vols
-inline tuple<vector<double>, vector<Time>, matrix<double>>
+//  Returns spots, times and lVols in a struct
+inline auto
 dupireCalib(
     //  The local vol grid
     //  The spots to include
@@ -233,8 +252,8 @@ dupireCalib(
 }
 
 //  Returns value, delta, strikes, maturities 
-//      and derivatives to calls = superbucket
-inline tuple<double, double, vector<double>, vector<Time>, matrix<double>>
+//      and vega = derivatives to implied vols = superbucket
+inline auto
     dupireSuperbucket(
     const double            spot,
     //  product parameters
@@ -271,6 +290,16 @@ inline tuple<double, double, vector<double>, vector<Time>, matrix<double>>
     const int               seed1 = 12345,
     const int               seed2 = 12346)
 {
+    //  Results
+    struct
+    {
+        double value;
+        double delta;
+        vector<double> strikes;
+        vector<Time> mats;
+        matrix<double> vega;
+    } results;
+
     //  Start with a clean tape
     auto* tape = Number::tape;
     tape->rewind();
@@ -287,9 +316,9 @@ inline tuple<double, double, vector<double>, vector<Time>, matrix<double>>
         jmpIntens, 
         jmpAverage, 
         jmpStd);
-    const vector<double>& spots = get<0>(params);
-    const vector<Time>& times = get<1>(params);
-    const matrix<double>& lvols = get<2>(params);
+    const vector<double>& spots = params.spots;
+    const vector<Time>& times = params.times;
+    const matrix<double>& lvols = params.lVols;
 
     //  Find delta and microbucket
     auto mdlDerivs = uocDupireAADRisk(
@@ -308,9 +337,9 @@ inline tuple<double, double, vector<double>, vector<Time>, matrix<double>>
         antithetic,
         seed1,
         seed2);
-    const double value = get<0>(mdlDerivs);
-    const double delta = get<1>(mdlDerivs);
-    const matrix<double>& microbucket = get<2>(mdlDerivs);
+    results.value = mdlDerivs.value;
+    results.delta = mdlDerivs.delta;
+    const matrix<double>& microbucket = mdlDerivs.vega;
 
     //  Clear tape
     //  tape->rewind();
@@ -331,7 +360,7 @@ inline tuple<double, double, vector<double>, vector<Time>, matrix<double>>
 
     //  Calibrate again, in AAD mode, make tape
     auto nParams = dupireCalib(*ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
-    matrix<Number>& nLvols = get<2>(nParams);
+    matrix<Number>& nLvols = nParams.lVols;
 
     //  Seed local vol adjoints on tape with microbucket results
     for (size_t i = 0; i < microbucket.rows(); ++i)
@@ -348,8 +377,10 @@ inline tuple<double, double, vector<double>, vector<Time>, matrix<double>>
     //  Results: superbucket = risk view
 
     //  Copy results
-    matrix<double> superbucket(riskView.rows(), riskView.cols());
-    transform(riskView.begin(), riskView.end(), superbucket.begin(), 
+    results.strikes = strikes;
+    results.mats = mats;
+    results.vega.resize(riskView.rows(), riskView.cols());
+    transform(riskView.begin(), riskView.end(), results.vega.begin(), 
         [](const Number& n)
     {
         return n.adjoint();
@@ -359,5 +390,5 @@ inline tuple<double, double, vector<double>, vector<Time>, matrix<double>>
     tape->clear();
 
     //  Return results
-    return make_tuple(value, delta, strikes, mats, superbucket);
+    return results;
 }

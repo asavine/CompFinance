@@ -153,14 +153,11 @@ inline FP12* xUocDupireBump(
         strike, barrier, maturity, monitorFreq, parallel>0,
         useSobol > 0, static_cast<int>(numPath), useAnti > 0,
         static_cast<int>(seed1), static_cast<int>(seed2));
-    auto v = get<0>(res);
-    auto delta = get<1>(res);
-    auto& vega = get<2>(res);
     //  Build return
 
     // Allocate result
     // Calculate size
-    size_t resultRows = vega.rows()+2, resultCols = vega.cols(), resultSize = resultRows * resultCols;
+    size_t resultRows = res.vega.rows()+2, resultCols = res.vega.cols(), resultSize = resultRows * resultCols;
     
     // Return an error if size is 0
     if (resultSize <= 0) return nullptr;
@@ -179,11 +176,12 @@ inline FP12* xUocDupireBump(
     result->rows = resultRows;
     result->columns = resultCols;
     for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = v;
-    result->array[resultCols] = delta;
-    for (size_t i = 0; i < vega.rows(); ++i) for (size_t j = 0; j < vega.cols(); ++j)
+    result->array[0] = res.value;
+    result->array[resultCols] = res.delta;
+    for (size_t i = 0; i < res.vega.rows(); ++i) 
+        for (size_t j = 0; j < res.vega.cols(); ++j)
     {
-        result->array[(i+2)*resultCols + j] = vega[i][j];
+        result->array[(i+2)*resultCols + j] = res.vega[i][j];
     }
 
     // Return it
@@ -261,15 +259,12 @@ extern "C" __declspec(dllexport)
         strike, barrier, maturity, monitorFreq, parallel>0,
         useSobol > 0, static_cast<int>(numPath), useAnti > 0,
         static_cast<int>(seed1), static_cast<int>(seed2));
-    auto v = get<0>(res);
-    auto delta = get<1>(res);
-    auto& vega = get<2>(res);
 
     //  Build return
 
     // Allocate result
     // Calculate size
-    size_t resultRows = vega.rows() + 2, resultCols = vega.cols(), resultSize = resultRows * resultCols;
+    size_t resultRows = res.vega.rows() + 2, resultCols = res.vega.cols(), resultSize = resultRows * resultCols;
 
     // Return an error if size is 0
     if (resultSize <= 0) return nullptr;
@@ -288,11 +283,12 @@ extern "C" __declspec(dllexport)
     result->rows = resultRows;
     result->columns = resultCols;
     for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = v;
-    result->array[resultCols] = delta;
-    for (size_t i = 0; i < vega.rows(); ++i) for (size_t j = 0; j < vega.cols(); ++j)
+    result->array[0] = res.value;
+    result->array[resultCols] = res.delta;
+    for (size_t i = 0; i < res.vega.rows(); ++i) 
+        for (size_t j = 0; j < res.vega.cols(); ++j)
     {
-        result->array[(i + 2)*resultCols + j] = vega[i][j];
+        result->array[(i + 2)*resultCols + j] = res.vega[i][j];
     }
 
     // Return it
@@ -341,119 +337,6 @@ extern "C" __declspec(dllexport)
     return interp2D(x, y, z, x0, y0);
 }
 
-
-/*
-
-extern "C" __declspec(dllexport)
-    inline FP12* xUocDupireSuperbucket(
-        //  model parameters
-        double              spot,
-        FP12*               strikes,
-        FP12*               mats,
-        FP12*               calls,
-        double              maxDt,
-        //  product parameters
-        double              strike,
-        double              barrier,
-        double              maturity,
-        double              monitorFreq,
-        //  numerical parameters
-        double              useSobol,
-        double              useAnti,
-        double              seed1,
-        double              seed2,
-        double              numPath,
-        double              parallel)
-{
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  MaxDt = 0 crashes
-    if (maxDt <= 0) return 0;
-
-    //  Same thing for frequency
-    if (monitorFreq <= 0) return 0;
-
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Unpack
-
-    vector<double> vstrikes;
-    {
-        size_t rows = strikes->rows;
-        size_t cols = strikes->columns;
-        double* numbers = strikes->array;
-
-        vstrikes.resize(rows);
-        copy(numbers, numbers + rows, vstrikes.begin());
-    }
-
-    vector<double> vmats;
-    {
-        size_t rows = mats->rows;
-        size_t cols = mats->columns;
-        double* numbers = mats->array;
-
-        vmats.resize(cols);
-        copy(numbers, numbers + cols, vmats.begin());
-    }
-
-    matrix<double> vcalls;
-    {
-        size_t rows = calls->rows;
-        size_t cols = calls->columns;
-        double* numbers = calls->array;
-
-        vcalls.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vcalls.begin());
-    }
-
-    //  Call 
-    auto res = uocDupireCheckPointedRisk(spot, vstrikes, vmats, vcalls, maxDt,
-        strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), useAnti > 0,
-        static_cast<int>(seed1), static_cast<int>(seed2));
-    auto v = get<0>(res);
-    auto delta = get<1>(res);
-    auto& vega = get<2>(res);
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = vega.rows() + 2, resultCols = vega.cols(), resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = v;
-    result->array[resultCols] = delta;
-    for (size_t i = 0; i < vega.rows(); ++i) for (size_t j = 0; j < vega.cols(); ++j)
-    {
-        result->array[(i + 2)*resultCols + j] = vega[i][j];
-    }
-
-    // Return it
-    return result;
-}
-*/
-
 extern "C" __declspec(dllexport)
 inline FP12* xDupireCalib(
     //  model parameters
@@ -497,15 +380,11 @@ inline FP12* xDupireCalib(
         ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
         spot, vol, jmpIntens, jmpAverage, jmpStd);
 
-    auto& rspots = get<0>(results);
-    auto& rtimes = get<1>(results);
-    auto& rvols = get<2>(results);
-
     //  Build return
 
     // Allocate result
     // Calculate size
-    size_t resultRows = rspots.size() + 1, resultCols = rtimes.size() + 1, resultSize = resultRows * resultCols;
+    size_t resultRows = results.spots.size() + 1, resultCols = results.times.size() + 1, resultSize = resultRows * resultCols;
 
     // Return an error if size is 0
     if (resultSize <= 0) return nullptr;
@@ -524,16 +403,16 @@ inline FP12* xDupireCalib(
     result->rows = resultRows;
     result->columns = resultCols;
     result->array[0] = 0.0;
-    for (size_t j = 0; j < rtimes.size(); ++j)
+    for (size_t j = 0; j < results.times.size(); ++j)
     {
-        result->array[j + 1] = rtimes[j];
+        result->array[j + 1] = results.times[j];
     }
-    for (size_t i = 0; i < rspots.size(); ++i)
+    for (size_t i = 0; i < results.spots.size(); ++i)
     {
-        result->array[(i + 1)*resultCols] = rspots[i];
-        for (size_t j = 0; j < rtimes.size(); ++j)
+        result->array[(i + 1)*resultCols] = results.spots[i];
+        for (size_t j = 0; j < results.times.size(); ++j)
         {
-            result->array[(i + 1)*resultCols + j + 1] = rvols[i][j];
+            result->array[(i + 1)*resultCols + j + 1] = results.lVols[i][j];
         }
     }
 
@@ -643,15 +522,11 @@ inline FP12* xDupireSuperbucket(
         static_cast<int>(seed1), 
         static_cast<int>(seed2));
 
-    double v = get<0>(results);
-    double delta = get<1>(results);
-    matrix<double>& vega = get<4>(results);
-
     //  Build return
 
     // Allocate result
     // Calculate size
-    size_t resultRows = vega.rows() + 3, resultCols = vega.cols() + 1, resultSize = resultRows * resultCols;
+    size_t resultRows = results.vega.rows() + 3, resultCols = results.vega.cols() + 1, resultSize = resultRows * resultCols;
 
     // Return an error if size is 0
     if (resultSize <= 0) return nullptr;
@@ -670,19 +545,20 @@ inline FP12* xDupireSuperbucket(
     result->rows = resultRows;
     result->columns = resultCols;
     for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = v;
-    result->array[resultCols] = delta;
-    for (size_t j = 0; j < vega.cols(); ++j)
+    result->array[0] = results.value;
+    result->array[resultCols] = results.delta;
+    for (size_t j = 0; j < results.vega.cols(); ++j)
     {
         result->array[2*resultCols + j + 1] = vmats[j];
     }
-    for (size_t i = 0; i < vega.rows(); ++i)
+    for (size_t i = 0; i < results.vega.rows(); ++i)
     {
         result->array[(3 + i) * resultCols] = vstrikes[i];
     }
-    for (size_t i = 0; i < vega.rows(); ++i) for (size_t j = 0; j < vega.cols(); ++j)
+    for (size_t i = 0; i < results.vega.rows(); ++i) 
+        for (size_t j = 0; j < results.vega.cols(); ++j)
     {
-        result->array[(3 + i)*resultCols + j + 1] = vega[i][j];
+        result->array[(3 + i)*resultCols + j + 1] = results.vega[i][j];
     }
 
     // Return it

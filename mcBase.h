@@ -243,15 +243,20 @@ inline vector<double> mcParallelSimul(
     return res;	//	C++11: move
 }
 
-#include "AADNumber.h"
+#include "AAD.h"
 
 //	MC simulator: free function that conducts simulations 
 //  Note we return:
 //  - a vector of pathwise payoffs as usual
 //  - a clone of the original model, 
 //      which parameters adjoints cumulated path-wise derivatives
+struct AADSimulResults
+{
+    vector<double> payoffs;
+    unique_ptr<Model<Number>> model;
+};
 //  Also note: tape must be wiped afterwards
-inline pair<vector<double>, unique_ptr<Model<Number>>> 
+inline AADSimulResults
 mcSimulAAD(
     const Product<Number>& prd,
     const Model<Number>& mdl,
@@ -282,9 +287,9 @@ mcSimulAAD(
     //
 
     //  Other init / allocate
-    vector<Number> res(nPath);	                       //  Allocate results
-    cRng->init(cMdl->simDim());                        //  Init the RNG
-    vector<double> gaussVec(cMdl->simDim());           //  Allocate Gaussian vector
+    vector<Number> nPayoffs(nPath);	                    //  Allocate results
+    cRng->init(cMdl->simDim());                         //  Init the RNG
+    vector<double> gaussVec(cMdl->simDim());            //  Allocate Gaussian vector
     vector<scenario<Number>> path(prd.timeline().size());   //  Allocate path
 
     //	Iterate through paths	
@@ -320,13 +325,13 @@ mcSimulAAD(
         //  Generate path, consume Gaussian vector
         cMdl->generatePath(gaussVec, path);     
         //	Compute result
-        res[i] = prd.payoff(path);              
+        nPayoffs[i] = prd.payoff(path);              
 
         //  AAD - 3
         //  Propagate adjoints
         //  do not reset: we accumulate parameters adjoint
         //  the rest are 0 as they are
-        res[i].propagateToMark();
+        nPayoffs[i].propagateToMark();
         //
     }
 
@@ -337,15 +342,15 @@ mcSimulAAD(
     Number::propagateMarkToStart();
 
     //  Results
-    pair<vector<double>, unique_ptr<Model<Number>>> results;
+    AADSimulResults results;
     
     //  Pathwise payoffs
-    results.first.resize(nPath);
+    results.payoffs.resize(nPath);
     //  Copy and convert
-    convertCollection(res.begin(), res.end(), results.first.begin());
+    convertCollection(nPayoffs.begin(), nPayoffs.end(), results.payoffs.begin());
     
     //  Model with accumulated adjoints
-    results.second = move(cMdl);
+    results.model = move(cMdl);
 
     return results;
 }
@@ -396,7 +401,7 @@ void initSimul(
 //  - a clone of the original model, 
 //      which parameters adjoints cumulated path-wise derivatives
 //  Also note: tape must be wiped afterwards
-inline pair<vector<double>, unique_ptr<Model<Number>>>
+inline AADSimulResults
 mcParallelSimulAAD(
     const Product<Number>& prd,
     const Model<Number>& mdl,
@@ -405,7 +410,7 @@ mcParallelSimulAAD(
     const bool antithetic)
 {
     //  Allocate results
-    vector<Number> res(nPath);	                       
+    vector<Number> nPayoffs(nPath);	                       
 
     //  We need one of all these for each thread
     //  0: main thread
@@ -509,12 +514,12 @@ mcParallelSimulAAD(
                 cMdl[threadNum]->generatePath(
                     gaussVecs[threadNum], 
                     paths[threadNum]);
-                res[firstPath + i] = prd.payoff(paths[threadNum]);
+                nPayoffs[firstPath + i] = prd.payoff(paths[threadNum]);
 
                 //  Propagate adjoints
                 //  do not reset: we accumulate parameters adjoint
                 //  the rest are 0 as they are
-                res[firstPath + i].propagateToMark();
+                nPayoffs[firstPath + i].propagateToMark();
             }
 
             //  Remember tasks must return bool
@@ -566,15 +571,15 @@ mcParallelSimulAAD(
     }
 
     //  Results
-    pair<vector<double>, unique_ptr<Model<Number>>> results;
+    AADSimulResults results;
 
     //  Pathwise payoffs
-    results.first.resize(nPath);
+    results.payoffs.resize(nPath);
     //  Copy and convert
-    convertCollection(res.begin(), res.end(), results.first.begin());
+    convertCollection(nPayoffs.begin(), nPayoffs.end(), results.payoffs.begin());
 
     //  Model with accumulated adjoints
-    results.second = move(cMdl[0]);
+    results.model = move(cMdl[0]);
 
     return results;
 }

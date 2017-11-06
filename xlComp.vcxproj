@@ -162,6 +162,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AAD.h" />
     <ClInclude Include="AADNode.h" />
     <ClInclude Include="AADNumber.h" />
     <ClInclude Include="AADTape.h" />

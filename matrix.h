@@ -59,8 +59,8 @@ public:
     void swap(matrix& rhs)
     {
         myVector.swap(rhs.myVector);
-        swap(myRows, rhs.myRows);
-        swap(myCols, rhs.myCols);
+        ::swap(myRows, rhs.myRows);
+        ::swap(myCols, rhs.myCols);
     }
 
     //  Resizer

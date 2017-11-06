@@ -74,12 +74,13 @@ public:
     T call(
         const double strike, 
         const Time mat, 
-        const RiskView<T>& risk = RiskView<double>()) const
+        const RiskView<T>* risk = nullptr) const
     {
         return blackScholes(
             mySpot,
             strike,
-            impliedVol(strike, mat) + risk.spread(strike, mat),
+            impliedVol(strike, mat) 
+                + (risk ? risk->spread(strike, mat) : convert<T>(0.0)),
             mat);
     }
 
@@ -88,7 +89,7 @@ public:
     T localVol(
         const double strike,
         const double mat,
-        const RiskView<T>& risk = RiskView<double>()) const
+        const RiskView<T>* risk = nullptr) const
     {
         //  Derivative to time
         const T c00 = call(strike, mat, risk);
