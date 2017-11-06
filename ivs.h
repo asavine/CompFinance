@@ -20,6 +20,7 @@ public:
     RiskView() : myEmpty(true) {}
 
     //  Intializes risk view AND put on tape
+    //  Sets all spreads to 0
     RiskView(const vector<double>& strikes, const vector<Time>& mats) :
         myEmpty(false), myStrikes(strikes), myMats(mats), mySpreads(strikes.size(), mats.size())
     {
@@ -76,6 +77,7 @@ public:
         const Time mat, 
         const RiskView<T>* risk = nullptr) const
     {
+        //  blackScholes is defined in gaussians.h, templated
         return blackScholes(
             mySpot,
             strike,
@@ -106,6 +108,7 @@ public:
         return sqrt(2.0 * ct / ckk);
     }
 
+    //  Virtual destructor needed for polymorphic class
     virtual ~IVS() {}
 };
 
@@ -122,6 +125,7 @@ public:
 
     double impliedVol(const double strike, const Time mat) const override
     {
+        //  Bachelier formula in gaussians.h
         const double call = bachelier(spot(), strike, myBachVol, mat);
         return blackScholesIvol(spot(), strike, call, mat);
     }
@@ -160,6 +164,7 @@ public:
 
     double impliedVol(const double strike, const Time mat) const override
     {
+        //  Merton's formula is defined in gaussians.h
         const double call
             = merton(
                 spot(),
@@ -170,6 +175,7 @@ public:
                 myAverageJmp,
                 myJmpStd);
 
+        //  Implied volatility from price, also in gaussians.h
         return blackScholesIvol(spot(), strike, call, mat);
     }
 };
