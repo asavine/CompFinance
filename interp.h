@@ -18,6 +18,7 @@ inline auto interp(
     const T&					x0,
     //  smooth?
     const bool                  smoothStep = false)
+    ->remove_reference_t<decltype(*yBegin)>
 {
     //	STL binary search, returns iterator on 1st no less than x0
     //  upper_boung guarantees logarithmic search
@@ -37,14 +38,19 @@ inline auto interp(
 
     auto t = (x0 - x1) / (x2 - x1);
 
-    return smoothStep
-        ? y1 + (y2 - y1) * t * t * (3.0 - 2 * t)
-        : y1 + (y2 - y1) * t;
+    if (smoothStep)
+    {
+        return y1 + (y2 - y1) * t * t * (3.0 - 2 * t);
+    }
+    else
+    {
+        return y1 + (y2 - y1) * t;
+    }
 }
 
 //  2D
 template <class T, class U, class V, class W, class X>
-inline auto interp2D(
+inline V interp2D(
     //	sorted on xs 
     const vector<T>&            x,
     //	sorted on ys
@@ -80,7 +86,12 @@ inline auto interp2D(
 
     //  Smooth step
     auto t = (x0 - x1) / (x2 - x1);
-    return smoothStep
-        ? z1 + (z2 - z1) * t * t * (3.0 - 2 * t)
-        : z1 + (z2 - z1) * t;
+    if (smoothStep)
+    {
+        return z1 + (z2 - z1) * t * t * (3.0 - 2 * t);
+    }
+    else
+    {
+        return z1 + (z2 - z1) * t;;
+    }
 }

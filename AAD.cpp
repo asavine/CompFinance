@@ -2,9 +2,11 @@
 #include "AAD.h"
 #include <algorithm>
 
+#if !AADET
 const struct Number::LeafType Number::leaf;
 const struct Number::UnaryType Number::unary;
 const struct Number::BinaryType Number::binary;
+#endif
 
 Tape globalTape;
 thread_local Tape* Number::tape = &globalTape;

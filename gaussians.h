@@ -24,7 +24,7 @@ inline T normalCdf( const T x)
 	//	checks
 	if (x < -10.0) return T(0.0);
 	if (x > 10.0) return T(1.0);
-    if (x < 0.0) return 1.0 - normalCdf(-x);
+    if (x < 0.0) return 1.0 - normalCdf<T>(-x);
 
 	//  calc pol 
 
@@ -37,13 +37,13 @@ inline T normalCdf( const T x)
 	static const double b5 = 1.330274429;
 
 	//	transform
-	const T t = 1.0 / (1.0 + p*x);
+	const auto t = 1.0 / (1.0 + p*x);
 
 	//	finally pol
-    const T pol = t*(b1 + t*(b2 + t*(b3 + t*(b4 + t*b5))));
+    const auto pol = t*(b1 + t*(b2 + t*(b3 + t*(b4 + t*b5))));
 
 	//	calc pdf
-    const T pdf = x<-10.0 || 10.0<x ? T(0.0) : exp(-0.5*x*x) / 2.506628274631; // sqrt (2 * pi())
+    const auto pdf = x<-10.0 || 10.0<x ? T(0.0) : exp(-0.5*x*x) / 2.506628274631; // sqrt (2 * pi())
 
 	//	return cdf
 	return 1.0 - pdf * pol;
@@ -137,10 +137,10 @@ inline T blackScholes(
     const W mat)
 {
     const auto std = vol * sqrt(mat);
-    if (std <= EPS) return max(T(0.0), T(spot - strike));
+    if (std <= EPS) return max<T>(T(0.0), T(spot - strike));
     const auto d2 = log(spot/strike) / std - 0.5 * std;
     const auto d1 = d2 + std;
-    return spot * normalCdf(d1) - strike * normalCdf(d2);
+    return spot * normalCdf<T>(d1) - strike * normalCdf<T>(d2);
 }
 
 //  Implied vol, untemplated

@@ -3,8 +3,6 @@
 #include <exception>
 using namespace std;
 
-//  #define CHECKTAPE
-
 struct Node
 {
     double adjoint = 0.0;
@@ -43,5 +41,28 @@ struct BinaryNode : public Node
     }
 };
 
+template <size_t N>
+struct MultiNode : public Node
+{
+    double derivatives[N];
+    Node* arguments[N];
 
+    void propagate() override
+    {
+        if (adjoint == 0.0) return;
+
+        //  The compiler should unroll the loop
+        for (int i = 0; i < N; ++i)
+        {
+            arguments[i]->adjoint += derivatives[i] * adjoint;
+        }
+    }
+};
+
+//  Specialization for leaf
+template<>
+struct MultiNode<0> : public Node
+{
+
+};
 

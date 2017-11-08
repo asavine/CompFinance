@@ -78,7 +78,7 @@ public:
         const RiskView<T>* risk = nullptr) const
     {
         //  blackScholes is defined in gaussians.h, templated
-        return blackScholes(
+        return blackScholes<T>(
             mySpot,
             strike,
             impliedVol(strike, mat) 
