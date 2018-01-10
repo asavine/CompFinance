@@ -46,17 +46,17 @@ fillData(
 
     while (it != sequence.end())
     {
-        Time current = filled.back();
-        Time next = *it;
+        auto current = filled.back();
+        auto next = *it;
         //  Must supplement?
         if (next - current > maxDx)
         {
             //  Number of points to add
             int addPoints = int((next - current) / maxDx - EPS) + 1;
             //  Spacing between supplementary points
-            Time spacing = (next - current) / addPoints;
+            auto spacing = (next - current) / addPoints;
             //  Add the steps
-            Time t = current + spacing;
+            auto t = current + spacing;
             while (t < next)
             {
                 filled.push_back(t);
