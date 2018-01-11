@@ -35,7 +35,7 @@ public:
         myEnd = myBegin + size;
     }
 
-    //	Provides the requested amount of memory if avail it or nullptr
+    //	Provides the requested amount of memory if avail or nullptr
     Ptr requestMemory(const size_t size)
     {
         if (myNext + size > myEnd) return nullptr;
