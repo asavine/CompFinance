@@ -27,8 +27,6 @@ class Dupire : public Model<T>
     //  Maximum space between time steps
     Time                myMaxDt;
 
-    //  Simulation timeline
-
     //  Similuation timeline
     vector<Time>        myTimeline;
     //  true (1) if the time step is on the product timeline

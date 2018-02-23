@@ -2,6 +2,8 @@
 
 #include "mcBase.h"
 
+#define ONE_HOUR 0.000114469
+
 template <class T>
 class UOC : public Product<T>
 {
@@ -20,7 +22,7 @@ public:
         myTimeline.push_back(systemTime);
         Time t = systemTime + monitorFreq;
 
-        while (t < myMaturity)
+        while (myMaturity - t > ONE_HOUR)
         {
             myTimeline.push_back(t);
             t += monitorFreq;

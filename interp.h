@@ -5,7 +5,7 @@ using namespace std;
 
 //  Utility for interpolation
 //  Interpolates the vector y against knots x in value x0 
-//  Interpolation is linear, extrapolation is flat
+//  Interpolation is linear or smooth, extrapolation is flat
 template <class ITX, class ITY, class T>
 inline auto interp(
     //	sorted on xs 
@@ -21,7 +21,7 @@ inline auto interp(
     ->remove_reference_t<decltype(*yBegin)>
 {
     //	STL binary search, returns iterator on 1st no less than x0
-    //  upper_boung guarantees logarithmic search
+    //  upper_bound guarantees logarithmic search
     auto it = upper_bound(xBegin, xEnd, x0);
 
     //  Extrapolation?

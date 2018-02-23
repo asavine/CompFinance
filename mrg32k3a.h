@@ -59,7 +59,6 @@ public:
         myDim = simDim;
     }
 
-    //  We cache the vector of numbers and return it by const reference
     void nextG(vector<double>& gaussVec) override
     {
         for (size_t i = 0; i < myDim; ++i) gaussVec[i] = nextNumber();
@@ -149,12 +148,12 @@ public:
         {
             if (skip & 1)   //  i.e. ai == 1
             {
-                //  cumulate Ab and Bb
+                //  accumulate Ab and Bb
                 mPrd(Ab, Ai, m1, Ab);
                 mPrd(Bb, Bi, m2, Bb);
             }
 
-            //  Recusion on Ai and Bi 
+            //  Recursion on Ai and Bi 
             mPrd(Ai, Ai, m1, Ai);
             mPrd(Bi, Bi, m2, Bi);
 

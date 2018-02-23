@@ -2,7 +2,7 @@
 
 #define EPS 1.0e-08
 //  Utility for filling data
-template<class CONT, class T, class IT = CONT::iterator>
+template<class CONT, class T, class IT = T*>
 //  Returns filled container 
 //      has all original points
 //      plus additional ones if requested
@@ -16,8 +16,8 @@ fillData(
     //  The maximum spacing allowed
     const T&                        maxDx,
     //  Specific points to add, by iterator, sorted
-    IT                              addBegin = IT(),
-    IT                              addEnd = IT(),
+    IT                              addBegin = nullptr,
+    IT                              addEnd = nullptr,
     //  Minimum distance for equality
     const T&                        minDx = T(0.0))
 {
@@ -26,7 +26,8 @@ fillData(
 
     //  Add points?
     CONT added;
-    const size_t addPoints = distance(addBegin, addEnd);
+    const size_t addPoints = addBegin || addEnd ? distance(addBegin, addEnd) : 0;
+
     if (addPoints > 0)
     {
         set_union(

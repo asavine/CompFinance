@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <exception>
 
 #include <vector>
@@ -35,7 +35,7 @@ public:
         myEnd = myBegin + size;
     }
 
-    //	Provides the requested amount of memory if avail or nullptr
+    //	Provides the requested amount of memory if available or nullptr
     Ptr requestMemory(const size_t size)
     {
         if (myNext + size > myEnd) return nullptr;
@@ -127,9 +127,9 @@ class Tape
         //  block
         list<MemoryBlock>::iterator block;
         //  vector
-        list<vector<Node*>>::iterator vector;
+        list<vector<Node*>>::iterator vec;
         //  position in vector
-        //  Next = current + 1 index in current vector 
+        //  index of the next free slot in the current vector
         size_t idx;
     };
     State myState;
@@ -159,8 +159,8 @@ class Tape
         myPointers.push_back(vector<Node*>(myVectorSize));
         
         //  current = last
-        myState.vector = myPointers.end();
-        --myState.vector;
+        myState.vec = myPointers.end();
+        --myState.vec;
 
         //  set index (in vector) to 0
         myState.idx = 0;
@@ -169,9 +169,9 @@ class Tape
     //	Move to next vector, if none create one
     void nextVector()
     {
-        ++myState.vector;
+        ++myState.vec;
         myState.idx = 0;
-        if (myState.vector == myPointers.end()) newVector();
+        if (myState.vec == myPointers.end()) newVector();
     }
 
 public:
@@ -187,7 +187,7 @@ public:
 
         //  Set state
         myState.block = myBlocks.begin();
-        myState.vector = myPointers.begin();
+        myState.vec = myPointers.begin();
         myState.idx = 0;
     }
 
@@ -210,7 +210,7 @@ public:
         }
 
         //	Register pointer to the node so we can iterate
-        (*myState.vector)[myState.idx++] = reinterpret_cast<Node*>(mem);
+        (*myState.vec)[myState.idx++] = reinterpret_cast<Node*>(mem);
         if (myState.idx == myVectorSize) nextVector();
 
         return mem;
@@ -224,7 +224,7 @@ public:
 
         //	Reset state
         myState.block = myBlocks.begin();
-        myState.vector = myPointers.begin();
+        myState.vec = myPointers.begin();
         myState.idx = 0;
     }
 
@@ -273,7 +273,7 @@ public:
         myPointers.push_back(vector<Node*>(myVectorSize));
 
         myState.block = myBlocks.begin();
-        myState.vector = myPointers.begin();
+        myState.vec = myPointers.begin();
         myState.idx = 0;
     }
 
@@ -361,7 +361,7 @@ public:
 
     iterator end()
     {
-        return iterator(myState.vector, myState.idx);
+        return iterator(myState.vec, myState.idx);
     }
 
     //  Iterator on last
@@ -375,7 +375,7 @@ public:
     //  Iterator on mark
     iterator markIt()
     {
-        return iterator(myMark.vector, myMark.idx);
+        return iterator(myMark.vec, myMark.idx);
     }
 
     //  Find specific node, searching from the end

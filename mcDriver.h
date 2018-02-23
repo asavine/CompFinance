@@ -13,9 +13,9 @@ using namespace std;
 inline double uocDupire(
     //  model parameters
     const double            spot,
-    const vector<double>    spots,
-    const vector<Time>      times,
-    const matrix<double>    vols,   //  spot major
+    const vector<double>&   spots,
+    const vector<Time>&     times,
+    const matrix<double>&   vols,   //  spot major
     const double            maxDt,
     //  product parameters
     const double            strike,
@@ -49,9 +49,9 @@ inline double uocDupire(
 inline auto uocDupireBumpRisk(
     //  model parameters
     const double            spot,
-    const vector<double>    spots,
-    const vector<Time>      times,
-    const matrix<double>    vols,   //  spot major
+    const vector<double>&   spots,
+    const vector<Time>&     times,
+    const matrix<double>&   vols,   //  spot major
     const double            maxDt,
     //  product parameters
     const double            strike,
@@ -150,9 +150,9 @@ inline auto uocDupireBumpRisk(
 inline auto uocDupireAADRisk(
     //  model parameters
     const double            spot,
-    const vector<double>    spots,
-    const vector<Time>      times,
-    const matrix<double>    vols,   //  spot major
+    const vector<double>&   spots,
+    const vector<Time>&     times,
+    const matrix<double>&   vols,   //  spot major
     const double            maxDt,
     //  product parameters
     const double            strike,
@@ -200,18 +200,17 @@ inline auto uocDupireAADRisk(
     //  Risks
 
     //  Downcast the model, we know it is a Dupire
-    Dupire<Number>& resMdl = *dynamic_cast<Dupire<Number>*>(simulResults.model.get());
+    Dupire<Number>& resMdl = *static_cast<Dupire<Number>*>(simulResults.model.get());
 
     results.delta = resMdl.spot().adjoint();
     results.vega.resize(resMdl.vols().rows(), resMdl.vols().cols());
     transform(resMdl.vols().begin(), resMdl.vols().end(), results.vega.begin(),
-        [](const Number& vol)
+        [numPath](const Number& vol)
     {
-        return vol.adjoint();
+        return vol.adjoint() / numPath;
     });
     //  Normalize
     results.delta /= numPath;
-    for (auto& risk : results.vega) risk /= numPath;
 
     //  Clear the tape
     Number::tape->clear();

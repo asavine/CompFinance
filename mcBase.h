@@ -249,7 +249,7 @@ inline vector<double> mcParallelSimul(
 //  Note we return:
 //  - a vector of pathwise payoffs as usual
 //  - a clone of the original model, 
-//      which parameters adjoints cumulated path-wise derivatives
+//      with derivatives accumulated inside the adjoints of the model parameters 
 struct AADSimulResults
 {
     vector<double> payoffs;
@@ -329,15 +329,13 @@ mcSimulAAD(
 
         //  AAD - 3
         //  Propagate adjoints
-        //  do not reset: we accumulate parameters adjoint
-        //  the rest are 0 as they are
         nPayoffs[i].propagateToMark();
         //
     }
 
     //  AAD - 4
     //  Mark = limit between pre-calculations and path-wise operations
-    //  Operations above mark have been propagated and cumulated
+    //  Operations above mark have been propagated and accumulated
     //  We conduct one propagation mark to start
     Number::propagateMarkToStart();
 
@@ -399,7 +397,7 @@ void initSimul(
 //  Note we return:
 //  - a vector of pathwise payoffs as usual
 //  - a clone of the original model, 
-//      which parameters adjoints cumulated path-wise derivatives
+//      with derivatives accumulated inside the adjoints of the model parameters 
 //  Also note: tape must be wiped afterwards
 inline AADSimulResults
 mcParallelSimulAAD(
@@ -517,8 +515,6 @@ mcParallelSimulAAD(
                 nPayoffs[firstPath + i] = prd.payoff(paths[threadNum]);
 
                 //  Propagate adjoints
-                //  do not reset: we accumulate parameters adjoint
-                //  the rest are 0 as they are
                 nPayoffs[firstPath + i].propagateToMark();
             }
 
@@ -534,7 +530,7 @@ mcParallelSimulAAD(
     for (auto& future : futures) pool->activeWait(future);
     
     //  Mark = limit between pre-calculations and path-wise operations
-    //  Operations above mark have been propagated and cumulated
+    //  Operations above mark have been propagated and accumulated
     //  We conduct one propagation mark to start
     //  On the main thread's tape
     Number::propagateMarkToStart();
