@@ -15,9 +15,15 @@ class UOC : public Product<T>
 public:
 
     //  Constructor: store data and build timeline
-    //  Timeline = system date to maturity, with steps every monitoring frequency
-    UOC(const double strike, const double barrier, const Time maturity, const Time monitorFreq)
-        : myStrike(strike), myBarrier(barrier), myMaturity(maturity)
+    //  Timeline = system date to maturity, 
+    //  with steps every monitoring frequency
+    UOC(const double strike, 
+        const double barrier, 
+        const Time maturity, 
+        const Time monitorFreq)
+        : myStrike(strike), 
+        myBarrier(barrier), 
+        myMaturity(maturity)
     {
         myTimeline.push_back(systemTime);
         Time t = systemTime + monitorFreq;
