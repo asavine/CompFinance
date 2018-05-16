@@ -1,3 +1,19 @@
+// this file is an edited version of
+// the file provided with
+// © 2002 "Monte Carlo Methods in Finance"
+// on the CD accompanying the book
+// "Monte Carlo Methods in Finance" by Peter Jäckel.
+//
+// the original copyright is:
+// ===========================================================================
+// Copyright (C) 2002 "Monte Carlo Methods in Finance". All rights reserved.
+//
+// Permission to use, copy, modify, and distribute this software is freely
+// granted, provided that this notice is preserved.
+// ===========================================================================
+
+//  Edited by Antoine Savine in 2018: essentially added a skip ahead
+
 #pragma once
 
 #include "mcBase.h"
