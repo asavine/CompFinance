@@ -5,7 +5,7 @@ Written by Antoine Savine in 2018
 This code is the strict IP of Antoine Savine
 
 License to use and alter this code for personal and commercial applications 
-is freely granted to any person of company who purchased a copy of the book
+is freely granted to any person or company who purchased a copy of the book
 
 Modern Computational Finance: AAD and Parallel Simulations
 Antoine Savine
