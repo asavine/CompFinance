@@ -81,7 +81,7 @@ public:
         return mySpot;
     }
 
-    const matrix<T>&vols()
+    const matrix<T>& vols()
     {
         return myVols;
     }
