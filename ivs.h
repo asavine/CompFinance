@@ -93,7 +93,7 @@ public:
         const Time mat, 
         const RiskView<T>* risk = nullptr) const
     {
-        //  blackScholes is defined in gaussians.h, templated
+        //  blackScholes is defined in analytics.h, templated
         return blackScholes<T>(
             mySpot,
             strike,
@@ -141,7 +141,7 @@ public:
 
     double impliedVol(const double strike, const Time mat) const override
     {
-        //  Bachelier formula in gaussians.h
+        //  Bachelier formula in analytics.h
         const double call = bachelier(spot(), strike, myBachVol, mat);
         return blackScholesIvol(spot(), strike, call, mat);
     }
@@ -180,7 +180,7 @@ public:
 
     double impliedVol(const double strike, const Time mat) const override
     {
-        //  Merton's formula is defined in gaussians.h
+        //  Merton's formula is defined in analytics.h
         const double call
             = merton(
                 spot(),
@@ -191,7 +191,7 @@ public:
                 myAverageJmp,
                 myJmpStd);
 
-        //  Implied volatility from price, also in gaussians.h
+        //  Implied volatility from price, also in analytics.h
         return blackScholesIvol(spot(), strike, call, mat);
     }
 };
