@@ -331,6 +331,34 @@ struct OPSqrt
     }
 };
 
+struct OPNormalDens
+{
+    static const double eval(const double r, const double d)
+    {
+        return normalDens(r);
+    }
+
+    static const double derivative
+    (const double r, const double v, const double d)
+    {
+        return - r * v;
+    }
+};
+
+struct OPNormalCdf
+{
+    static const double eval(const double r, const double d)
+    {
+        return normalCdf(r);
+    }
+
+    static const double derivative
+    (const double r, const double v, const double d)
+    {
+        return normalDens(r);
+    }
+};
+
 //  Binary operators with a double on one side 
 
 //  * double or double *
@@ -471,6 +499,18 @@ template <class ARG>
  UnaryExpression<ARG, OPSqrt> sqrt(const Expression<ARG>& arg)
 {
     return UnaryExpression<ARG, OPSqrt>(arg);
+}
+
+template <class ARG>
+UnaryExpression<ARG, OPNormalDens> normalDens(const Expression<ARG>& arg)
+{
+    return UnaryExpression<ARG, OPNormalDens>(arg);
+}
+
+template <class ARG>
+UnaryExpression<ARG, OPNormalCdf> normalCdf(const Expression<ARG>& arg)
+{
+    return UnaryExpression<ARG, OPNormalCdf>(arg);
 }
 
 //  Binary operators with a double on one side 

@@ -18,6 +18,9 @@ As long as this comment is preserved at the top of the file
 
 #define AADET true
 
+//  So we can instrument Gaussians like standard math functions
+#include "Gaussians.h"
+
 #if AADET
 
 #include "AADExpr.h"

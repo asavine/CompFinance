@@ -99,6 +99,9 @@
     <ClInclude Include="AADExpr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="analytics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

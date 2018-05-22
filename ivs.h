@@ -18,7 +18,7 @@ As long as this comment is preserved at the top of the file
 
 #include "mcBase.h"
 #include "matrix.h"
-#include "gaussians.h"
+#include "analytics.h"
 
 //  Risk view
 template <class T>

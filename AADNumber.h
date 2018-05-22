@@ -402,6 +402,32 @@ public:
         return result;
     }
 
+    inline friend Number normalDens(const Number& arg)
+    {
+        const double e = normalDens(arg.value());
+        //  Eagerly evaluate and put on tape
+        Number result(e, unary);
+        //  Set arguments
+        result.node<UnaryNode>()->argument = arg.node();
+        //  Eagerly compute derivatives
+        result.node<UnaryNode>()->derivative = - arg.value() * e;
+
+        return result;
+    }
+
+    inline friend Number normalCdf(const Number& arg)
+    {
+        const double e = normalCdf(arg.value());
+        //  Eagerly evaluate and put on tape
+        Number result(e, unary);
+        //  Set arguments
+        result.node<UnaryNode>()->argument = arg.node();
+        //  Eagerly compute derivatives
+        result.node<UnaryNode>()->derivative = normalDens(arg.value());
+
+        return result;
+    }
+
     //  Binary functions
     inline friend Number pow(const Number& lhs, const Number& rhs)
     {
