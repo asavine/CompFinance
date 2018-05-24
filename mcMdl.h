@@ -103,7 +103,7 @@ public:
             myMaxDt, // Maximum space allowed
             &systemTime, // Include system time
             &systemTime + 1,
-            0.002739726);  // Minimum distance = 1 day
+            0.00136986301369863);  // Minimum distance = half day
         
         //  Mark steps on timeline that are on the product timeline
         myCommonSteps.resize(myTimeline.size());
