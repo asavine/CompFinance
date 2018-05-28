@@ -71,7 +71,7 @@ public:
     {
         //  We apply the smooth barrier technique to stabilize risks
         //  See Savine's presentation on Fuzzy Logic, Global Derivatives 2016
-        //  Or Andreasen and Savine's publication on scripting, part IV
+        //  Or Andreasen and Savine's publication on scripting
 
         //  We apply a smoothing factor of 1% of the spot both ways, untemplated
         const double smooth = convert<double>(path[0].spot * 0.01);
