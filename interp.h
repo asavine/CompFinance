@@ -48,7 +48,6 @@ inline auto interp(
     size_t n = distance(xBegin, it) - 1;
     auto x1 = xBegin[n];
     auto y1 = yBegin[n];
-    if (x0 == x1) return y1;
     auto x2 = xBegin[n + 1];
     auto y2 = yBegin[n + 1];
 
