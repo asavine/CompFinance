@@ -110,8 +110,7 @@ inline vector<double> mcSimul(
     const Product<double>& prd,
     const Model<double>& mdl,
     const RNG& rng,			            
-    const size_t nPath,
-    const bool antithetic)                      
+    const size_t nPath)                      
 {
     //  Work with copies of the model and RNG
     //      which are modified when we set up the simulation
@@ -131,29 +130,10 @@ inline vector<double> mcSimul(
     vector<scenario<double>> path(prd.timeline().size());   
 
     //	Iterate through paths	
-    bool antiPath = false;
     for (size_t i = 0; i<nPath; i++)
     {
-        if (!antithetic)
-        {
-            //  Next Gaussian vector, dimension D
-            cRng->nextG(gaussVec);                        
-        }
-        else
-        {
-            //  Antithetic logic
-            if (!antiPath)
-            {
-                cRng->nextG(gaussVec);
-                antiPath = true;
-            }
-            else
-            {
-                for (auto& gauss : gaussVec) gauss = -gauss;
-                antiPath = false;
-            }
-
-        }
+        //  Next Gaussian vector, dimension D
+        cRng->nextG(gaussVec);                        
         //  Generate path, consume Gaussian vector
         cMdl->generatePath(gaussVec, path);     
         //	Compute result
@@ -172,8 +152,7 @@ inline vector<double> mcParallelSimul(
     const Product<double>& prd,
     const Model<double>& mdl,
     const RNG& rng,
-    const size_t nPath,
-    const bool antithetic)
+    const size_t nPath)
 {
     auto cMdl = mdl.clone();
     auto cRng = rng.clone();
@@ -215,33 +194,17 @@ inline vector<double> mcParallelSimul(
 
             //  Get a RNG and position it correctly
             auto taskRng = cRng->clone();
-            taskRng->skipTo(antithetic? firstPath / 2: firstPath);
+            taskRng->skipTo(firstPath);
 
             //  And conduct the simulations, exactly same as sequential
             bool antiPath = false;
             for (size_t i = 0; i < pathsInTask; i++)
             {
-                if (!antithetic)
-                {
-                    //  Next Gaussian vector, dimension D
-                    taskRng->nextG(gaussVec);
-                }
-                else
-                {
-                    //  Antithetic logic
-                    if (!antiPath)
-                    {
-                        taskRng->nextG(gaussVec);
-                        antiPath = true;
-                    }
-                    else
-                    {
-                        for (auto& gauss : gaussVec) gauss = -gauss;
-                        antiPath = false;
-                    }
-
-                }
+                //  Next Gaussian vector, dimension D
+                taskRng->nextG(gaussVec);
+                //  Path
                 cMdl->generatePath(gaussVec, path);       
+                //  Payoff
                 res[firstPath + i] = prd.payoff(path);
             }
 
@@ -277,8 +240,7 @@ mcSimulAAD(
     const Product<Number>& prd,
     const Model<Number>& mdl,
     const RNG& rng,
-    const size_t nPath,
-    const bool antithetic)
+    const size_t nPath)
 {
     //  Work with copies of the model and RNG
     //      which are modified when we set up the simulation
@@ -309,7 +271,6 @@ mcSimulAAD(
     vector<scenario<Number>> path(prd.timeline().size());   //  Allocate path
 
     //	Iterate through paths	
-    bool antiPath = false;
     for (size_t i = 0; i<nPath; i++)
     {
         //  AAD - 2
@@ -318,26 +279,8 @@ mcSimulAAD(
         tape.rewindToMark();
         //
 
-        if (!antithetic)
-        {
-            //  Next Gaussian vector, dimension D
-            cRng->nextG(gaussVec);
-        }
-        else
-        {
-            //  Antithetic logic
-            if (!antiPath)
-            {
-                cRng->nextG(gaussVec);
-                antiPath = true;
-            }
-            else
-            {
-                for (auto& gauss : gaussVec) gauss = -gauss;
-                antiPath = false;
-            }
-
-        }
+        //  Next Gaussian vector, dimension D
+        cRng->nextG(gaussVec);
         //  Generate path, consume Gaussian vector
         cMdl->generatePath(gaussVec, path);     
         //	Compute result
@@ -420,8 +363,7 @@ mcParallelSimulAAD(
     const Product<Number>& prd,
     const Model<Number>& mdl,
     const RNG& rng,
-    const size_t nPath,
-    const bool antithetic)
+    const size_t nPath)
 {
     //  Allocate results
     vector<Number> nPayoffs(nPath);	                       
@@ -495,39 +437,21 @@ mcParallelSimulAAD(
 
             //  Get a RNG and position it correctly
             auto taskRng = cRng->clone();
-            taskRng->skipTo(antithetic ? firstPath / 2 : firstPath);
+            taskRng->skipTo(firstPath);
 
             //  And conduct the simulations, exactly same as sequential
-            bool antiPath = false;
             for (size_t i = 0; i < pathsInTask; i++)
             {
                 //  Rewind tape to mark
                 Number::tape->rewindToMark();
 
-                if (!antithetic)
-                {
-                    //  Next Gaussian vector, dimension D
-                    taskRng->nextG(gaussVecs[threadNum]);
-                }
-                else
-                {
-                    //  Antithetic logic
-                    if (!antiPath)
-                    {
-                        taskRng->nextG(gaussVecs[threadNum]);
-                        antiPath = true;
-                    }
-                    else
-                    {
-                        for (auto& gauss : gaussVecs[threadNum]) 
-                            gauss = -gauss;
-                        antiPath = false;
-                    }
-
-                }
+                //  Next Gaussian vector, dimension D
+                taskRng->nextG(gaussVecs[threadNum]);
+                //  Path
                 cMdl[threadNum]->generatePath(
                     gaussVecs[threadNum], 
                     paths[threadNum]);
+                //  Payoff
                 nPayoffs[firstPath + i] = prd.payoff(paths[threadNum]);
 
                 //  Propagate adjoints

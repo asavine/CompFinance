@@ -39,7 +39,6 @@ inline double xUocDupire(
     double              monitorFreq,
     //  numerical parameters
     double              useSobol,
-    double              useAnti,
     double              seed1,
     double              seed2,
     double              numPath,
@@ -93,7 +92,7 @@ inline double xUocDupire(
     //  Call and return
 
     return uocDupire(spot, vspots, vtimes, vvols, maxDt, strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), useAnti > 0, static_cast<int>(seed1), static_cast<int>(seed2));
+        useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
 
 }
 
@@ -112,7 +111,6 @@ inline FP12* xUocDupireBump(
     double              monitorFreq,
     //  numerical parameters
     double              useSobol,
-    double              useAnti,
     double              seed1,
     double              seed2,
     double              numPath,
@@ -166,7 +164,7 @@ inline FP12* xUocDupireBump(
     //  Call 
     auto res = uocDupireBumpRisk(spot, vspots, vtimes, vvols, maxDt, 
         strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), useAnti > 0,
+        useSobol > 0, static_cast<int>(numPath), 
         static_cast<int>(seed1), static_cast<int>(seed2));
     //  Build return
 
@@ -218,7 +216,6 @@ extern "C" __declspec(dllexport)
         double              monitorFreq,
         //  numerical parameters
         double              useSobol,
-        double              useAnti,
         double              seed1,
         double              seed2,
         double              numPath,
@@ -272,7 +269,7 @@ extern "C" __declspec(dllexport)
     //  Call 
     auto res = uocDupireAADRisk(spot, vspots, vtimes, vvols, maxDt,
         strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), useAnti > 0,
+        useSobol > 0, static_cast<int>(numPath), 
         static_cast<int>(seed1), static_cast<int>(seed2));
 
     //  Build return
@@ -461,7 +458,6 @@ inline FP12* xDupireSuperbucket(
     double              monitorFreq,
     //  numerical parameters
     double              useSobol,
-    double              useAnti,
     double              seed1,
     double              seed2,
     double              numPath,
@@ -522,7 +518,6 @@ inline FP12* xDupireSuperbucket(
         parallel>0,
         useSobol > 0,
         static_cast<int>(numPath), 
-        useAnti > 0,
         vspots,
         maxDs,
         vtimes,
@@ -596,9 +591,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
 	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
 		(LPXLOPER12)TempStr12(L"xUocDupire"),
-		(LPXLOPER12)TempStr12(L"BBK%K%K%BBBBBBBBBBB"),
+		(LPXLOPER12)TempStr12(L"BBK%K%K%BBBBBBBBBB"),
 		(LPXLOPER12)TempStr12(L"xUocDupire"),
-		(LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, useAnti, [seed1], [seed2], N, [Parallel]"),
+		(LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
 		(LPXLOPER12)TempStr12(L"1"),
 		(LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
 		(LPXLOPER12)TempStr12(L""),
@@ -621,9 +616,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xUocDupireBump"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBB"),
         (LPXLOPER12)TempStr12(L"xUocDupireBump"),
-        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, useAnti, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -633,9 +628,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xUocDupireAAD"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBB"),
         (LPXLOPER12)TempStr12(L"xUocDupireAAD"),
-        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, useAnti, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -645,9 +640,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBK%K%K%BK%BBBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"K%BBBBBBK%K%K%BK%BBBBBBBBBBB"),
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"ivs, spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, K, B, T, Bfreq, sobol, anti, s1, s2, numPth, parallel"),
+        (LPXLOPER12)TempStr12(L"ivs, spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, K, B, T, Bfreq, sobol, s1, s2, numPth, parallel"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -657,9 +652,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xUocDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBB"),
         (LPXLOPER12)TempStr12(L"xUocDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"spot, strikes, mats, calls, maxDt, K, B, T, freq, useSobol, useAnti, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"spot, strikes, mats, calls, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

@@ -42,7 +42,6 @@ inline double uocDupire(
     const bool              parallel,
     const bool              useSobol,
     const int               numPath,
-    const bool              antithetic,
     const int               seed1 = 12345,
     const int               seed2 = 12346)
 {
@@ -53,8 +52,8 @@ inline double uocDupire(
 
     //  Simulate
     auto results = parallel
-        ? mcParallelSimul(product, model, *rng, numPath, antithetic)
-        : mcSimul(product, model, *rng, numPath, antithetic);
+        ? mcParallelSimul(product, model, *rng, numPath)
+        : mcSimul(product, model, *rng, numPath);
 
     //  Return average
     return accumulate(results.begin(), results.end(), 0.0) 
@@ -78,7 +77,6 @@ inline auto uocDupireBumpRisk(
     const bool              parallel,
     const bool              useSobol,
     const int               numPath,
-    const bool              antithetic,
     //  optionals
     const int               seed1 = 12345,
     const int               seed2 = 12346)
@@ -105,7 +103,6 @@ inline auto uocDupireBumpRisk(
         parallel,
         useSobol,
         numPath,
-        antithetic,
         seed1,
         seed2);
     
@@ -125,7 +122,6 @@ inline auto uocDupireBumpRisk(
         parallel,
         useSobol,
         numPath,
-        antithetic,
         seed1,
         seed2);
     results.delta = 1.e+08 * (v1 - results.value);
@@ -151,7 +147,6 @@ inline auto uocDupireBumpRisk(
                 parallel,
                 useSobol,
                 numPath,
-                antithetic,
                 seed1,
                 seed2);
             results.vega[i][j] = 1.e+08 * (v1 - results.value);
@@ -179,7 +174,6 @@ inline auto uocDupireAADRisk(
     const bool              parallel,
     const bool              useSobol,
     const int               numPath,
-    const bool              antithetic,
     //  optionals
     const int               seed1 = 12345,
     const int               seed2 = 12346)
@@ -202,8 +196,8 @@ inline auto uocDupireAADRisk(
     //  Simulate
 
     const auto simulResults = parallel
-        ? mcParallelSimulAAD(product, model, *rng, numPath, antithetic)
-        : mcSimulAAD(product, model, *rng, numPath, antithetic);
+        ? mcParallelSimulAAD(product, model, *rng, numPath)
+        : mcSimulAAD(product, model, *rng, numPath);
 
     //  Value
 
@@ -281,7 +275,6 @@ inline auto
     const bool              parallel,
     const bool              useSobol,
     const int               numPath,
-    const bool              antithetic,
     //  The local vol grid
     //  The spots to include
     const vector<double>&   inclSpots,
@@ -349,7 +342,6 @@ inline auto
         parallel,
         useSobol,
         numPath,
-        antithetic,
         seed1,
         seed2);
     results.value = mdlDerivs.value;
