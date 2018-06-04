@@ -67,32 +67,35 @@ public:
     }
 
     //  Payoff
-    T payoff(const vector<scenario<T>>& path) const override
+    T payoff(
+        typename vector<scenario<T>>::const_iterator pathBegin,
+        typename vector<scenario<T>>::const_iterator pathEnd
+    ) const override
     {
         //  We apply the smooth barrier technique to stabilize risks
         //  See Savine's presentation on Fuzzy Logic, Global Derivatives 2016
         //  Or Andreasen and Savine's publication on scripting
 
         //  We apply a smoothing factor of 1% of the spot both ways, untemplated
-        const double smooth = convert<double>(path[0].spot * 0.01);
+        const double smooth = convert<double>(pathBegin->spot * 0.01);
 
         //  We start alive
         T alive = convert<T>(1.0);
 
         //  Go through path, update alive status
-        for (size_t i = 0; i < path.size(); ++i)
+        for (auto it = pathBegin; it != pathEnd; ++it)
         {
             //  Breached
-            if (path[i].spot > myBarrier + smooth) return convert<T>(0.0);
+            if (it->spot > myBarrier + smooth) return convert<T>(0.0);
 
             //  Semi-breached: apply smoothing
-            if (path[i].spot > myBarrier - smooth)
+            if (it->spot > myBarrier - smooth)
             {
-                alive *= (myBarrier + smooth - path[i].spot) / (2 * smooth);
+                alive *= (myBarrier + smooth - it->spot) / (2 * smooth);
             }
         }
 
         //  Payoff
-        return alive * max<T>(path.back().spot - myStrike, convert<T>(0.0));
+        return alive * max<T>((--pathEnd)->spot - myStrike, convert<T>(0.0));
     }
 };

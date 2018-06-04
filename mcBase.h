@@ -44,7 +44,10 @@ public:
     virtual const vector<Time>& timeline() const = 0;
 
     //  Compute payoff given a path (on the product timeline)
-    virtual T payoff(const vector<scenario<T>>& path) const = 0;
+    virtual T payoff(
+        typename vector<scenario<T>>::const_iterator pathBegin,
+        typename vector<scenario<T>>::const_iterator pathEnd
+    ) const = 0;
 
     virtual unique_ptr<Product<T>> clone() const = 0;
 
@@ -137,7 +140,7 @@ inline vector<double> mcSimul(
         //  Generate path, consume Gaussian vector
         cMdl->generatePath(gaussVec, path);     
         //	Compute result
-        res[i] = prd.payoff(path);              
+        res[i] = prd.payoff(path.begin(), path.end());              
     }
 
     return res;	//	C++11: move
@@ -205,7 +208,7 @@ inline vector<double> mcParallelSimul(
                 //  Path
                 cMdl->generatePath(gaussVec, path);       
                 //  Payoff
-                res[firstPath + i] = prd.payoff(path);
+                res[firstPath + i] = prd.payoff(path.begin(), path.end());
             }
 
             //  Remember tasks must return bool
@@ -284,7 +287,7 @@ mcSimulAAD(
         //  Generate path, consume Gaussian vector
         cMdl->generatePath(gaussVec, path);     
         //	Compute result
-        nPayoffs[i] = prd.payoff(path);              
+        nPayoffs[i] = prd.payoff(path.begin(), path.end());
 
         //  AAD - 3
         //  Propagate adjoints
@@ -452,7 +455,9 @@ mcParallelSimulAAD(
                     gaussVecs[threadNum], 
                     paths[threadNum]);
                 //  Payoff
-                nPayoffs[firstPath + i] = prd.payoff(paths[threadNum]);
+                nPayoffs[firstPath + i] = prd.payoff(
+                                    paths[threadNum].begin(),
+                                    paths[threadNum].end());
 
                 //  Propagate adjoints
                 nPayoffs[firstPath + i].propagateToMark();
