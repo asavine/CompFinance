@@ -179,7 +179,6 @@
     <ClInclude Include="mcPrd.h" />
     <ClInclude Include="mrg32k3a.h" />
     <ClInclude Include="primitivepolynomials.h" />
-    <ClInclude Include="SyncConstructs.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="gaussians.h" />
     <ClInclude Include="matrix.h" />
@@ -196,7 +195,6 @@
     <ClCompile Include="initializers.cpp" />
     <ClCompile Include="mcBase.cpp" />
     <ClCompile Include="primitivepolynomials.cpp" />
-    <ClCompile Include="SyncConstructs.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

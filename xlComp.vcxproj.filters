@@ -48,9 +48,6 @@
     <ClInclude Include="ConcurrentQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SyncConstructs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="mcBase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -126,9 +123,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ThreadPool.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SyncConstructs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="mcBase.cpp">
