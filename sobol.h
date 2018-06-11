@@ -80,7 +80,7 @@ public:
 
         //	Set pointers
         myInitializers = get_jk_initializers();
-        myPrimitivePolynomials = PrimitivePolynomials;
+        myPrimitivePolynomials = pj_PrimitivePolynomials;
 
         //	Initialize coeffcients and degree of the k'th primitive polynomial
         myPpmt.resize(myDim);

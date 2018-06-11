@@ -1,10 +1,10 @@
 
 // this file is a slightly edited version of
 // PrimitivePolynomialsModuloTwoUpToDegree27.h
-// © 2002 "Monte Carlo Methods in Finance"
+// Â© 2002 "Monte Carlo Methods in Finance"
 // as provided ready for compilation in the directory
 // "PrimitivePolynomialsModuloTwo" on the CD accompanying the book
-// "Monte Carlo Methods in Finance" by Peter Jäckel.
+// "Monte Carlo Methods in Finance" by Peter Jaeckel.
 //
 // the original copyright is:
 // ===========================================================================
@@ -263,7 +263,7 @@ const long *const PrimitivePolynomials[N_MAX_DEGREE];
 #ifdef __cplusplus
 extern "C"
 #endif
-const long *const jk_PrimitivePolynomials[N_MAX_DEGREE]; // A different order of the polynomials corresponding to Stephen Joe and Fraces Y. Kuo initializers.
+const long *const pj_PrimitivePolynomials[N_MAX_DEGREE]; // A different order of the polynomials corresponding to Stephen Joe and Fraces Y. Kuo initializers.
 
 #endif
 
