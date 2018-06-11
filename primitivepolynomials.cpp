@@ -3,7 +3,7 @@
 // 8129334 polinomials. Both are slightly edited versions of
 // PrimitivePolynomialsModuloTwoUpToDegree27.c
 //
-// © 2002 "Monte Carlo Methods in Finance"
+// Â© 2002 "Monte Carlo Methods in Finance"
 //
 //
 // =========================================================================
@@ -21309,7 +21309,7 @@ static const long PrimitivePolynomialDegree18[]={
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_04
-static const long jk_PrimitivePolynomialDegree05[]={
+static const long PrimitivePolynomialDegree05[]={
 2,
 13,
 7,
@@ -21320,7 +21320,7 @@ static const long jk_PrimitivePolynomialDegree05[]={
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_05
-static const long jk_PrimitivePolynomialDegree06[]={
+static const long PrimitivePolynomialDegree06[]={
 1,
 16,
 13,
@@ -21331,7 +21331,7 @@ static const long jk_PrimitivePolynomialDegree06[]={
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_06
-static const long jk_PrimitivePolynomialDegree07[]={
+static const long PrimitivePolynomialDegree07[]={
 1,
 32,
 4,
@@ -21354,7 +21354,7 @@ static const long jk_PrimitivePolynomialDegree07[]={
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_07
-static const long jk_PrimitivePolynomialDegree08[]={
+static const long PrimitivePolynomialDegree08[]={
 14,
 56,
 21,
@@ -21462,7 +21462,7 @@ const long *const PrimitivePolynomials[N_MAX_DEGREE]={
 
 };
 
-const long *const jk_PrimitivePolynomials[N_MAX_DEGREE]={
+const long *const PrimitivePolynomials[N_MAX_DEGREE]={
    PrimitivePolynomialDegree01
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_01
  , PrimitivePolynomialDegree02
@@ -21474,16 +21474,16 @@ const long *const jk_PrimitivePolynomials[N_MAX_DEGREE]={
  , PrimitivePolynomialDegree04
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_04
- , jk_PrimitivePolynomialDegree05
+ , PrimitivePolynomialDegree05
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_05
- , jk_PrimitivePolynomialDegree06
+ , PrimitivePolynomialDegree06
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_06
- , jk_PrimitivePolynomialDegree07
+ , PrimitivePolynomialDegree07
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_07
- , jk_PrimitivePolynomialDegree08
+ , PrimitivePolynomialDegree08
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_08
  , PrimitivePolynomialDegree09
