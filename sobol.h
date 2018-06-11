@@ -1,8 +1,8 @@
 // this file is an edited version of
 // the file provided with
-// © 2002 "Monte Carlo Methods in Finance"
+// Â© 2002 "Monte Carlo Methods in Finance"
 // on the CD accompanying the book
-// "Monte Carlo Methods in Finance" by Peter Jäckel.
+// "Monte Carlo Methods in Finance" by Peter Jaeckel.
 //
 // the original copyright is:
 // ===========================================================================
@@ -12,7 +12,7 @@
 // granted, provided that this notice is preserved.
 // ===========================================================================
 
-//  Edited by Antoine Savine in 2018: essentially added a skip ahead
+//  Edited by Antoine Savine in 2018: essentially added a skip ahead (skipTo)
 
 #pragma once
 
@@ -22,17 +22,17 @@
 #include "primitivepolynomials.h"
 #include "initializers.h"
 
-//	content:	generatees sobol sequences up to dimension 21200
+//	content:	generates sobol sequences up to dimension 1110
 //	
 //				Joe and Kou directional numbers guarantee Sobol property A to be satisfied
 //
-//				Code is based on QuantLib 0.3.6 and routines from Jackel
+//				Code is based on QuantLib 0.3.6 and routines from Jaeckel
 //	
 //				
 //
 //				References:
 //
-//				Jackel (2002): Monte-Carlo Methods in Finance, Wiley
+//				Jaeckel (2002): Monte-Carlo Methods in Finance, Wiley
 //
 //				Joe & Kuo (2003): Remark on Algorithm 659: Implementing Sobol's 
 //				Quasirandom Sequence Generator. ACM Transactions on Mathematical Software 29, 1, 43-57
@@ -80,7 +80,7 @@ public:
 
         //	Set pointers
         myInitializers = get_jk_initializers();
-        myPrimitivePolynomials = jk_PrimitivePolynomials;
+        myPrimitivePolynomials = PrimitivePolynomials;
 
         //	Initialize coeffcients and degree of the k'th primitive polynomial
         myPpmt.resize(myDim);
@@ -197,7 +197,7 @@ public:
         return myDim;
     }
 
-    //  Skip ahead
+    //  Skip ahead (from 0 to b)
     void skipTo(const long b) override
     {
         //	Check skip
