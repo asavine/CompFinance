@@ -80,7 +80,11 @@ public:
 
         //	Set pointers
         myInitializers = get_jk_initializers();
-        myPrimitivePolynomials = pj_PrimitivePolynomials;
+
+        //  The array jk_PrimitivePolynomials is identical to Jaeckel's original in all 
+        //  except the ordering of the polynomials of degree 4 to 8. These appear as a 
+        //  renamed copy of the original towards the end of primitivepolynomials.cpp
+        myPrimitivePolynomials = jk_PrimitivePolynomials;
 
         //	Initialize coeffcients and degree of the k'th primitive polynomial
         myPpmt.resize(myDim);

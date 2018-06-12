@@ -14,6 +14,10 @@
 // granted, provided that this notice is preserved.
 // ===========================================================================
 
+//  The array jk_PrimitivePolynomials is identical to Jaeckel's original in all 
+//  except the ordering of the polynomials of degree 4 to 8. These appear as a 
+//  renamed copy of the original towards the end of primitivepolynomials.cpp
+
 #ifndef primitivepolynomials_h
 #define primitivepolynomials_h
 
@@ -263,7 +267,7 @@ const long *const PrimitivePolynomials[N_MAX_DEGREE];
 #ifdef __cplusplus
 extern "C"
 #endif
-const long *const pj_PrimitivePolynomials[N_MAX_DEGREE]; // A different order of the polynomials corresponding to Stephen Joe and Fraces Y. Kuo initializers.
+const long *const jk_PrimitivePolynomials[N_MAX_DEGREE]; // A different order of the polynomials corresponding to Stephen Joe and Fraces Y. Kuo initializers.
 
 #endif
 

@@ -13,6 +13,10 @@
 // granted, provided that this notice is preserved.
 // =========================================================================
 
+//  The array jk_PrimitivePolynomials is identical to Jaeckel's original in all 
+//  except the ordering of the polynomials of degree 4 to 8. These appear as a 
+//  renamed copy of the original towards the end of primitivepolynomials.cpp
+
 #include "primitivepolynomials.h"
 
 static const long PrimitivePolynomialDegree01[] = {
@@ -21309,7 +21313,7 @@ static const long PrimitivePolynomialDegree18[] = {
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_04
-static const long pj_PrimitivePolynomialDegree05[] = {
+static const long jk_PrimitivePolynomialDegree05[] = {
     2,
     13,
     7,
@@ -21320,7 +21324,7 @@ static const long pj_PrimitivePolynomialDegree05[] = {
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_05
-static const long pj_PrimitivePolynomialDegree06[] = {
+static const long jk_PrimitivePolynomialDegree06[] = {
     1,
     16,
     13,
@@ -21331,7 +21335,7 @@ static const long pj_PrimitivePolynomialDegree06[] = {
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_06
-static const long pj_PrimitivePolynomialDegree07[] = {
+static const long jk_PrimitivePolynomialDegree07[] = {
     1,
     32,
     4,
@@ -21354,7 +21358,7 @@ static const long pj_PrimitivePolynomialDegree07[] = {
 #endif
 
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_07
-static const long pj_PrimitivePolynomialDegree08[] = {
+static const long jk_PrimitivePolynomialDegree08[] = {
     14,
     56,
     21,
@@ -21462,7 +21466,7 @@ const long *const PrimitivePolynomials[N_MAX_DEGREE] = {
 
 };
 
-const long *const pj_PrimitivePolynomials[N_MAX_DEGREE] = {
+const long *const jk_PrimitivePolynomials[N_MAX_DEGREE] = {
     PrimitivePolynomialDegree01
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_01
     , PrimitivePolynomialDegree02
@@ -21474,16 +21478,16 @@ const long *const pj_PrimitivePolynomials[N_MAX_DEGREE] = {
     , PrimitivePolynomialDegree04
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_04
-    , pj_PrimitivePolynomialDegree05
+    , jk_PrimitivePolynomialDegree05
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_05
-    , pj_PrimitivePolynomialDegree06
+    , jk_PrimitivePolynomialDegree06
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_06
-    , pj_PrimitivePolynomialDegree07
+    , jk_PrimitivePolynomialDegree07
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_07
-    , pj_PrimitivePolynomialDegree08
+    , jk_PrimitivePolynomialDegree08
 #endif
 #if PPMT_MAX_DIM > N_PRIMITIVES_UP_TO_DEGREE_08
     , PrimitivePolynomialDegree09
