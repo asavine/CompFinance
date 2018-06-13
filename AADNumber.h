@@ -36,7 +36,7 @@ class Number
     template <class NodeType = Node>
     inline NodeType* node() const
     {
-        return reinterpret_cast<NodeType*>(myNode);
+        return static_cast<NodeType*>(myNode);
     }
 
     //  To help overloading
