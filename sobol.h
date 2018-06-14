@@ -15,6 +15,7 @@
 //  Edited by Antoine Savine in 2018: essentially added a skip ahead (skipTo)
 
 #pragma once
+#pragma warning(disable : 4018)
 
 #include "mcBase.h"
 #include "gaussians.h"
