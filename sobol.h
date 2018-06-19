@@ -182,14 +182,16 @@ public:
         }
 
         //	XOR the appropriate direction number into each component of the integer sequence
-        unsigned int i;
-        for (i = 0; i<myDim; ++i)
+        for (int i = 0; i<myDim; ++i)
         {
             myIntegerSequence[i] ^= myDirectionIntegers[i][j];
-            
-            //  Result, only if required
-            if(gaussVec.size())
-                gaussVec[i] = invNormalCdf(myIntegerSequence[i]*ONEOVER2POW32);
+        }
+        if (!gaussVec.empty())
+        {
+            for (int i = 0; i < myDim; ++i)
+            {
+                gaussVec[i] = invNormalCdf(ONEOVER2POW32 * myIntegerSequence[i]);
+            }
         }
 
         //	Update count

@@ -19,6 +19,36 @@ As long as this comment is preserved at the top of the file
 #include <exception>
 using namespace std;
 
+#if AADET && AADETNV
+
+struct Node
+{
+    inline Node(const unsigned char N) :
+        n(N),
+        adjoint(0),
+        derivatives(reinterpret_cast<double*>((char*)(this) + sizeof(Node))),
+        argAdjoints(reinterpret_cast<double**>((char*)(this) + sizeof(Node) + N * sizeof(double)))
+    {}
+
+    const unsigned char n;
+    double adjoint;
+
+    double* derivatives;
+    double **argAdjoints;
+
+    inline void propagate() const
+    {
+        if (adjoint == 0.0) return;
+
+        for (int i = 0; i < n; ++i)
+        {
+            *argAdjoints[i] += derivatives[i] * adjoint;
+        }
+    }
+};
+
+#else
+
 struct Node
 {
     double adjoint = 0.0;
@@ -82,3 +112,4 @@ struct MultiNode<0> : public Node
 
 };
 
+#endif
