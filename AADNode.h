@@ -23,14 +23,14 @@ using namespace std;
 
 struct Node
 {
-    inline Node(const unsigned char N) :
+    inline Node(const size_t N) :
         n(N),
         adjoint(0),
         derivatives(reinterpret_cast<double*>((char*)(this) + sizeof(Node))),
         argAdjoints(reinterpret_cast<double**>((char*)(this) + sizeof(Node) + N * sizeof(double)))
     {}
 
-    const unsigned char n;
+    const size_t n;
     double adjoint;
 
     double* derivatives;
@@ -40,7 +40,7 @@ struct Node
     {
         if (adjoint == 0.0) return;
 
-        for (int i = 0; i < n; ++i)
+        for (size_t i = 0; i < n; ++i)
         {
             *argAdjoints[i] += derivatives[i] * adjoint;
         }

@@ -125,11 +125,12 @@
       <OmitFramePointers>true</OmitFramePointers>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <BufferSecurityCheck>
+      </BufferSecurityCheck>
       <OpenMPSupport>true</OpenMPSupport>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
-      <StructMemberAlignment>16Bytes</StructMemberAlignment>
-      <AdditionalOptions>/Zo %(AdditionalOptions)</AdditionalOptions>
+      <StructMemberAlignment>8Bytes</StructMemberAlignment>
+      <AdditionalOptions>/Zo /Qvec-report:1 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

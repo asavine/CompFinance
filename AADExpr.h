@@ -724,13 +724,13 @@ class Number : public Expression<Number>
 
 #if AADETNV
     
-    static const size_t sz = sizeof(double) + sizeof(double*);
-
     template <size_t N>
     Node* createMultiNode()
     {
+        static const size_t sz = sizeof(Node) + N * (sizeof(double) + sizeof(double*));
+
         //  Placement syntax to allocate in place on tape
-        return new (tape->allocate(sizeof(Node) + N * sz)) Node(N);
+        return new (tape->allocate(sz)) Node(N);
     }
 
 #else
