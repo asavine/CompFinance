@@ -16,8 +16,8 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
-#define AADET   true    //  AAD with expression templates
-#define AADETNV false   //  Optimization without virtual nodes (experimental)
+#define AADET   true        //  AAD with expression templates
+#define AADETNV false       //  Optimization without virtual nodes (experimental)
 
 //  So we can instrument Gaussians like standard math functions
 #include "Gaussians.h"
@@ -35,8 +35,7 @@ As long as this comment is preserved at the top of the file
 template <class IT>
 inline void putOnTape(IT begin, IT end)
 {
-    for (auto it = begin; it != end; ++it)
-        it->putOnTape();
+    for_each(begin, end, [](Number& n) {n.putOnTape(); });
 }
 
 template<class To, class From>

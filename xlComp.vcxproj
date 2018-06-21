@@ -130,7 +130,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <StructMemberAlignment>8Bytes</StructMemberAlignment>
-      <AdditionalOptions>/Zo /Qvec-report:1 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zo %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

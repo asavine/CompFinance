@@ -23,6 +23,10 @@ As long as this comment is preserved at the top of the file
 
 using namespace std;
 
+#include "matrix.h"
+#include "threadPool.h"
+#include "AAD.h"
+
 using Time = double;
 
 extern Time systemTime;
@@ -43,11 +47,19 @@ public:
     //  Access to the product timeline
     virtual const vector<Time>& timeline() const = 0;
 
-    //  Compute payoff given a path (on the product timeline)
-    virtual T payoff(
-        typename vector<scenario<T>>::const_iterator pathBegin,
-        typename vector<scenario<T>>::const_iterator pathEnd
-    ) const = 0;
+    //  Number of payoffs in the product, 1 by default
+    virtual size_t numPayoffs() const
+    {
+        return 1;
+    }
+
+    //  Compute payoffs given a path (on the product timeline)
+    virtual void payoffs(
+        //  path, one entry per time step (on the product timeline)
+        const vector<scenario<T>>&  path,     
+        //  pre-allocated space for resulting payoffs
+        vector<T>&                  payoffs)       
+            const = 0;
 
     virtual unique_ptr<Product<T>> clone() const = 0;
 
@@ -73,12 +85,37 @@ public:
 
     virtual ~Model() {}
 
-    //  Access to all parameters by copy
-    virtual vector<T> parameters() const = 0;
+    //  Access to all the model parameters and what they mean
+    virtual const vector<T*>& parameters() = 0;
+    virtual const vector<string>& parameterLabels() const = 0;
 
-    //  For AAD enabled models
-    //  Put parameters on tape 
-    virtual void putOnTape() {}
+    //  Number of parameters
+    size_t numParams() const
+    {
+        return const_cast<Model*>(this)->parameters().size();
+    }
+
+    //  Put parameters on tape, only valid for T = Number
+    void putParametersOnTape()
+    {
+        putParametersOnTapeT<T>();
+    }
+
+private:
+
+    //  If T not Number : do nothing
+    template<class U> 
+    void putParametersOnTapeT()
+    {
+
+    }
+
+    //  If T = Number : put on tape
+    template <>
+    void putParametersOnTapeT<Number>()
+    {
+        for (Number* param : parameters()) param->putOnTape();
+    }
 };
 
 class RNG
@@ -108,8 +145,8 @@ public:
 };
 
 //	MC simulator: free function that conducts simulations 
-//      and returns a vector of nPath payoffs
-inline vector<double> mcSimul(
+//      and returns a matrix (as vector of vectors) (0..nPath-1 , 0..nPay-1) of payoffs 
+inline vector<vector<double>> mcSimul(
     const Product<double>& prd,
     const Model<double>& mdl,
     const RNG& rng,			            
@@ -122,7 +159,8 @@ inline vector<double> mcSimul(
     auto cRng = rng.clone();
 
     //	Allocate results
-    vector<double> res(nPath);
+    const size_t nPay = prd.numPayoffs();
+    vector<vector<double>> results(nPath, vector<double>(nPay));
     //  Init the simulation timeline
     cMdl->init(prd.timeline());              
     //  Init the RNG
@@ -140,18 +178,15 @@ inline vector<double> mcSimul(
         //  Generate path, consume Gaussian vector
         cMdl->generatePath(gaussVec, path);     
         //	Compute result
-        res[i] = prd.payoff(path.begin(), path.end());              
+        prd.payoffs(path, results[i]);
     }
 
-    return res;	//	C++11: move
+    return results;	//	C++11: move
 }
 
-#include "threadPool.h"
-
 #define BATCHSIZE 64
-//	MC simulator: free function that conducts simulations 
-//      and returns a vector of nPath payoffs
-inline vector<double> mcParallelSimul(
+//	Parallel equivalent of mcSimul()
+inline vector<vector<double>> mcParallelSimul(
     const Product<double>& prd,
     const Model<double>& mdl,
     const RNG& rng,
@@ -160,7 +195,9 @@ inline vector<double> mcParallelSimul(
     auto cMdl = mdl.clone();
     auto cRng = rng.clone();
 
-    vector<double> res(nPath);	                           
+    const size_t nPay = prd.numPayoffs();
+    vector<vector<double>> results(nPath, vector<double>(nPay));
+
     cMdl->init(prd.timeline());                        
     cRng->init(cMdl->simDim());                        
 
@@ -208,7 +245,7 @@ inline vector<double> mcParallelSimul(
                 //  Path
                 cMdl->generatePath(gaussVec, path);       
                 //  Payoff
-                res[firstPath + i] = prd.payoff(path.begin(), path.end());
+                prd.payoffs(path, results[firstPath + i]);
             }
 
             //  Remember tasks must return bool
@@ -222,28 +259,42 @@ inline vector<double> mcParallelSimul(
     //  Wait and help
     for (auto& future : futures) pool->activeWait(future);
 
-    return res;	//	C++11: move
+    return results;	//	C++11: move
 }
 
-#include "AAD.h"
+//  AAD instrumentation of mcSimul()
+//  returns the following results:
 
-//	MC simulator: free function that conducts simulations 
-//  Note we return:
-//  - a vector of pathwise payoffs as usual
-//  - a clone of the original model, 
-//      with derivatives accumulated inside the adjoints of the model parameters 
 struct AADSimulResults
 {
-    vector<double> payoffs;
-    unique_ptr<Model<Number>> model;
+    AADSimulResults(const size_t nPath, const size_t nPay, const size_t nParam) :
+        payoffs(nPath, vector<double>(nPay)),
+        aggregated(nPath),
+        risks(nParam)
+    {}
+
+    //  matrix(0..nPath - 1, 0..nPay - 1) of payoffs, same as mcSimul()
+    vector<vector<double>>  payoffs;
+
+    //  vector(0..nPath) of aggregated payoffs
+    vector<double>          aggregated;
+
+    //  vector(0..nParam - 1) of risk sensitivities
+    //  of aggregated payoff, averaged over paths
+    vector<double>          risks;
 };
-//  Also note: tape must be wiped afterwards
+
+//  Default aggregator = 1st payoff = payoff[0]
+const auto defaultAggregator = [](const vector<Number>& v) {return v[0]; };
+
+template<class F = decltype(defaultAggregator)>
 inline AADSimulResults
 mcSimulAAD(
     const Product<Number>& prd,
     const Model<Number>& mdl,
     const RNG& rng,
-    const size_t nPath)
+    const size_t            nPath,
+    const F&                aggFun = defaultAggregator)
 {
     //  Work with copies of the model and RNG
     //      which are modified when we set up the simulation
@@ -258,7 +309,7 @@ mcSimulAAD(
     tape.rewind();
     //  Put parameters on tape
     //  note that also initializes all adjoints
-    cMdl->putOnTape();
+    cMdl->putParametersOnTape();
     //  Init the simulation timeline
     //  CAREFUL: simulation timeline must be on tape
     //  Hence moved here
@@ -267,11 +318,21 @@ mcSimulAAD(
     tape.mark();
     //
 
-    //  Other init / allocate
-    vector<Number> nPayoffs(nPath);	                    //  Allocate results
-    cRng->init(cMdl->simDim());                         //  Init the RNG
+    //  Init the RNG
+    cRng->init(cMdl->simDim());                         
+                                                        
+    //  Dimensions
+    const size_t nPay = prd.numPayoffs();
+    const vector<Number*>& params = cMdl->parameters();
+    const size_t nParam = params.size();
+    
+    //  Allocate workspace
+    vector<Number> nPayoffs(nPay);
     vector<double> gaussVec(cMdl->simDim());            //  Allocate Gaussian vector
     vector<scenario<Number>> path(prd.timeline().size());   //  Allocate path
+
+    //  Results
+    AADSimulResults results(nPath, nPay, nParam);
 
     //	Iterate through paths	
     for (size_t i = 0; i<nPath; i++)
@@ -287,12 +348,17 @@ mcSimulAAD(
         //  Generate path, consume Gaussian vector
         cMdl->generatePath(gaussVec, path);     
         //	Compute result
-        nPayoffs[i] = prd.payoff(path.begin(), path.end());
+        prd.payoffs(path, nPayoffs);
+        Number result = aggFun(nPayoffs);
 
         //  AAD - 3
         //  Propagate adjoints
-        nPayoffs[i].propagateToMark();
+        result.propagateToMark();
         //
+
+        //  Store results for the path
+        results.aggregated[i] = convert<double>(result);
+        convertCollection(nPayoffs.begin(), nPayoffs.end(), results.payoffs[i].begin());
     }
 
     //  AAD - 4
@@ -301,16 +367,15 @@ mcSimulAAD(
     //  We conduct one propagation mark to start
     Number::propagateMarkToStart();
 
-    //  Results
-    AADSimulResults results;
+    //  Pick sensitivities, summed over paths, and normalize
+    transform(
+        params.begin(), 
+        params.end(), 
+        results.risks.begin(), 
+        [nPath](const Number* p) {return p->adjoint() / nPath; });
     
-    //  Pathwise payoffs
-    results.payoffs.resize(nPath);
-    //  Copy and convert
-    convertCollection(nPayoffs.begin(), nPayoffs.end(), results.payoffs.begin());
-    
-    //  Model with accumulated adjoints
-    results.model = move(cMdl);
+    //  Clear the tape
+    tape.clear();
 
     return results;
 }
@@ -325,7 +390,8 @@ void initSimul(
     unique_ptr<Model<T>>& mdlClone,
     //  Stuff to allocate
     vector<double>& gaussVec,
-    vector<scenario<T>>& path)
+    vector<scenario<T>>&    path,
+    vector<Number>&         nPayoffs)
 {
     //  Work with copies of the model and RNG
     //      which are modified when we set up the simulation
@@ -338,7 +404,7 @@ void initSimul(
     tape.rewind();
     //  Put parameters on tape
     //  note that also initializes all adjoints
-    mdlClone->putOnTape();
+    mdlClone->putParametersOnTape();
     //  Init the simulation timeline
     //  CAREFUL: simulation timeline must be on tape
     //  Hence moved here
@@ -352,25 +418,20 @@ void initSimul(
     gaussVec.resize(mdlClone->simDim());     
     //  Allocate path
     path.resize(prd.timeline().size());   
-
+    //  Allocate payoffs
+    nPayoffs.resize(prd.numPayoffs());
 }
 
-//	MC simulator: free function that conducts simulations 
-//  Note we return:
-//  - a vector of pathwise payoffs as usual
-//  - a clone of the original model, 
-//      with derivatives accumulated inside the adjoints of the model parameters 
-//  Also note: tape must be wiped afterwards
+//  Parallel version of mcSimulAAD()
+template<class F = decltype(defaultAggregator)>
 inline AADSimulResults
 mcParallelSimulAAD(
     const Product<Number>& prd,
     const Model<Number>& mdl,
     const RNG& rng,
-    const size_t nPath)
+    const size_t            nPath,
+    const F&                aggFun = defaultAggregator)
 {
-    //  Allocate results
-    vector<Number> nPayoffs(nPath);	                       
-
     //  We need one of all these for each thread
     //  0: main thread
     //  1 to n : worker threads
@@ -378,10 +439,11 @@ mcParallelSimulAAD(
     ThreadPool *pool = ThreadPool::getInstance();
     const size_t nThread = pool->numThreads();
 
-    //  Clones
+    //  Allocate workspace
+    const size_t nPay = prd.numPayoffs();
+    const size_t nParam = mdl.numParams();
+    vector<vector<Number>> nPayoffs(nThread + 1);
     vector<unique_ptr<Model<Number>>> cMdl(nThread + 1);
-
-    //  Space for Gaussian vectors and paths 
     vector<vector<double>> gaussVecs(nThread + 1);   
     vector<vector<scenario<Number>>> paths(nThread + 1);
 
@@ -393,13 +455,16 @@ mcParallelSimulAAD(
     vector<int> init(nThread + 1, false);
 
     //  Initialize main thread
-    initSimul(prd, mdl, cMdl[0], gaussVecs[0], paths[0]);
+    initSimul(prd, mdl, cMdl[0], gaussVecs[0], paths[0], nPayoffs[0]);
+
+    //  Allocate results
+    AADSimulResults results(nPath, nPay, nParam);
 
     //  Init the RNG
     auto cRng = rng.clone();
     cRng->init(cMdl[0]->simDim());
 
-    //  Mark as initialized
+    //  Mark main thread as initialized
     init[0] = true;
 
     //  Reserve memory for futures
@@ -432,7 +497,8 @@ mcParallelSimulAAD(
                 initSimul(prd, mdl, 
                     cMdl[threadNum], 
                     gaussVecs[threadNum], 
-                    paths[threadNum]);
+                    paths[threadNum],
+                    nPayoffs[threadNum]);
 
                 //  Mark as initialized
                 init[threadNum] = true;
@@ -446,6 +512,7 @@ mcParallelSimulAAD(
             for (size_t i = 0; i < pathsInTask; i++)
             {
                 //  Rewind tape to mark
+                //  Notice : this is the tape for the executing thread
                 Number::tape->rewindToMark();
 
                 //  Next Gaussian vector, dimension D
@@ -455,12 +522,18 @@ mcParallelSimulAAD(
                     gaussVecs[threadNum], 
                     paths[threadNum]);
                 //  Payoff
-                nPayoffs[firstPath + i] = prd.payoff(
-                                    paths[threadNum].begin(),
-                                    paths[threadNum].end());
+                prd.payoffs(paths[threadNum], nPayoffs[threadNum]);
+                Number result = aggFun(nPayoffs[threadNum]);
 
                 //  Propagate adjoints
-                nPayoffs[firstPath + i].propagateToMark();
+                result.propagateToMark();
+
+                //  Store results for the path
+                results.aggregated[firstPath + i] = convert<double>(result);
+                convertCollection(
+                    nPayoffs[threadNum].begin(), 
+                    nPayoffs[threadNum].end(), 
+                    results.payoffs[firstPath + i].begin());
             }
 
             //  Remember tasks must return bool
@@ -494,33 +567,22 @@ mcParallelSimulAAD(
     //  Reset tape to main thread's
     Number::tape = mainThreadPtr;
 
-    //  At this point, we have nThread + 1 models
-    //  Each model i has parameters that accumlated adjoints
-    //      on its own tape for all paths on thread i
-    //  We accumulate them all on the main thread's model
-    vector<Number> params0 = cMdl[0]->parameters();
-    for (size_t i = 0; i < nThread; ++i)
+    //  Sum sensitivities over threads
+    for (size_t j = 0; j < nParam; ++j)
     {
-        if (init[i+1])
-        {
-            vector<Number> params = cMdl[i+1]->parameters();
-            for (size_t j = 0; j < params0.size(); ++j)
+        results.risks[j] += accumulate(
+                                cMdl.begin(), 
+                                cMdl.end(), 
+                                0.0, [j](const double acc, unique_ptr<Model<Number>>& mdl) 
             {
-                params0[j].adjoint() += params[j].adjoint();
+                                    return acc + (mdl? mdl->parameters()[j]->adjoint() : 0.0); 
             }
-        }
+        ) / nPath;
     }
 
-    //  Results
-    AADSimulResults results;
-
-    //  Pathwise payoffs
-    results.payoffs.resize(nPath);
-    //  Copy and convert
-    convertCollection(nPayoffs.begin(), nPayoffs.end(), results.payoffs.begin());
-
-    //  Model with accumulated adjoints
-    results.model = move(cMdl[0]);
+    //  Clear the main thread's tape
+    //  The other tapes are cleared on the destruction of the vector of tapes
+    Number::tape->clear();
 
     return results;
 }

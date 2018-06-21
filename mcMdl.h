@@ -22,7 +22,191 @@ As long as this comment is preserved at the top of the file
 #include "interp.h"
 #include "utility.h"
 
+#include <string>
 #include <iterator>
+using namespace std;
+
+template <class T>
+class BlackScholes : public Model<T>
+{
+    //  Model parameters
+
+    //  Today's spot
+    //  That would be today's linear market in a production system
+    T                   mySpot;
+    //  Local volatility structure
+    vector<Time>        myTimes;
+    //  Local vols function of time
+    vector<T>           myVols;
+
+    //  Normal specification = Bachelier
+    //      or Lognormal = Black-Scholes
+    bool                myNormal;
+
+    //  Similuation timeline
+    vector<Time>        myTimeline;
+    //  true (1) if the time step is on the product timeline
+    //  false (0) if it is an additional simulation step
+    //  note we use vector<int> because vector<bool> is broken in C++
+    vector<int>         myCommonSteps;
+
+    //  Pre-calculated on initialization
+
+    //  volatilities pre-interpolated in time for each time step
+    vector<T>           myInterpVols;
+    //  volatilities as stored are multiplied by sqrt(dt) 
+    //  so there is no need to do that during paths generation
+
+    //  pre-calculated ito terms 0.5 * vol ^ 2 * dt
+    vector<T>           myItoTerms;
+
+    //  Exported parameters
+    vector<T*>          myParameters;
+    vector<string>      myParameterLabels;
+
+public:
+
+    //  Constructor: store data
+
+    template <class U>
+    BlackScholes(const U spot,
+        const vector<Time> times,
+        const matrix<U> vols,
+        const bool normal)
+        : mySpot(spot),
+        myTimes(times),
+        myVols(vols),
+        myNormal(normal)
+    {
+        //  All parameters in a vector
+        myParameters.reserve(myVols.size() + 1);
+        myParameterLabels.reserve(myVols.size() + 1);
+
+        myParameters.push_back(& mySpot);
+        myParameterLabels.push_back("spot");
+
+        for (size_t i = 0; i < myVols.size(); ++i)
+        {
+            myParameters.push_back(& myVols[i]);
+            myParameterLabels.push_back("vol " + to_string(myTimes[j]));
+        }
+    }
+
+    //  Read access to parameters
+    
+    T spot() const
+    {
+        return mySpot;
+    }
+
+    const vector<Time>& times() const
+    {
+        return myTimes;
+    }
+
+    const vector<T>& vols() const
+    {
+        return myVols;
+    }
+
+    //  Access to all the model parameters
+    const vector<T*>& parameters() override
+    {
+        return myParameters;
+    }
+    const vector<string>& parameterLabels() const override
+    {
+        return myParameterLabels;
+    }
+
+    //  Virtual copy constructor
+    unique_ptr<Model<T>> clone() const override
+    {
+        return unique_ptr<Model<T>>(new BlackScholes<T>(*this));
+    }
+
+    //  Initialize timeline
+    void init(const vector<Time>& productTimeline) override
+    {
+        //  Simulation timeline = today + product timeline
+        myTimeline.clear();
+        myTimeline.push_back(systemTime);
+        for (const auto time& : productTimeline)
+        {
+            if (time > systemTime) myTimeLine.push_back(time);
+        }
+
+        //  Mark steps on timeline that are on the product timeline
+        myCommonSteps.resize(myTimeline.size());
+        fill(myTimeline.begin(), myTimeline.end(), true);
+        if (productTimeline[0] > systemTime) myCommonSteps[0] = false;
+
+        //  Allocate and compute the local volatilities
+        //      pre-interpolated in time and multiplied by sqrt(dt)
+        myInterpVols.resize(myTimeline.size() - 1);
+        if (!myNormal) myItoTerms.resize(myTimeline.size() - 1);
+        for (size_t i = 0; i < myTimeline.size() - 1; ++i)
+        {
+            const double dt = myTimeline[i + 1] - myTimeline[i];
+            const double sqrtdt = sqrt(dt);
+            onst double vol = sqrtdt * interp(
+                myTimes.begin(),
+                myTimes.end(),
+                myVols.begin(),
+                myVols.end(),
+                myTimeline[i]);
+            myInterpVols[i] = vol;
+            if (!myNormal)
+            {
+                myItoTerms[i] = -0.5 * vol * vol * dt;
+            }
+        }
+    }
+
+    //  MC Dimension
+    size_t simDim() const override
+    {
+        return myTimeline.size() - 1;
+    }
+
+    //  Generate one path, consume Gaussian vector
+    //  path must be pre-allocated 
+    //  with the same size as the product timeline
+    void generatePath(const vector<double>& gaussVec, vector<scenario<T>>& path) const override
+    {
+        //  The starting spot
+        //  We know that today is on the timeline
+        T spot = mySpot;
+        Time current = systemTime;
+        //  Next index to fill on the product timeline
+        size_t idx = 0;
+        //  Is today on the product timeline?
+        if (myCommonSteps[idx]) path[idx++].spot = spot;
+
+        //  Iterate through timeline
+        for (size_t i = 1; i<myTimeline.size(); ++i)
+        {
+            //  Interpolate volatility in spot
+            const T vol = myInterpVols[i - 1];
+            //  vol comes out * sqrt(dt)
+
+            //  Apply Euler's scheme
+            if (myNormal)
+            {
+                //  Bachelier
+                spot += vol * gaussVec[i - 1];
+            }
+            else
+            {
+                //  Black-Scholes
+                spot *= exp(myItoTerms[i] + vol * gaussVec[i - 1]);
+            }
+
+            //  Store on the path?
+            if (myCommonSteps[i]) path[idx++].spot = spot;
+        }
+    }
+};
 
 template <class T>
 class Dupire : public Model<T>
@@ -59,6 +243,10 @@ class Dupire : public Model<T>
     //  volatilities as stored are multiplied by sqrt(dt) 
     //  so there is no need to do that during paths generation
 
+    //  Exported parameters
+    vector<T*>          myParameters;
+    vector<string>      myParameterLabels;
+
 public:
 
     //  Constructor: store data
@@ -73,8 +261,40 @@ public:
         mySpots(spots), 
         myTimes(times), 
         myVols(vols), 
-        myMaxDt(maxDt)
-    { }
+        myMaxDt(maxDt),
+        myParameters(myVols.rows() * myVols.cols() + 1),
+        myParameterLabels(myVols.rows() * myVols.cols() + 1)
+    {
+        //  Set parameter labels once 
+        myParameterLabels[0] = "spot";
+
+        size_t p = 0;
+        for (size_t i = 0; i < myVols.rows(); ++i)
+        {
+            for (size_t j = 0; j < myVols.cols(); ++j)
+            {
+                myParameterLabels[++p] = 
+                    "vol " + to_string(mySpots[i]) + " " + to_string(myTimes[j]);
+            }
+        }
+
+        setParamPointers();
+    }
+
+    //  Must reset on copy
+    void setParamPointers()
+    {
+        myParameters[0] = & mySpot;
+
+        size_t p = 0;
+        for (size_t i = 0; i < myVols.rows(); ++i)
+        {
+            for (size_t j = 0; j < myVols.cols(); ++j)
+            {
+                myParameters[++p] = & myVols[i][j];
+            }
+        }
+    }
 
     //  Read access to parameters
     T spot() const
@@ -82,15 +302,37 @@ public:
         return mySpot;
     }
 
-    const matrix<T>& vols()
+    const vector<double>& spots() const
+    {
+        return mySpots;
+    }
+
+    const vector<Time>& times() const
+    {
+        return myTimes;
+    }
+
+    const vector<T>& vols() const
     {
         return myVols;
+    }
+
+    //  Access to all the model parameters
+    const vector<T*>& parameters() override
+    {
+        return myParameters;
+    }
+    const vector<string>& parameterLabels() const override
+    {
+        return myParameterLabels;
     }
 
     //  Virtual copy constructor
     unique_ptr<Model<T>> clone() const override
     {
-        return unique_ptr<Model<T>>(new Dupire<T>(*this));
+        auto clone = new Dupire<T>(*this);
+        clone->setParamPointers();
+        return unique_ptr<Model<T>>(clone);
     }
 
     //  Initialize timeline
@@ -172,39 +414,6 @@ public:
             //  Store on the path?
             if (myCommonSteps[i]) path[idx++].spot = spot;
         }
-    }
-
-    //  Access to all parameters by copy
-    vector<T> parameters() const override
-    {
-        vector<T> params;
-        params.reserve(myVols.rows() * myVols.cols() + 1);
-        params.push_back(mySpot);
-        for (auto& vol : myVols) params.push_back(vol);
-
-        return params;
-    }
-
-    //  AAD enabled
-private:
-    //  Implementation, for Number instances only
-
-    //  Put parameters on tape 
-    template <class U> void putOnTapeI() {}
-    template<> void putOnTapeI<Number>()
-    {
-        mySpot.putOnTape();
-        //  Free function putOnTape in AADNumber.h
-        ::putOnTape(myVols.begin(), myVols.end());
-    }
-
-public:
-    //  Interface    
-
-    //  Put parameters on tape 
-    void putOnTape() override
-    {
-        putOnTapeI<T>();
     }
 };
 

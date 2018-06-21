@@ -59,7 +59,6 @@ class Sobol : public RNG
 
     //	Cached Uniforms
     vector<unsigned long>	    myIntegerSequence;  //  The current numbers, as integers
-    vector<double>              myUniforms;
 
     //  The current point number
     unsigned long				mySimCount;
@@ -158,7 +157,6 @@ public:
 
         //	Resize
         myIntegerSequence.resize(myDim);
-        myUniforms.resize(myDim);
 
         //  Generate the first point
         unsigned i;
@@ -188,12 +186,12 @@ public:
         {
             myIntegerSequence[i] ^= myDirectionIntegers[i][j];
         }
-
-        transform(myIntegerSequence.begin(), myIntegerSequence.end(), myUniforms.begin(), [](const unsigned long i) {return ONEOVER2POW32 * i; });
-
         if (!gaussVec.empty())
         {
-            transform(myUniforms.begin(), myUniforms.end(), gaussVec.begin(), invNormalCdf);
+            for (int i = 0; i < myDim; ++i)
+            {
+                gaussVec[i] = invNormalCdf(ONEOVER2POW32 * myIntegerSequence[i]);
+            }
         }
 
         //	Update count

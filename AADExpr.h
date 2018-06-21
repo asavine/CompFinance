@@ -727,10 +727,10 @@ class Number : public Expression<Number>
     template <size_t N>
     Node* createMultiNode()
     {
-        static const size_t sz = sizeof(Node) + N * (sizeof(double) + sizeof(double*));
+        static const size_t size = sizeof(Node) + N * (sizeof(double) + sizeof(double*));
 
         //  Placement syntax to allocate in place on tape
-        return new (tape->allocate(sz)) Node(N);
+        return new (tape->allocate<size>()) Node(N);
     }
 
 #else
@@ -739,7 +739,7 @@ class Number : public Expression<Number>
     MultiNode<N>* createMultiNode()
     {
         //  Placement syntax to allocate in place on tape
-        return new (tape->allocate(sizeof(MultiNode<N>))) MultiNode<N>;
+        return new (tape->allocate<sizeof(MultiNode<N>)>()) MultiNode<N>;
     }
 
 #endif   

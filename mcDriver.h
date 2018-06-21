@@ -21,7 +21,6 @@ As long as this comment is preserved at the top of the file
 #include "mcPrd.h"
 #include "mrg32k3a.h"
 #include "sobol.h"
-#include "memory.h"
 #include <numeric>
 #include <fstream>
 using namespace std;
@@ -51,13 +50,16 @@ inline double uocDupire(
     unique_ptr<RNG> rng = useSobol ? unique_ptr<RNG>(new Sobol) : unique_ptr<RNG>(new mrg32k3a(seed1, seed2));
 
     //  Simulate
-    auto results = parallel
+    const auto resultMat = parallel
         ? mcParallelSimul(product, model, *rng, numPath)
         : mcSimul(product, model, *rng, numPath);
 
-    //  Return average
-    return accumulate(results.begin(), results.end(), 0.0) 
-        / results.size();
+    //  Compute averages among paths
+    double result = accumulate(resultMat.begin(), resultMat.end(), 0.0,
+        [](const double acc, const vector<double>& v) { return acc + v[0]; }
+        ) / numPath;
+        
+    return result;
 }
 
 //  Returns a struct with price, delta and vega matrix
@@ -204,28 +206,26 @@ inline auto uocDupireAADRisk(
     results.value = accumulate(
         simulResults.payoffs.begin(),
         simulResults.payoffs.end(),
-        0.0)
-            / numPath;
+        0.0,
+        [](const double acc, const vector<double>& v) { return acc + v[0]; }
+            ) / numPath;
 
-    //  Risks
+    //  Delta
 
-    //  Downcast the model, we know it is a Dupire
-    Dupire<Number>& resMdl = *static_cast<Dupire<Number>*>(simulResults.model.get());
+    results.delta = simulResults.risks[0];
 
-    results.delta = resMdl.spot().adjoint();
-    results.vega.resize(resMdl.vols().rows(), resMdl.vols().cols());
-    transform(resMdl.vols().begin(), resMdl.vols().end(), results.vega.begin(),
-        [numPath](const Number& vol)
+    //  Vegas
+    const size_t n = model.spots().size(), m = model.times().size();
+    results.vega.resize(n, m);
+    size_t paramNo = 0;
+    for (size_t i = 0; i < model.spots().size(); ++i)
     {
-        return vol.adjoint() / numPath;
-    });
-    //  Normalize
-    results.delta /= numPath;
+        for (size_t j = 0; j < model.times().size(); ++j)
+        {
+            results.vega[i][j] = simulResults.risks[++paramNo];
+        }
+    }
 
-    //  Clear the tape
-    Number::tape->clear();
-
-    //  Return value
     return results;
 }
 

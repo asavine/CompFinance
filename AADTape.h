@@ -16,7 +16,6 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
-#include <cstdlib>
 #include <exception>
 
 #include <vector>
@@ -52,7 +51,8 @@ public:
     }
 
     //	Provides the requested amount of memory if available or nullptr
-    Ptr requestMemory(const size_t size)
+    template <size_t size>
+    Ptr requestMemory()
     {
         if (myNext + size > myEnd) return nullptr;
 
@@ -210,16 +210,17 @@ public:
     //  Get memory, this is what we call in place of new/malloc/calloc
     //  Note the is no free - all tape is released at once
     //	We assume that the requested size is always smaller than the block size, otherwise will fail
-    Ptr allocate(const size_t size)
+    template <size_t size>
+    inline Ptr allocate()
     {
         //  Get memory from current block
-        Ptr mem = myState.block->requestMemory(size);
+        Ptr mem = myState.block->requestMemory<size>();
 
         if (!mem) 
         {
             //	Failed : try next block, create one if necessary, then retry
             nextBlock();
-            mem = myState.block->requestMemory(size);
+            mem = myState.block->requestMemory<size>();
             //	If allocation failed, will have thrown by now, 
             //      the only way it could have failed is if size > myBlockSize, 
             //      which we assume never happens
