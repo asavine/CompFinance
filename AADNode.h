@@ -26,8 +26,8 @@ struct Node
     inline Node(const size_t N) :
         n(N),
         adjoint(0),
-        derivatives(reinterpret_cast<double*>((char*)(this) + sizeof(Node))),
-        argAdjoints(reinterpret_cast<double**>((char*)(this) + sizeof(Node) + N * sizeof(double)))
+        derivatives(reinterpret_cast<double*>((char*)(this) + sizeof(Node)),
+        argAdjoints(reinterpret_cast<double**>((char*)(this) + sizeof(Node) + N * sizeof(double))
     {}
 
     const size_t n;

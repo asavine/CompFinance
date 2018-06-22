@@ -21,34 +21,29 @@ As long as this comment is preserved at the top of the file
 #define ONE_HOUR 0.000114469
 
 template <class T>
-class Europeans : public Product<T>
+class European : public Product<T>
 {
-    vector<double>  myStrikes;
-    vector<Time>    myMaturities;
+    double          myStrike;
+    vector<Time>    myMaturity;
 
 public:
 
     //  Constructor: store data and build timeline
-    Europeans(const vector<double>& strikes, const vector<Time>& maturities) : 
-        myStrikes(strikes),
-        myMaturities(maturities)
+    European(const double strike, const Time maturity) :
+        myStrike(strike),
+        myMaturity({ maturity })
     {}
 
     //  Virtual copy constructor
     unique_ptr<Product<T>> clone() const override
     {
-        return unique_ptr<Product<T>>(new Europeans<T>(*this));
+        return unique_ptr<Product<T>>(new European<T>(*this));
     }
 
     //  Timeline
     const vector<Time>& timeline() const override
     {
-        return myMaturities;
-    }
-
-    size_t numPayoffs() const override
-    {
-        return myMaturities.size() * myStrikes.size();
+        return myMaturity;
     }
 
     //  Payoffs, maturity major
@@ -59,20 +54,7 @@ public:
         vector<T>&                  payoffs)
             const override
     {
-        const size_t numT = myMaturities.size(), numK = myStrikes.size();
-        
-        auto payoffIt = payoffs.begin();
-        for (size_t i = 0; i < numMat; ++i)
-        {
-            transform(
-                myStrikes.begin(),
-                myStrikes.end(),
-                payoffIt,
-                [spot = path[i].spot](const double& k) {return max<T>(spot - k, convert<T>(0.0)); }
-            );
-
-            payoffIt += numK;
-        }
+        payoffs[0] = max<T>(path[0].spot - myStrike, convert<T>(0.0)); 
     }
 };
 
@@ -106,7 +88,6 @@ public:
             t += monitorFreq;
         }
 
-        if (myTimeline.back() < myMaturity)
             myTimeline.push_back(myMaturity);
     }
 
@@ -163,55 +144,42 @@ public:
 };
 
 template <class T>
-class Asians : public Product<T>
+class Europeans : public Product<T>
 {
-    vector<double>  myStrikes;
-    Time            myMaturity;
-    vector<Time>    myTimeline;
+    vector<Time>            myMaturities;
+    vector<vector<double>>  myStrikes;      //  a vector of strikes per maturity
 
 public:
 
     //  Constructor: store data and build timeline
-    //  Timeline = system date to maturity, 
-    //  with steps every monitoring frequency
-    Asians(const vector<double>& strikes,
-        const Time maturity,
-        const Time monitorFreq)
-        : myStrikes(strikes),
-        myBarrier(barrier),
-        myMaturity(maturity)
-    {
-        myTimeline.push_back(systemTime);
-        Time t = systemTime + monitorFreq;
-
-        while (myMaturity - t > ONE_HOUR)
-        {
-            myTimeline.push_back(t);
-            t += monitorFreq;
-        }
-
-        if (myTimeline.back() < myMaturity)
-            myTimeline.push_back(myMaturity);
-    }
+    Europeans(const vector<Time>& maturities, const vector<vector<double>>& strikes) :
+        myMaturities(maturities),
+        myStrikes(strikes)
+    {}
 
     //  Virtual copy constructor
     unique_ptr<Product<T>> clone() const override
     {
-        return unique_ptr<Product<T>>(new Asians<T>(*this));
+        return unique_ptr<Product<T>>(new Europeans<T>(*this));
     }
 
     //  Timeline
     const vector<Time>& timeline() const override
     {
-        return myTimeline;
+        return myMaturities;
     }
 
     size_t numPayoffs() const override
     {
-        return myStrikes.size();
+        return accumulate(myStrikes.begin(), myStrikes.end(), 0, 
+            [](const int acc, const vector<double>& strikes) 
+            { 
+                return acc + strikes.size(); 
+            }
+        );
     }
 
-    //  Payoff
+    //  Payoffs, maturity major
     void payoffs(
         //  path, one entry per time step (on the product timeline)
         const vector<scenario<T>>&  path,
@@ -219,23 +187,19 @@ public:
         vector<T>&                  payoffs)
         const override
     {
-        T ave = 0.0;
-        size_t cntr = 0;
+        const size_t numT = myMaturities.size(), numK = myStrikes.size();
 
-        //  Go through path, update average
-        for (const auto& scen : path)
+        auto payoffIt = payoffs.begin();
+        for (size_t i = 0; i < numT; ++i)
         {
-            ave += scen.spot;
-            ++cntr;
-        }
-
-        ave /= cntr;
-
         transform(
-            myStrikes.begin(), 
-            myStrikes.end(), 
-            payoffs.begin(), 
-            [ave](const double& k) {return max<T>(ave - k, convert<T>(0.0)); }
+                myStrikes[i].begin(),
+                myStrikes[i].end(),
+                payoffIt,
+                [spot = path[i].spot](const double& k) {return max<T>(spot - k, convert<T>(0.0)); }
         );
+
+            payoffIt += myStrikes[i].size();
+        }
     }
 };

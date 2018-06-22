@@ -586,6 +586,3 @@ mcParallelSimulAAD(
 
     return results;
 }
-
-
-

@@ -174,9 +174,12 @@
     <ClInclude Include="interp.h" />
     <ClInclude Include="ivs.h" />
     <ClInclude Include="mcDriver.h" />
+    <ClInclude Include="mcMdl.h" />
+    <ClInclude Include="mcMdlBS.h" />
+    <ClInclude Include="mcMdlMulti.h" />
     <ClInclude Include="sobol.h" />
     <ClInclude Include="mcBase.h" />
-    <ClInclude Include="mcMdl.h" />
+    <ClInclude Include="mcMdlDupire.h" />
     <ClInclude Include="mcPrd.h" />
     <ClInclude Include="mrg32k3a.h" />
     <ClInclude Include="primitivepolynomials.h" />

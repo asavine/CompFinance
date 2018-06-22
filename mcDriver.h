@@ -30,10 +30,12 @@ inline double uocDupire(
     const double            spot,
     const vector<double>&   spots,
     const vector<Time>&     times,
-    const matrix<double>&   vols,   //  spot major
+    //  spot major
+    const matrix<double>&   vols,   
     const double            maxDt,
     //  product parameters
     const double            strike,
+    //  negative = european
     const double            barrier,
     const Time              maturity,
     const double            monitorFreq,
@@ -46,13 +48,21 @@ inline double uocDupire(
 {
     //  Build model, product and rng
     Dupire<double> model(spot, spots, times, vols, maxDt);
-    UOC<double> product(strike, barrier, maturity, monitorFreq);
-    unique_ptr<RNG> rng = useSobol ? unique_ptr<RNG>(new Sobol) : unique_ptr<RNG>(new mrg32k3a(seed1, seed2));
+    
+    //  Product
+    unique_ptr<Product<double>> product;
+    if (barrier > 0) product = make_unique<UOC<double>>(strike, barrier, maturity, monitorFreq);
+    else product = make_unique<European<double>>(strike, maturity);
+
+    //  RNG
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
 
     //  Simulate
     const auto resultMat = parallel
-        ? mcParallelSimul(product, model, *rng, numPath)
-        : mcSimul(product, model, *rng, numPath);
+        ? mcParallelSimul(*product, model, *rng, numPath)
+        : mcSimul(*product, model, *rng, numPath);
 
     //  Compute averages among paths
     double result = accumulate(resultMat.begin(), resultMat.end(), 0.0,
@@ -60,6 +70,62 @@ inline double uocDupire(
         ) / numPath;
         
     return result;
+}
+
+inline vector<vector<double>> europeansDupire(
+    //  model parameters
+    const double            spot,
+    const vector<double>&   spots,
+    const vector<Time>&     times,
+    //  spot major
+    const matrix<double>&   vols,
+    const double            maxDt,
+    //  product parameters
+    const vector<Time>&             maturities, 
+    const vector<vector<double>>&   strikes,
+    //  numerical parameters
+    const bool              parallel,
+    const bool              useSobol,
+    const int               numPath,
+    const int               seed1 = 12345,
+    const int               seed2 = 12346)
+{
+    //  Build model, product and rng
+    Dupire<double> model(spot, spots, times, vols, maxDt);
+
+    //  Product
+    unique_ptr<Product<double>> product = make_unique<Europeans<double>>(maturities, strikes);
+
+    //  RNG
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
+
+    //  Simulate
+    const auto resultMat = parallel
+        ? mcParallelSimul(*product, model, *rng, numPath)
+        : mcSimul(*product, model, *rng, numPath);
+
+    //  Compute averages among paths
+    vector<vector<double>> results = strikes;   //  just for the right size
+
+    size_t nPay = 0;
+    for (size_t i = 0; i < maturities.size(); ++i)
+    {
+        for (size_t j = 0; j < strikes[i].size(); ++j)
+        {
+            results[i][j] = accumulate(resultMat.begin(), resultMat.end(), 0.0,
+                [nPay](const double acc, const vector<double>& payoffs)
+                {
+                    return acc + payoffs[nPay];
+                }
+            ) / numPath;
+
+            ++nPay;
+        }
+    }
+
+    return results;
 }
 
 //  Returns a struct with price, delta and vega matrix
@@ -165,10 +231,12 @@ inline auto uocDupireAADRisk(
     const double            spot,
     const vector<double>&   spots,
     const vector<Time>&     times,
-    const matrix<double>&   vols,   //  spot major
+    //  spot major
+    const matrix<double>&   vols,   
     const double            maxDt,
     //  product parameters
     const double            strike,
+    //  negative = european
     const double            barrier,
     const Time              maturity,
     const double            monitorFreq,
@@ -190,16 +258,22 @@ inline auto uocDupireAADRisk(
 
     //  Build model, product and rng
     Dupire<Number> model(spot, spots, times, vols, maxDt);
-    UOC<Number> product(strike, barrier, maturity, monitorFreq);
-    unique_ptr<RNG> rng = useSobol 
-        ? unique_ptr<RNG>(new Sobol) 
-        : unique_ptr<RNG>(new mrg32k3a(seed1, seed2));
+
+    //  Product
+    unique_ptr<Product<Number>> product;
+    if (barrier > 0) product = make_unique<UOC<Number>>(strike, barrier, maturity, monitorFreq);
+    else product = make_unique<European<Number>>(strike, maturity);
+
+    //  RNG
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
 
     //  Simulate
 
     const auto simulResults = parallel
-        ? mcParallelSimulAAD(product, model, *rng, numPath)
-        : mcSimulAAD(product, model, *rng, numPath);
+        ? mcParallelSimulAAD(*product, model, *rng, numPath)
+        : mcSimulAAD(*product, model, *rng, numPath);
 
     //  Value
 
@@ -215,16 +289,110 @@ inline auto uocDupireAADRisk(
     results.delta = simulResults.risks[0];
 
     //  Vegas
-    const size_t n = model.spots().size(), m = model.times().size();
-    results.vega.resize(n, m);
-    size_t paramNo = 0;
-    for (size_t i = 0; i < model.spots().size(); ++i)
+
+    results.vega.resize(model.spots().size(), model.times().size());
+    copy(++simulResults.risks.begin(), simulResults.risks.end(), results.vega.begin());
+
+    return results;
+}
+
+//  Returns a struct with price, delta and vega matrix of portfolio
+inline auto europeansDupireAADRisk(
+    //  model parameters
+    const double            spot,
+    const vector<double>&   spots,
+    const vector<Time>&     times,
+    //  spot major
+    const matrix<double>&   vols,
+    const double            maxDt,
+    //  product parameters
+    //  must be sorted by ascending maturity
+    const vector<Time>&     maturities, 
+    const vector<double>&   strikes,
+    const vector<double>&   notionals,
+    //  numerical parameters
+    const bool              parallel,
+    const bool              useSobol,
+    const int               numPath,
+    //  optionals
+    const int               seed1 = 12345,
+    const int               seed2 = 12346)
+{
+    //  Results
+    struct
     {
-        for (size_t j = 0; j < model.times().size(); ++j)
+        double value;
+        double delta;
+        matrix<double> vega;
+    } results;
+
+    //  Build model, product and rng
+    Dupire<Number> model(spot, spots, times, vols, maxDt);
+
+    //  RNG
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
+
+    //  Put in the right format
+    vector<Time> uMats(1, maturities[0]);
+    vector<vector<double>> uStrikes (1, { strikes[0] });
+    vector<vector<double>> uNots (1, { notionals[0] });
+
+    const size_t nOpt = maturities.size();
+    for (size_t i = 1; i < nOpt; ++i)
+    {
+        if (maturities[i] > maturities[i - 1] + EPS)
         {
-            results.vega[i][j] = simulResults.risks[++paramNo];
+            uMats.push_back(maturities[i]);
+            uStrikes.push_back({ strikes[i] });
+            uNots.push_back({ notionals[i] });
+        }
+        else
+        {
+            uStrikes.back().push_back(strikes[i]);
+            uNots.back().push_back(notionals[i]);
         }
     }
+
+    //  Product
+    unique_ptr<Product<Number>> product = make_unique<Europeans<Number>>(uMats, uStrikes);
+
+    //  Aggregator lambda
+
+    //  Flat notionals
+    vector<double> flatNotionals;
+    for (const auto& notVec : uNots)
+    {
+        copy(notVec.begin(), notVec.end(), back_inserter(flatNotionals));
+    }
+
+    auto aggregator = [&flatNotionals] (const vector<Number>& payoffs)
+    {
+        return inner_product(flatNotionals.begin(), flatNotionals.end(), payoffs.begin(), Number(0.0));
+    };
+
+    //  Simulate
+
+    const auto simulResults = parallel
+        ? mcParallelSimulAAD(*product, model, *rng, numPath, aggregator)
+        : mcSimulAAD(*product, model, *rng, numPath, aggregator);
+
+    //  Value
+    
+    results.value = accumulate(
+        simulResults.aggregated.begin(),
+        simulResults.aggregated.end(),
+        0.0) / numPath;
+
+    //  Delta
+
+    results.delta = simulResults.risks[0];
+
+    //  Vegas
+
+    results.vega.resize(model.spots().size(), model.times().size());
+    copy(++simulResults.risks.begin(), simulResults.risks.end(), results.vega.begin());
 
     return results;
 }
@@ -267,6 +435,7 @@ inline auto
     const double            spot,
     //  product parameters
     const double            strike,
+    //  negative = european
     const double            barrier,
     const Time              maturity,
     const double            monitorFreq,
@@ -397,5 +566,112 @@ inline auto
     tape->clear();
 
     //  Return results
+    return results;
+}
+
+inline double uocBS(
+    //  model parameters
+    const double            spot,
+    const double            vol,
+    const bool              normal,
+    //  product parameters
+    const double            strike,
+    //  negative = european
+    const double            barrier,
+    const Time              maturity,
+    const double            monitorFreq,
+    //  numerical parameters
+    const bool              parallel,
+    const bool              useSobol,
+    const int               numPath,
+    const int               seed1 = 12345,
+    const int               seed2 = 12346)
+{
+    //  Build model, product and rng
+    SimpleBlackScholes<double> model(spot, vol, normal);
+
+    //  Product
+    unique_ptr<Product<double>> product;
+    if (barrier > 0) product = make_unique<UOC<double>>(strike, barrier, maturity, monitorFreq);
+    else product = make_unique<European<double>>(strike, maturity);
+
+    //  RNG
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
+
+    //  Simulate
+    const auto resultMat = parallel
+        ? mcParallelSimul(*product, model, *rng, numPath)
+        : mcSimul(*product, model, *rng, numPath);
+
+    //  Compute averages among paths
+    double result = accumulate(resultMat.begin(), resultMat.end(), 0.0,
+        [](const double acc, const vector<double>& v) { return acc + v[0]; }
+    ) / numPath;
+
+    return result;
+}
+
+//  Returns a struct with price, delta and vega matrix
+inline auto uocBSAADRisk(
+    //  model parameters
+    const double            spot,
+    const double            vol,   
+    const bool              normal,
+    //  product parameters
+    const double            strike,
+    //  negative = european
+    const double            barrier,
+    const Time              maturity,
+    const double            monitorFreq,
+    //  numerical parameters
+    const bool              parallel,
+    const bool              useSobol,
+    const int               numPath,
+    //  optionals
+    const int               seed1 = 12345,
+    const int               seed2 = 12346)
+{
+    //  Results
+    struct
+    {
+        double value;
+        double delta;
+        double vega;
+    } results;
+
+    //  Build model, product and rng
+    SimpleBlackScholes<Number> model(spot, vol, normal);
+
+    //  Product
+    unique_ptr<Product<Number>> product;
+    if (barrier > 0) product = make_unique<UOC<Number>>(strike, barrier, maturity, monitorFreq);
+    else product = make_unique<European<Number>>(strike, maturity);
+
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
+
+    //  Simulate
+
+    const auto simulResults = parallel
+        ? mcParallelSimulAAD(*product, model, *rng, numPath)
+        : mcSimulAAD(*product, model, *rng, numPath);
+
+    //  Value
+
+    results.value = accumulate(
+        simulResults.payoffs.begin(),
+        simulResults.payoffs.end(),
+        0.0,
+        [](const double acc, const vector<double>& v) { return acc + v[0]; }
+    ) / numPath;
+
+    //  Delta
+
+    results.delta = simulResults.risks[0];
+    results.vega = simulResults.risks[1];
+
     return results;
 }
