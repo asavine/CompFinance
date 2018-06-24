@@ -16,8 +16,8 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+#include <algorithm>
 #include "AADTape.h"
-#include <cmath>
 
 //  Base CRTP class so operators catch expressions
 template <class E>
@@ -203,6 +203,46 @@ struct OPPow
     }
 };
 
+struct OPMax
+{
+    static const double eval(const double l, const double r)
+    {
+        return max(l, r);
+    }
+
+    static const double leftDerivative
+    (const double l, const double r, const double v)
+    {
+        return l > r ? 1.0 : 0.0;
+    }
+
+    static const double rightDerivative
+    (const double l, const double r, const double v)
+    {
+        return r > l? 1.0 : 0.0;
+    }
+};
+
+struct OPMin
+{
+    static const double eval(const double l, const double r)
+    {
+        return min(l, r);
+    }
+
+    static const double leftDerivative
+    (const double l, const double r, const double v)
+    {
+        return l < r ? 1.0 : 0.0;
+    }
+
+    static const double rightDerivative
+    (const double l, const double r, const double v)
+    {
+        return r < l ? 1.0 : 0.0;
+    }
+};
+
 //  Operator overloading for binary expressions
 //  So DAG is built on the stack at compile time
 //  And traversed at run time for evaluation and propagation
@@ -240,6 +280,20 @@ template <class LHS, class RHS>
     const Expression<LHS>& lhs, const Expression<RHS>& rhs)
 {
     return BinaryExpression<LHS, RHS, OPPow>(lhs, rhs);
+}
+
+template <class LHS, class RHS>
+BinaryExpression<LHS, RHS, OPMax> max(
+    const Expression<LHS>& lhs, const Expression<RHS>& rhs)
+{
+    return BinaryExpression<LHS, RHS, OPMax>(lhs, rhs);
+}
+
+template <class LHS, class RHS>
+BinaryExpression<LHS, RHS, OPMin> min(
+    const Expression<LHS>& lhs, const Expression<RHS>& rhs)
+{
+    return BinaryExpression<LHS, RHS, OPMin>(lhs, rhs);
 }
 
 //  Unary expressions : Same logic with one argument
@@ -341,6 +395,20 @@ struct OPSqrt
         (const double r, const double v, const double d)
     { 
         return 0.5 / v; 
+    }
+};
+
+struct OPFabs
+{
+    static const double eval(const double r, const double d)
+    {
+        return fabs(r);
+    }
+
+    static const double derivative
+    (const double r, const double v, const double d)
+    {
+        return r > 0.0 ? 1.0 : -1.0;
     }
 };
 
@@ -464,7 +532,7 @@ struct OPDivDR
     }
 };
 
-//  pow (d/)
+//  pow (d,)
 struct OPPowDL
 {
     static const double eval(const double r, const double d)
@@ -479,7 +547,7 @@ struct OPPowDL
     }
 };
 
-//  pow (/d)
+//  pow (,d)
 struct OPPowDR
 {
     static const double eval(const double r, const double d)
@@ -491,6 +559,36 @@ struct OPPowDR
     (const double r, const double v, const double d)
     {
         return d * v / r;
+    }
+};
+
+//  max (d,)
+struct OPMaxD
+{
+    static const double eval(const double r, const double d)
+    {
+        return max(r, d);
+    }
+
+    static const double derivative
+    (const double r, const double v, const double d)
+    {
+        return r > d ? 1.0 : 0.0;
+    }
+};
+
+//  min (d,)
+struct OPMinD
+{
+    static const double eval(const double r, const double d)
+    {
+        return min(r, d);
+    }
+
+    static const double derivative
+    (const double r, const double v, const double d)
+    {
+        return r < d ? 1.0 : 0.0;
     }
 };
 
@@ -512,6 +610,12 @@ template <class ARG>
  UnaryExpression<ARG, OPSqrt> sqrt(const Expression<ARG>& arg)
 {
     return UnaryExpression<ARG, OPSqrt>(arg);
+}
+
+template <class ARG>
+UnaryExpression<ARG, OPFabs> fabs(const Expression<ARG>& arg)
+{
+    return UnaryExpression<ARG, OPFabs>(arg);
 }
 
 template <class ARG>
@@ -596,6 +700,35 @@ template <class ARG>
     const Expression<ARG>& lhs, const double d)
 {
     return UnaryExpression<ARG, OPPowDR>(lhs, d);
+}
+
+
+template <class ARG>
+UnaryExpression<ARG, OPMaxD> max(
+    const double d, const Expression<ARG>& rhs)
+{
+    return UnaryExpression<ARG, OPMaxD>(rhs, d);
+}
+
+template <class ARG>
+UnaryExpression<ARG, OPMaxD> max(
+    const Expression<ARG>& lhs, const double d)
+{
+    return UnaryExpression<ARG, OPMaxD>(lhs, d);
+}
+
+template <class ARG>
+UnaryExpression<ARG, OPMinD> min(
+    const double d, const Expression<ARG>& rhs)
+{
+    return UnaryExpression<ARG, OPMinD>(rhs, d);
+}
+
+template <class ARG>
+UnaryExpression<ARG, OPMinD> min(
+    const Expression<ARG>& lhs, const double d)
+{
+    return UnaryExpression<ARG, OPMinD>(lhs, d);
 }
 
 //  Comparison, as normal

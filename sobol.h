@@ -157,7 +157,10 @@ public:
 
         //	Resize
         myIntegerSequence.resize(myDim);
+    }
 
+    void reset()
+    {
         //  Generate the first point
         unsigned i;
         for (i = 0; i<myDim; ++i)
@@ -209,6 +212,8 @@ public:
     {
         //	Check skip
         if (b <= 0) return;
+
+        reset();
 
         //	Reset Sobol to entry 0 
         //  (not 1, hence must reset even though reset has already been called in init)

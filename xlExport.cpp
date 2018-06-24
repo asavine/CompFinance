@@ -14,13 +14,14 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
+#include "threadPool.h"
+#include "mcDriver.h"
+
+#define NOMINMAX
 #include <windows.h>
+
 #include "xlcall.h"
 #include "framework.h"
-
-#include "threadPool.h"
-
-#include "mcDriver.h"
 
 //	Wrappers
 
@@ -194,8 +195,13 @@ inline FP12* xEuropeansDupire(
 
 
     //  Call and return
+    map <Time, vector<double>> options;
+    for (size_t i = 0; i < vmats.size(); ++i)
+    {
+        options[vmats[i]] = vvstrikes[i];
+    }
 
-    auto res =  europeansDupire(spot, vspots, vtimes, vvols, maxDt, vmats, vvstrikes, parallel>0,
+    auto res =  europeansDupire(spot, vspots, vtimes, vvols, maxDt, options, parallel>0,
         useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
 
     //  Build return
@@ -203,7 +209,12 @@ inline FP12* xEuropeansDupire(
     // Allocate result
     // Calculate size
     size_t resultRows = res.size(), 
-        resultCols = accumulate(res.begin(), res.end(), 0, [](const int acc, const vector<double>& v) { return max(acc, v.size()); }),
+        resultCols = accumulate(res.begin(), res.end(), 0, 
+            [](const int acc, const vector<double>& v) 
+            { 
+                return max<int>(acc, v.size()); 
+            }
+        ),
         resultSize = resultRows * resultCols;
 
     // Return an error if size is 0
@@ -240,6 +251,8 @@ inline double xUocBS(
     double              spot,
     double              vol,
     double              normal,
+    double              rate,
+    double              div,
     //  product parameters
     double              strike,
     double              barrier,
@@ -264,7 +277,7 @@ inline double xUocBS(
 
     //  Call and return
 
-    return uocBS(spot, vol, normal > 0, strike, barrier, maturity, monitorFreq, parallel>0,
+    return uocBS(spot, vol, normal > 0, rate, div, strike, barrier, maturity, monitorFreq, parallel>0,
         useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
 
 }
@@ -640,13 +653,14 @@ extern "C" __declspec(dllexport)
     return result;
 }
 
-
 extern "C" __declspec(dllexport)
     inline FP12* xUocBSAAD(
         //  model parameters
         double              spot,
         double              vol,
         double              normal,
+        double              rate,
+        double              div,
         //  product parameters
         double              strike,
         double              barrier,
@@ -672,7 +686,7 @@ extern "C" __declspec(dllexport)
     //  Unpack
 
     //  Call 
-    auto res = uocBSAADRisk(spot, vol, normal > 0,
+    auto res = uocBSAADRisk(spot, vol, normal > 0, rate, div,
         strike, barrier, maturity, monitorFreq, parallel>0,
         useSobol > 0, static_cast<int>(numPath),
         static_cast<int>(seed1), static_cast<int>(seed2));
@@ -681,7 +695,7 @@ extern "C" __declspec(dllexport)
 
     // Allocate result
     // Calculate size
-    size_t resultRows = 3, resultCols = 1, resultSize = resultRows * resultCols;
+    size_t resultRows = 5, resultCols = 1, resultSize = resultRows * resultCols;
 
     // Return an error if size is 0
     if (resultSize <= 0) return nullptr;
@@ -702,6 +716,8 @@ extern "C" __declspec(dllexport)
     result->array[0] = res.value;
     result->array[1] = res.delta;
     result->array[2] = res.vega;
+    result->array[3] = res.rho;
+    result->array[4] = res.ddiv;
 
     // Return it
     return result;
@@ -1015,9 +1031,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xUocBS"),
-        (LPXLOPER12)TempStr12(L"BBBBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"BBBBBBBBBBBBBBB"),
         (LPXLOPER12)TempStr12(L"xUocBS"),
-        (LPXLOPER12)TempStr12(L"spot, vol, normal, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"spot, vol, normal, rate, div, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -1075,9 +1091,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xUocBSAAD"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"K%BBBBBBBBBBBBBB"),
         (LPXLOPER12)TempStr12(L"xUocBSAAD"),
-        (LPXLOPER12)TempStr12(L"spot, vol, normal, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"spot, vol, normal, rate, div, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

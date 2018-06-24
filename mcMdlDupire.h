@@ -55,6 +55,9 @@ class Dupire : public Model<T>
     //  note we use vector<int> because vector<bool> is broken in C++
     vector<int>             myCommonSteps;
 
+    //  The pruduct's dataline byref
+    const vector<simulData>*    myDataline;
+
     //  Pre-calculated on initialization
 
     //  volatilities pre-interpolated in time for each time step
@@ -101,12 +104,16 @@ public:
         setParamPointers();
     }
 
+private:
+
     //  Must reset on copy
     void setParamPointers()
     {
         myParameters[0] = &mySpot;
         transform(myVols.begin(), myVols.end(), ++myParameters.begin(), [](auto& vol) {return &vol; });
     }
+
+public:
 
     //  Read access to parameters
     T spot() const
@@ -148,7 +155,7 @@ public:
     }
 
     //  Initialize timeline
-    void init(const vector<Time>& productTimeline) override
+    void allocate(const vector<Time>& productTimeline, const vector<simulData>& dataline) override
     {
         //  Fill from product timeline
         
@@ -167,21 +174,28 @@ public:
             return binary_search(productTimeline.begin(), productTimeline.end(), t);
         });
 
-        //
+        //  Take a reference on the product's dataline
+        myDataline = &dataline;
 
-        //  Allocate and compute the local volatilities
-        //      pre-interpolated in time and multiplied by sqrt(dt)
+        //  Allocate the local volatilities
+        //      pre-interpolated in time over simulation timeline
         myInterpVols.resize(myTimeline.size() - 1, mySpots.size());
+    }
+
+    void init(const vector<Time>& productTimeline, const vector<simulData>& dataline) override
+    {
+        //  Compute the local volatilities
+        //      pre-interpolated in time and multiplied by sqrt(dt)
         for (size_t i = 0; i < myTimeline.size() - 1; ++i)
         {
-            const double sqrtdt = sqrt(myTimeline[i+1] - myTimeline[i]);
+            const double sqrtdt = sqrt(myTimeline[i + 1] - myTimeline[i]);
             for (size_t j = 0; j < mySpots.size(); ++j)
             {
                 myInterpVols[i][j] = sqrtdt * interp(
-                    myTimes.begin(), 
-                    myTimes.end(), 
-                    myVols[j], 
-                    myVols[j] + myTimes.size(), 
+                    myTimes.begin(),
+                    myTimes.end(),
+                    myVols[j],
+                    myVols[j] + myTimes.size(),
                     myTimeline[i]);
             }
         }
@@ -192,6 +206,18 @@ public:
     {
         return myTimeline.size() - 1;
     }
+
+private:
+
+    //  Helper function, fills a scenario given the spot
+    inline static void fillScen(const T& spot, scenario<T>& scen)
+    {
+        scen.numeraire = 1.0;
+        fill(scen.forwards.begin(), scen.forwards.end(), spot);
+        fill(scen.discounts.begin(), scen.discounts.end(), 1.0);
+    }
+
+public:
 
     //  Generate one path, consume Gaussian vector
     //  path must be pre-allocated 
@@ -205,7 +231,7 @@ public:
         //  Next index to fill on the product timeline
         size_t idx = 0;
         //  Is today on the product timeline?
-        if (myCommonSteps[idx]) path[idx++].spot = spot;
+        if (myCommonSteps[idx]) fillScen(spot, path[idx++]);
 
         //  Iterate through timeline
         for(size_t i=1; i<myTimeline.size(); ++i)
@@ -223,7 +249,7 @@ public:
             spot += vol * gaussVec[i - 1];
 
             //  Store on the path?
-            if (myCommonSteps[i]) path[idx++].spot = spot;
+            if (myCommonSteps[i]) fillScen(spot, path[idx++]);
         }
     }
 };

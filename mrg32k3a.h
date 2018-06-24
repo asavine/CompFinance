@@ -9,6 +9,7 @@ class mrg32k3a : public RNG
     size_t                      myDim;
 
     //  State
+    unsigned long long          myA, myB;
     unsigned long long          myXn, myXn1, myXn2, myYn, myYn1, myYn2;
 
     //  Constants
@@ -44,8 +45,16 @@ public:
 
     //  Constructor with seed
     mrg32k3a(const unsigned a = 12345, const unsigned b = 12346) :
-        myXn(a), myXn1(a), myXn2(a), myYn(b), myYn1(b), myYn2(b)
-    {}
+        myA(a), myB(b)
+    {
+        reset();
+    }
+
+    void reset()
+    {
+        myXn = myXn1 = myXn2 = myA;
+        myYn = myYn1 = myYn2 = myB;
+    }
 
     //  Virtual copy constructor
     unique_ptr<RNG> clone() const override
@@ -120,6 +129,8 @@ public:
     //  Skip ahead
     void skipTo(const long b) override
     {
+        reset();
+
         if ( b <= 0) return;
         long skip = b * myDim;
 

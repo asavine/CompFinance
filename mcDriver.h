@@ -43,6 +43,7 @@ inline double uocDupire(
     const bool              parallel,
     const bool              useSobol,
     const int               numPath,
+    //  optionals
     const int               seed1 = 12345,
     const int               seed2 = 12346)
 {
@@ -81,8 +82,7 @@ inline vector<vector<double>> europeansDupire(
     const matrix<double>&   vols,
     const double            maxDt,
     //  product parameters
-    const vector<Time>&             maturities, 
-    const vector<vector<double>>&   strikes,
+    const map<Time, vector<double>>&    options, 
     //  numerical parameters
     const bool              parallel,
     const bool              useSobol,
@@ -94,7 +94,7 @@ inline vector<vector<double>> europeansDupire(
     Dupire<double> model(spot, spots, times, vols, maxDt);
 
     //  Product
-    unique_ptr<Product<double>> product = make_unique<Europeans<double>>(maturities, strikes);
+    unique_ptr<Product<double>> product = make_unique<Europeans<double>>(options);
 
     //  RNG
     unique_ptr<RNG> rng;
@@ -107,12 +107,13 @@ inline vector<vector<double>> europeansDupire(
         : mcSimul(*product, model, *rng, numPath);
 
     //  Compute averages among paths
-    vector<vector<double>> results = strikes;   //  just for the right size
+    const Europeans<double>* prd = static_cast<const Europeans<double>*> (product.get());
+    vector<vector<double>> results = prd->strikes();   //  just for the right size
 
     size_t nPay = 0;
-    for (size_t i = 0; i < maturities.size(); ++i)
+    for (size_t i = 0; i < prd->maturities().size(); ++i)
     {
-        for (size_t j = 0; j < strikes[i].size(); ++j)
+        for (size_t j = 0; j < prd->strikes()[i].size(); ++j)
         {
             results[i][j] = accumulate(resultMat.begin(), resultMat.end(), 0.0,
                 [nPay](const double acc, const vector<double>& payoffs)
@@ -306,7 +307,6 @@ inline auto europeansDupireAADRisk(
     const matrix<double>&   vols,
     const double            maxDt,
     //  product parameters
-    //  must be sorted by ascending maturity
     const vector<Time>&     maturities, 
     const vector<double>&   strikes,
     const vector<double>&   notionals,
@@ -335,36 +335,23 @@ inline auto europeansDupireAADRisk(
     else rng = make_unique<mrg32k3a>(seed1, seed2);
 
     //  Put in the right format
-    vector<Time> uMats(1, maturities[0]);
-    vector<vector<double>> uStrikes (1, { strikes[0] });
-    vector<vector<double>> uNots (1, { notionals[0] });
-
-    const size_t nOpt = maturities.size();
-    for (size_t i = 1; i < nOpt; ++i)
+    map<Time, vector<double>> options, nots;
+    for (size_t i = 0; i < maturities.size(); ++i)
     {
-        if (maturities[i] > maturities[i - 1] + EPS)
-        {
-            uMats.push_back(maturities[i]);
-            uStrikes.push_back({ strikes[i] });
-            uNots.push_back({ notionals[i] });
-        }
-        else
-        {
-            uStrikes.back().push_back(strikes[i]);
-            uNots.back().push_back(notionals[i]);
-        }
+        options[maturities[i]].push_back(strikes[i]);
+        nots[maturities[i]].push_back(notionals[i]);
     }
 
     //  Product
-    unique_ptr<Product<Number>> product = make_unique<Europeans<Number>>(uMats, uStrikes);
+    unique_ptr<Product<Number>> product = make_unique<Europeans<Number>>(options);
 
     //  Aggregator lambda
 
     //  Flat notionals
     vector<double> flatNotionals;
-    for (const auto& notVec : uNots)
+    for (const auto& p : nots)
     {
-        copy(notVec.begin(), notVec.end(), back_inserter(flatNotionals));
+        copy(p.second.begin(), p.second.end(), back_inserter(flatNotionals));
     }
 
     auto aggregator = [&flatNotionals] (const vector<Number>& payoffs)
@@ -574,6 +561,8 @@ inline double uocBS(
     const double            spot,
     const double            vol,
     const bool              normal,
+    const double            rate,
+    const double            div,
     //  product parameters
     const double            strike,
     //  negative = european
@@ -588,7 +577,7 @@ inline double uocBS(
     const int               seed2 = 12346)
 {
     //  Build model, product and rng
-    SimpleBlackScholes<double> model(spot, vol, normal);
+    BlackScholes<double> model(spot, vol, normal, rate, div);
 
     //  Product
     unique_ptr<Product<double>> product;
@@ -619,6 +608,8 @@ inline auto uocBSAADRisk(
     const double            spot,
     const double            vol,   
     const bool              normal,
+    const double            rate,
+    const double            div,
     //  product parameters
     const double            strike,
     //  negative = european
@@ -639,10 +630,12 @@ inline auto uocBSAADRisk(
         double value;
         double delta;
         double vega;
+        double rho;
+        double ddiv;
     } results;
 
     //  Build model, product and rng
-    SimpleBlackScholes<Number> model(spot, vol, normal);
+    BlackScholes<Number> model(spot, vol, normal, rate, div);
 
     //  Product
     unique_ptr<Product<Number>> product;
@@ -672,6 +665,8 @@ inline auto uocBSAADRisk(
 
     results.delta = simulResults.risks[0];
     results.vega = simulResults.risks[1];
+    results.rho = simulResults.risks[2];
+    results.ddiv = simulResults.risks[3];
 
     return results;
 }

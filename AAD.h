@@ -17,7 +17,7 @@ As long as this comment is preserved at the top of the file
 #pragma once
 
 #define AADET   true        //  AAD with expression templates
-#define AADETNV false       //  Optimization without virtual nodes (experimental)
+#define AADETNV false       //  Non-virtual nodes (experimental)
 
 //  So we can instrument Gaussians like standard math functions
 #include "Gaussians.h"
