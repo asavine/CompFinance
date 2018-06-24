@@ -301,6 +301,12 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
-/PredictedInputCache_Release_x86.dat
-/PredictedInputCache_Debug_x64.dat
+*.dat
+*.dat
+/*.dat
+/*.dat
 *.bak
+*.*.bak
+*.*.*.bak
+*.*.*.*.bak
+*.*.*.*.*.bak
