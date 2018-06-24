@@ -15,11 +15,11 @@ fillData(
     const CONT&                     original,
     //  The maximum spacing allowed
     const T&                        maxDx,
+    //  Minimum distance for equality
+    const T&                        minDx = T(0.0),
     //  Specific points to add, by iterator, sorted
     IT                              addBegin = nullptr,
-    IT                              addEnd = nullptr,
-    //  Minimum distance for equality
-    const T&                        minDx = T(0.0))
+    IT                              addEnd = nullptr)
 {
     //  Results
     CONT filled;
@@ -58,7 +58,7 @@ fillData(
             auto spacing = (next - current) / addPoints;
             //  Add the steps
             auto t = current + spacing;
-            while (t < next)
+            while (t < next - minDx)
             {
                 filled.push_back(t);
                 t += spacing;

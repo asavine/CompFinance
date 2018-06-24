@@ -29,7 +29,7 @@ class Number
     inline void createNode()
     {
         //  Placement syntax to allocate in place on tape
-        myNode = new (tape->allocate(sizeof(NodeType))) NodeType;
+        myNode = new (tape->allocate<sizeof(NodeType)>()) NodeType;
     }
 
     //  Access to node for friends

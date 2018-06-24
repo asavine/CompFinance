@@ -18,12 +18,6 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="targetver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="gaussians.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -52,9 +46,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mcPrd.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mcMdl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="primitivepolynomials.h">
@@ -99,17 +90,20 @@
     <ClInclude Include="analytics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="mcMdlDupire.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mcMdlBS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mcMdlMulti.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mcMdl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="xlComp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="dllmain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MemoryManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -70,8 +70,14 @@ public:
     //  n : numbers already processed
     template <size_t N, size_t n>
     void pushAdjoint(
-        //  Node for the complete expression being processed
-        MultiNode<N>& exprNode,     
+        
+//  Node for the complete expression being processed
+#if AADETNV
+        Node&           exprNode,
+#else
+        MultiNode<N>&   exprNode,     
+#endif   
+        
         //  Adjoint cumulated for this binary node
         const double adjoint)       
         const
@@ -273,7 +279,14 @@ public:
     //  Push adjoint down the expression DAG
     template <size_t N, size_t n>
     void pushAdjoint(
-        MultiNode<N>& exprNode,     //  Node for the complete expression
+
+//  Node for the complete expression being processed
+#if AADETNV
+        Node&           exprNode,
+#else
+        MultiNode<N>&   exprNode,
+#endif   
+
         const double adjoint)       //  Adjoint cumulated on the node
         const
     {
@@ -708,12 +721,29 @@ class Number : public Expression<Number>
     Node* myNode;
 
     //  Node creation on tape, as normal
+
+#if AADETNV
+    
+    template <size_t N>
+    Node* createMultiNode()
+    {
+        static const size_t size = sizeof(Node) + N * (sizeof(double) + sizeof(double*));
+
+        //  Placement syntax to allocate in place on tape
+        return new (tape->allocate<size>()) Node(N);
+    }
+
+#else
+
     template <size_t N>
     MultiNode<N>* createMultiNode()
     {
         //  Placement syntax to allocate in place on tape
-        return new (tape->allocate(sizeof(MultiNode<N>))) MultiNode<N>;
+        return new (tape->allocate<sizeof(MultiNode<N>)>()) MultiNode<N>;
     }
+
+#endif   
+
 
     //  This is where, on assignment or construction from an expression,
     //      that derivatives are pushed through the expression's DAG 
@@ -739,6 +769,21 @@ public:
     //  Push adjoint
     //  This is where the derivatives and pointers are set on the node
     //  Push adjoint down the expression DAG
+
+#if AADETNV
+
+    template <size_t N, size_t n>
+    void pushAdjoint(
+        Node& exprNode,             //  Node for the complete expression
+        const double adjoint)       //  Adjoint cumulated on the node
+        const
+    {
+        exprNode.argAdjoints[n] = & myNode->adjoint;
+        exprNode.derivatives[n] = adjoint;
+    }
+
+#else
+
     template <size_t N, size_t n>
     void pushAdjoint(
         MultiNode<N>& exprNode,     //  Node for the complete expression
@@ -748,6 +793,8 @@ public:
         exprNode.arguments[n] = myNode;
         exprNode.derivatives[n] = adjoint;
     }
+
+#endif
 
     //  Static access to tape, as normal
     static thread_local Tape* tape;
