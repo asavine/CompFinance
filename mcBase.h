@@ -22,6 +22,8 @@ As long as this comment is preserved at the top of the file
 #include <memory>
 #include <algorithm>
 #include <numeric>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -77,10 +79,7 @@ public:
     virtual const vector<simulData>& dataline() const = 0;
 
     //  Number of payoffs in the product, 1 by default
-    virtual size_t numPayoffs() const
-    {
-        return 1;
-    }
+    virtual const vector<string>& payoffLabels() const = 0;
 
     //  Compute payoffs given a path (on the product timeline)
     virtual void payoffs(
@@ -185,7 +184,7 @@ inline vector<vector<double>> mcSimul(
     auto cRng = rng.clone();
 
     //	Allocate results
-    const size_t nPay = prd.numPayoffs();
+    const size_t nPay = prd.payoffLabels().size();
     vector<vector<double>> results(nPath, vector<double>(nPay));
     //  Init the simulation timeline
     cMdl->allocate(prd.timeline(), prd.dataline());
@@ -222,7 +221,7 @@ inline vector<vector<double>> mcParallelSimul(
 {
     auto cMdl = mdl.clone();
 
-    const size_t nPay = prd.numPayoffs();
+    const size_t nPay = prd.payoffLabels().size();
     vector<vector<double>> results(nPath, vector<double>(nPay));
 
     cMdl->allocate(prd.timeline(), prd.dataline());
@@ -358,7 +357,7 @@ mcSimulAAD(
     cRng->init(cMdl->simDim());                         
                                                         
     //  Dimensions
-    const size_t nPay = prd.numPayoffs();
+    const size_t nPay = prd.payoffLabels().size();
     const vector<Number*>& params = cMdl->parameters();
     const size_t nParam = params.size();
     
@@ -462,7 +461,7 @@ mcParallelSimulAAD(
 
     //  Allocate workspace
 
-    const size_t nPay = prd.numPayoffs();
+    const size_t nPay = prd.payoffLabels().size();
     const size_t nParam = mdl.numParams();
 
     //  One model clone per thread

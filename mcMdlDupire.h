@@ -96,8 +96,11 @@ public:
         {
             for (size_t j = 0; j < myVols.cols(); ++j)
             {
-                myParameterLabels[++p] = 
-                    "vol " + to_string(mySpots[i]) + " " + to_string(myTimes[j]);
+                ostringstream ost;
+                ost << setprecision(2);
+                ost << "lvol " << mySpots[i] << " " << myTimes[j];
+ 
+                myParameterLabels[++p] = ost.str();
             }
         }
 

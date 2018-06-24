@@ -173,7 +173,7 @@
     <ClInclude Include="initializers.h" />
     <ClInclude Include="interp.h" />
     <ClInclude Include="ivs.h" />
-    <ClInclude Include="mcDriver.h" />
+    <ClInclude Include="main.h" />
     <ClInclude Include="mcMdl.h" />
     <ClInclude Include="mcMdlBS.h" />
     <ClInclude Include="mcMdlMulti.h" />
@@ -188,6 +188,7 @@
     <ClInclude Include="matrix.h" />
     <ClInclude Include="memorymanager.h" />
     <ClInclude Include="MemoryPool.h" />
+    <ClInclude Include="store.h" />
     <ClInclude Include="threadPool.h" />
     <ClInclude Include="utility.h" />
     <ClInclude Include="xlcall.h" />

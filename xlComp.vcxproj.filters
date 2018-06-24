@@ -63,9 +63,6 @@
     <ClInclude Include="interp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="mcDriver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="AADNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -100,6 +97,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mcMdl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="main.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="store.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

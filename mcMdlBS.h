@@ -203,7 +203,7 @@ public:
             //  Forward factors
             for (size_t j = 0; j < dataline[i].forwardMats.size(); ++j)
             {
-                myForwardFactors[i][j] = exp(-mu * (dataline[i].forwardMats[j] - productTimeline[i]));
+                myForwardFactors[i][j] = exp(mu * (dataline[i].forwardMats[j] - productTimeline[i]));
             }
         }
     }

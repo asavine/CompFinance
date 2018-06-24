@@ -15,7 +15,7 @@ As long as this comment is preserved at the top of the file
 */
 
 #include "threadPool.h"
-#include "mcDriver.h"
+#include "main.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -26,7 +26,308 @@ As long as this comment is preserved at the top of the file
 //	Wrappers
 
 extern "C" __declspec(dllexport)
-inline double xUocDupire(
+ double xPutDupire(
+    //  model parameters
+    double              spot,
+    FP12*               spots,
+    FP12*               times,
+    FP12*               vols,
+    double              maxDt,
+    double              xid)
+{
+    const int id = int(xid + EPS);
+
+    //  Make sure the last inputs are given
+    if (maxDt <= 0.0 || id <= 0) return -1;
+
+    //  Unpack
+
+    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns) return -1;
+
+    vector<double> vspots;
+    {
+        size_t rows = spots->rows;
+        size_t cols = spots->columns;
+        double* numbers = spots->array;
+
+        vspots.resize(rows);
+        copy(numbers, numbers + rows, vspots.begin());
+    }
+
+    vector<double> vtimes;
+    {
+        size_t rows = times->rows;
+        size_t cols = times->columns;
+        double* numbers = times->array;
+
+        vtimes.resize(cols);
+        copy(numbers, numbers + cols, vtimes.begin());
+    }
+
+    matrix<double> vvols;
+    {
+        size_t rows = vols->rows;
+        size_t cols = vols->columns;
+        double* numbers = vols->array;
+
+        vvols.resize(rows, cols);
+        copy(numbers, numbers + rows * cols, vvols.begin());
+    }
+
+    //  Call and return
+    putDupire(spot, vspots, vtimes, vvols, maxDt, id);
+
+    return id;
+}
+
+extern "C" __declspec(dllexport)
+ double xPutBlackScholes(
+    double              spot,
+    double              vol,
+    double              normal,
+    double              rate,
+    double              div,
+    double              xid)
+{
+    const int id = int(xid + EPS);
+
+    //  Make sure the last inputs are given
+    if (id <= 0) return -1;
+
+    //  Call and return
+    putBlackScholes(spot, vol, normal > 0, rate, div, id);
+
+    return id;
+}
+
+extern "C" __declspec(dllexport)
+ double xPutEuropean(
+    double              strike,
+    double              exerciseDate,
+    double              settlementDate,
+    double              xid)
+{
+    const int id = int(xid + EPS);
+
+    //  Make sure the last inputs are given
+    if (id <= 0) return -1;
+
+    if (settlementDate <= 0) settlementDate = exerciseDate;
+
+    //  Call and return
+    putEuropean(strike, exerciseDate, settlementDate, id);
+
+    return id;
+}
+
+extern "C" __declspec(dllexport)
+ double xPutBarrier(
+    double              strike,
+    double              barrier,
+    double              maturity,
+    double              monitorFreq,
+    double              xid)
+{
+    const int id = int(xid + EPS);
+
+    //  Make sure the last inputs are given
+    if (monitorFreq <= 0.0 || id <= 0) return -1;
+
+
+    //  Call and return
+    putBarrier(strike, barrier, maturity, monitorFreq, id);
+
+    return id;
+}
+
+extern "C" __declspec(dllexport)
+ double xPutEuropeans(
+    FP12*               maturities,
+    FP12*               strikes,
+    double              xid)
+{
+    const int id = int(xid + EPS);
+
+    //  Make sure the last input is given
+    if (!strikes->rows || !strikes->columns || id <= 0) return -1;
+
+    vector<double> vmats;
+    vector<double> vstrikes;
+    {
+        size_t rows = maturities->rows;
+        size_t cols = maturities->columns;
+        
+        if (strikes->rows * strikes->columns != rows * cols) return -1;
+        
+        double* mats= maturities->array;
+        double* strs = strikes->array;
+
+        for (size_t i = 0; i < cols * rows; ++i)
+        {
+            if (mats[i] > EPS && strs[i] > EPS)
+            {
+                vmats.push_back(mats[i]);
+                vstrikes.push_back(strs[i]);
+            }
+        }
+    }
+
+    //  Call and return
+    putEuropeans(vmats, vstrikes, id);
+
+    return id;
+}
+
+extern "C" __declspec(dllexport)
+ FP12* xValue(
+    double              modelid,
+    double              productid,
+    //  numerical parameters
+    double              useSobol,
+    double              seed1,
+    double              seed2,
+    double              numPath,
+    double              parallel)
+{
+    const int mid = int(modelid + EPS);
+    const int pid = int(productid + EPS);
+
+    //  Make sure the last input is given
+    if (!mid || !pid || numPath <= 0)
+    {
+        FP12* result = (FP12*)GetTempMemory(1);
+        result->rows = 1;
+        result->columns = 1;
+        result->array[0] = -1;
+        return result;
+    }
+
+    //  Call and return
+    vector<double> res;
+
+    try 
+    {
+        auto results = value(mid, pid, parallel>0,
+            useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
+        res = move(results.values);
+    }
+    catch (const exception&)
+    {
+        res.push_back(-1);
+    }
+
+    //  Build return
+
+    // Allocate result
+    // Calculate size
+    size_t resultRows = res.size(),
+        resultCols = 1,
+        resultSize = resultRows * resultCols;
+
+    // Return an error if size is 0
+    if (resultSize <= 0) return nullptr;
+
+    // First, free all memory previously allocated
+    // the function is defined in framework.h
+    FreeAllTempMemory();
+    // Then, allocate the memory for this result
+    // We don't need to de-allocate it, that will be done by the next call
+    // to this function or another function calling FreeAllTempMemory()
+    // Memory size required, details in Dalton's book, section 6.2.2
+    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
+    // Finally allocate, function definition in framework.h
+    FP12* result = (FP12*)GetTempMemory(memSize);
+    // Compute result
+    result->rows = resultRows;
+    result->columns = resultCols;
+    for (size_t i = 0; i < res.size(); ++i)
+        result->array[i] = res[i];
+ 
+    // Return it
+    return result;
+}
+
+extern "C" __declspec(dllexport)
+FP12* xAADrisk(
+    double              modelid,
+    double              productid,
+    //  numerical parameters
+    double              useSobol,
+    double              seed1,
+    double              seed2,
+    double              numPath,
+    double              parallel)
+{
+    const int mid = int(modelid + EPS);
+    const int pid = int(productid + EPS);
+
+    //  Make sure the last input is given
+    if (!mid || !pid || numPath <= 0)
+    {
+        FP12* result = (FP12*)GetTempMemory(1);
+        result->rows = 1;
+        result->columns = 1;
+        result->array[0] = -1;
+        return result;
+    }
+
+    //  Call and return
+    vector<double> payoffs;
+    double aggregate;
+    vector<double> risks;
+
+    try
+    {
+        auto results = AADrisk(mid, pid, parallel>0,
+            useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
+        payoffs = move(results.payoffValues);
+        aggregate = results.riskPayoffValue;
+        risks = move(results.risks);
+    }
+    catch (const exception&)
+    {
+        payoffs.push_back(-1);
+        aggregate = -1;
+        risks.push_back(-1);
+    }
+
+    //  Build return
+
+    // Allocate result
+    // Calculate size
+    size_t resultRows = 2 + risks.size(),
+        resultCols = payoffs.size(),
+        resultSize = resultRows * resultCols;
+
+    // Return an error if size is 0
+    if (resultSize <= 0) return nullptr;
+
+    // First, free all memory previously allocated
+    // the function is defined in framework.h
+    FreeAllTempMemory();
+    // Then, allocate the memory for this result
+    // We don't need to de-allocate it, that will be done by the next call
+    // to this function or another function calling FreeAllTempMemory()
+    // Memory size required, details in Dalton's book, section 6.2.2
+    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
+    // Finally allocate, function definition in framework.h
+    FP12* result = (FP12*)GetTempMemory(memSize);
+    // Compute result
+    result->rows = resultRows;
+    result->columns = resultCols;
+    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
+    for (size_t i = 0; i < payoffs.size(); ++i)
+        result->array[i] = payoffs[i];
+    result->array[resultCols] = aggregate;
+    for (size_t i = 0; i < risks.size(); ++i)
+        result->array[(i + 2)*resultCols] = risks[i];
+
+    // Return it
+    return result;
+}
+
+extern "C" __declspec(dllexport)
+ double xUocDupire(
     //  model parameters
     double              spot,
     FP12*               spots,
@@ -100,7 +401,7 @@ inline double xUocDupire(
 }
 
 extern "C" __declspec(dllexport)
-inline FP12* xEuropeansDupire(
+ FP12* xEuropeansDupire(
     //  model parameters
     double              spot,
     FP12*               spots,
@@ -242,11 +543,10 @@ inline FP12* xEuropeansDupire(
 
     // Return it
     return result;
-
 }
 
 extern "C" __declspec(dllexport)
-inline double xUocBS(
+ double xUocBS(
     //  model parameters
     double              spot,
     double              vol,
@@ -283,7 +583,7 @@ inline double xUocBS(
 }
 
 extern "C" __declspec(dllexport)
-inline FP12* xUocDupireBump(
+ FP12* xUocDupireBump(
     //  model parameters
     double              spot,
     FP12*               spots,
@@ -398,7 +698,7 @@ inline FP12* xUocDupireBump(
 }
 
 extern "C" __declspec(dllexport)
-    inline FP12* xUocDupireAAD(
+     FP12* xUocDupireAAD(
         //  model parameters
         double              spot,
         FP12*               spots,
@@ -513,7 +813,7 @@ extern "C" __declspec(dllexport)
 }
 
 extern "C" __declspec(dllexport)
-    inline FP12* xEuroBookDupireAAD(
+     FP12* xEuroBookDupireAAD(
         //  model parameters
         double              spot,
         FP12*               spots,
@@ -654,7 +954,7 @@ extern "C" __declspec(dllexport)
 }
 
 extern "C" __declspec(dllexport)
-    inline FP12* xUocBSAAD(
+     FP12* xUocBSAAD(
         //  model parameters
         double              spot,
         double              vol,
@@ -724,7 +1024,7 @@ extern "C" __declspec(dllexport)
 }
 
 extern "C" __declspec(dllexport)
-    inline double xLinterp2D(
+     double xLinterp2D(
         FP12*               xs,
         FP12*               ys,
         FP12*               zs,
@@ -766,7 +1066,7 @@ extern "C" __declspec(dllexport)
 }
 
 extern "C" __declspec(dllexport)
-inline FP12* xDupireCalib(
+ FP12* xDupireCalib(
     //  model parameters
     const double ivsType, //  0: Bach, 1: BS, 2: Merton
     const double spot,
@@ -849,7 +1149,7 @@ inline FP12* xDupireCalib(
 }
 
 extern "C" __declspec(dllexport)
-inline FP12* xDupireSuperbucket(
+ FP12* xDupireSuperbucket(
     //  model parameters
     const double ivsType, //  0: Bach, 1: BS, 2: Merton
     const double spot,
@@ -1004,6 +1304,90 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 	XLOPER12 xDLL;
 
 	Excel12f(xlGetName, &xDLL, 0);
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutBlackScholes"),
+        (LPXLOPER12)TempStr12(L"BBBBBBB"),
+        (LPXLOPER12)TempStr12(L"xPutBlackScholes"),
+        (LPXLOPER12)TempStr12(L"spot, vol, normal, rate, div, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a Black-Scholes in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutDupire"),
+        (LPXLOPER12)TempStr12(L"BBK%K%K%BB"),
+        (LPXLOPER12)TempStr12(L"xPutDupire"),
+        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a Dupire in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutEuropean"),
+        (LPXLOPER12)TempStr12(L"BBBBB"),
+        (LPXLOPER12)TempStr12(L"xPutEuropean"),
+        (LPXLOPER12)TempStr12(L"strike, exerciseDate, [settlementDate], id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a European call in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutBarrier"),
+        (LPXLOPER12)TempStr12(L"BBBBBB"),
+        (LPXLOPER12)TempStr12(L"xPutBarrier"),
+        (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a European call in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutEuropeans"),
+        (LPXLOPER12)TempStr12(L"BK%K%B"),
+        (LPXLOPER12)TempStr12(L"xPutEuropeans"),
+        (LPXLOPER12)TempStr12(L"maturities, strikes, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a collection of European call in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xValue"),
+        (LPXLOPER12)TempStr12(L"K%BBBBBBB"),
+        (LPXLOPER12)TempStr12(L"xValue"),
+        (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Monte-Carlo valuation"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xAADrisk"),
+        (LPXLOPER12)TempStr12(L"K%BBBBBBB"),
+        (LPXLOPER12)TempStr12(L"xAADrisk"),
+        (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"AAD risk report"),
+        (LPXLOPER12)TempStr12(L""));
 
 	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
 		(LPXLOPER12)TempStr12(L"xUocDupire"),

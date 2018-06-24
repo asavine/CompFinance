@@ -32,6 +32,8 @@ class European : public Product<T>
     vector<Time>        myTimeline;
     vector<simulData>   myDataline;
 
+    vector<string>      myLabels;
+
 public:
 
     //  Constructor: store data and build timeline
@@ -40,13 +42,31 @@ public:
         const Time settlementDate) :
         myStrike(strike),
         myExerciseDate(exerciseDate),
-        mySettlementDate(settlementDate)
+        mySettlementDate(settlementDate),
+        myLabels(1)
     {
+        //  Timeline = { exercise date }
         myTimeline.push_back(exerciseDate);
 
-        myDataline.resize(1);
+        //  Dataline
+        myDataline.resize(1);   //  only exercise date
+        //  Forward to settlement needed at exercise
         myDataline[0].forwardMats.push_back(settlementDate);
+        //  Discount to settlement needed at exercise
         myDataline[0].discountMats.push_back(settlementDate);
+
+        //  Identify the product
+        ostringstream ost;
+        ost.precision(2);
+        if (settlementDate == exerciseDate)
+        {
+            ost << "call " << myStrike << " " << exerciseDate;
+        }
+        else
+        {
+            ost << "call " << myStrike << " " << exerciseDate << " " << settlementDate;
+        }
+        myLabels[0] = ost.str();
     }
 
     European(const double strike,
@@ -69,6 +89,12 @@ public:
     const vector<simulData>& dataline() const override
     {
         return myDataline;
+    }
+
+    //  Labels
+    const vector<string>& payoffLabels() const override
+    {
+        return myLabels;
     }
 
     //  Payoffs, maturity major
@@ -94,6 +120,8 @@ class UOC : public Product<T>
     vector<Time>        myTimeline;
     vector<simulData>   myDataline;
 
+    vector<string>      myLabels;
+
 public:
 
     //  Constructor: store data and build timeline
@@ -105,25 +133,45 @@ public:
         const Time monitorFreq)
         : myStrike(strike), 
         myBarrier(barrier), 
-        myMaturity(maturity)
+        myMaturity(maturity),
+        myLabels(1)
     {
+        //  Produce timeline
+
+        //  Today
         myTimeline.push_back(systemTime);
         Time t = systemTime + monitorFreq;
-
+            
+        //  Barrier monitoring
         while (myMaturity - t > ONE_HOUR)
         {
             myTimeline.push_back(t);
             t += monitorFreq;
         }
 
+        //  Maturity
         myTimeline.push_back(myMaturity);
+
+        //
+
+        //  Dataline
 
         const size_t n = myTimeline.size();
         myDataline.resize(n);
         for (size_t i = 0; i < n; ++i)
         {
+            //  spot(t) = forward (t, t) needed on every step
             myDataline[i].forwardMats.push_back(myTimeline[i]);
         }
+
+        //
+
+        //  Identify the product
+        ostringstream ost;
+        ost.precision(2);
+        ost << "call " << myStrike << " up and out " 
+            << myBarrier << " monitoring freq " << monitorFreq;
+        myLabels[0] = ost.str();
     }
 
     //  Virtual copy constructor
@@ -142,6 +190,12 @@ public:
     const vector<simulData>& dataline() const override
     {
         return myDataline;
+    }
+
+    //  Labels
+    const vector<string>& payoffLabels() const override
+    {
+        return myLabels;
     }
 
     //  Payoff
@@ -192,6 +246,8 @@ class Europeans : public Product<T>
     vector<vector<double>>  myStrikes;      //  a vector of strikes per maturity
     vector<simulData>       myDataline;
 
+    vector<string>          myLabels;
+
 public:
 
     //  Constructor: store data and build timeline
@@ -199,16 +255,30 @@ public:
     {
         const size_t n = options.size();
 
+        //  Timeline = one step per maturity
         for (const pair<Time, vector<double>>& p : options)
         {
             myMaturities.push_back(p.first);
             myStrikes.push_back(p.second);
         }
 
+        //  Dataline = spot(t) = forward(t,t) one every step
         myDataline.resize(n);
         for (size_t i = 0; i < n; ++i)
         {
             myDataline[i].forwardMats.push_back(myMaturities[i]);
+        }
+
+        //  Identify the payoffs
+        for (const auto& option : options)
+        {
+            for (const auto& strike : option.second)
+            {
+                ostringstream ost;
+                ost.precision(2);
+                ost << "call " << option.first << " " << strike;
+                myLabels.push_back(ost.str());
+            }
         }
     }
 
@@ -241,14 +311,10 @@ public:
         return myDataline;
     }
 
-    size_t numPayoffs() const override
+    //  Labels
+    const vector<string>& payoffLabels() const override
     {
-        return accumulate(myStrikes.begin(), myStrikes.end(), 0, 
-            [](const int acc, const vector<double>& strikes) 
-            { 
-                return acc + strikes.size(); 
-            }
-        );
+        return myLabels;
     }
 
     //  Payoffs, maturity major

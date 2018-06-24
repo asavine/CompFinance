@@ -25,6 +25,144 @@ As long as this comment is preserved at the top of the file
 #include <fstream>
 using namespace std;
 
+#include "store.h"
+
+//  Generic valuation
+inline auto value(
+    const int               modelId,
+    const int               productId,
+    //  numerical parameters
+    const bool              parallel,
+    const bool              useSobol,
+    const int               numPath,
+    //  optionals
+    const int               seed1 = 12345,
+    const int               seed2 = 12346)
+{
+    //  Get model and product
+    const Model<double>* model = getModel<double>(modelId);
+    const Product<double>* product = getProduct<double>(productId);
+
+    if (!model || !product)
+    {
+        throw runtime_error("evaluate() : Could not retrieve model and product");
+    }
+
+    //  Random Number Generator
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
+
+    //  Simulate
+    const auto resultMat = parallel
+        ? mcParallelSimul(*product, *model, *rng, numPath)
+        : mcSimul(*product, *model, *rng, numPath);
+
+    //  We return 2 vectors : the payoff identifiers and their values
+    struct
+    {
+        vector<string> identifiers;
+        vector<double> values;
+    } results;
+
+    const size_t nPayoffs = product->payoffLabels().size();
+    results.identifiers = product->payoffLabels();
+    results.values.resize(nPayoffs);
+    for (size_t i = 0; i < nPayoffs; ++i)
+    {
+        results.values[i] = accumulate(resultMat.begin(), resultMat.end(), 0.0,
+            [i](const double acc, const vector<double>& v) { return acc + v[i]; }
+        ) / numPath;
+    }
+
+    return results;
+}
+
+//  Generic risk
+inline auto AADrisk(
+    const int               modelId,
+    const int               productId,
+    //  numerical parameters
+    const bool              parallel,
+    const bool              useSobol,
+    const int               numPath,
+    //  optionals
+    const int               seed1 = 12345,
+    const int               seed2 = 12346,
+    const string            riskPayoff = "")
+{
+    //  Get model and product
+    const Model<Number>* model = getModel<Number>(modelId);
+    const Product<Number>* product = getProduct<Number>(productId);
+
+    if (!model || !product)
+    {
+        throw runtime_error("AADrisk() : Could not retrieve model and product");
+    }
+
+    //  Random Number Generator
+    unique_ptr<RNG> rng;
+    if (useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1, seed2);
+
+    //  Find the payoff for risk
+    size_t riskPayoffIdx = 0;
+    if (!riskPayoff.empty())
+    {
+        const vector<string>& allPayoffs = product->payoffLabels();
+        auto it = find(allPayoffs.begin(), allPayoffs.end(), riskPayoff);
+        if (it == allPayoffs.end())
+        {
+            throw runtime_error("AADrisk() : payoff not found");
+        }
+        riskPayoffIdx = distance(allPayoffs.begin(), it);
+    }
+
+    //  Simulate
+    const auto simulResults = parallel
+        ? mcParallelSimulAAD(*product, *model, *rng, numPath,
+            [riskPayoffIdx](const vector<Number>& v) {return v[riskPayoffIdx]; })
+        : mcSimulAAD(*product, *model, *rng, numPath,
+            [riskPayoffIdx](const vector<Number>& v) {return v[riskPayoffIdx]; });
+
+    //  We return: a number and 2 vectors : 
+    //  -   The payoff identifiers and their values
+    //  -   The value of the aggreagte payoff
+    //  -   The parameter idenitifiers 
+    //  -   The sensititivities of the aggregate to parameters
+    struct
+    {
+        vector<string>  payoffIds;
+        vector<double>  payoffValues;
+        double          riskPayoffValue;
+        vector<string>  paramIds;
+        vector<double>  risks;
+    } results;
+
+    const size_t nPayoffs = product->payoffLabels().size();
+    results.payoffIds = product->payoffLabels();
+    results.payoffValues.resize(nPayoffs);
+    for (size_t i = 0; i < nPayoffs; ++i)
+    {
+        results.payoffValues[i] = accumulate(
+            simulResults.payoffs.begin(), 
+            simulResults.payoffs.end(), 
+            0.0,
+            [i](const double acc, const vector<double>& v) { return acc + v[i]; }
+        ) / numPath;
+    }
+    results.riskPayoffValue = accumulate(
+        simulResults.aggregated.begin(),
+        simulResults.aggregated.end(),
+        0.0) / numPath;
+    results.paramIds = model->parameterLabels();
+    results.risks = move (simulResults.risks);
+
+    return results;
+}
+
+//  Specific driver functions for particular cases
+
 inline double uocDupire(
     //  model parameters
     const double            spot,
@@ -271,7 +409,6 @@ inline auto uocDupireAADRisk(
     else rng = make_unique<mrg32k3a>(seed1, seed2);
 
     //  Simulate
-
     const auto simulResults = parallel
         ? mcParallelSimulAAD(*product, model, *rng, numPath)
         : mcSimulAAD(*product, model, *rng, numPath);
