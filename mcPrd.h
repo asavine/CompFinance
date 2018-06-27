@@ -21,6 +21,7 @@ As long as this comment is preserved at the top of the file
 #include "mcBase.h"
 
 #define ONE_HOUR 0.000114469
+#define ONE_DAY 0.003773585
 
 template <class T>
 class European : public Product<T>
@@ -135,7 +136,7 @@ public:
         const double    barrier, 
         const Time      maturity, 
         const Time      monitorFreq,
-        const double    smooth = 0.1)
+        const double    smooth)
         : myStrike(strike), 
         myBarrier(barrier), 
         myMaturity(maturity),
@@ -176,7 +177,7 @@ public:
         ostringstream ost;
         ost.precision(2);
         ost << fixed;
-        ost << "call " << myStrike;
+        ost << "call " << myMaturity << " " << myStrike ;
         myLabels[1] = ost.str();
 
         ost << " up and out "
@@ -221,8 +222,10 @@ public:
         //  See Savine's presentation on Fuzzy Logic, Global Derivatives 2016
         //  Or Andreasen and Savine's publication on scripting
 
-        //  We apply a smoothing factor of 1% of the spot both ways, untemplated
-        const double smooth = convert<double>(path[0].forwards[0] * mySmooth);
+        //  We apply a smoothing factor of x% of the spot both ways, untemplated
+        const double smooth = convert<double>(path[0].forwards[0] * mySmooth),
+            twoSmooth = 2 * smooth,
+            barSmooth = myBarrier + smooth;
 
         //  We start alive
         T alive(1.0);
@@ -231,7 +234,7 @@ public:
         for (const auto& scen: path)
         {
             //  Breached
-            if (scen.forwards[0] > myBarrier + smooth)
+            if (scen.forwards[0] > barSmooth)
             {
                 alive = T(0.0);
                 break;
@@ -240,7 +243,7 @@ public:
             //  Semi-breached: apply smoothing
             if (scen.forwards[0] > myBarrier - smooth)
             {
-                alive *= (myBarrier + smooth - scen.forwards[0]) / (2 * smooth);
+                alive *= (barSmooth - scen.forwards[0]) / twoSmooth;
             }
         }
 
@@ -354,5 +357,177 @@ public:
 
             payoffIt += myStrikes[i].size();
         }
+    }
+};
+
+//  Payoff = sum { (libor(Ti, Ti+1) + cpn) * coverage(Ti, Ti+1) only if Si+1 >= Si }
+template <class T>
+class ContingentBond : public Product<T>
+{
+    Time                myMaturity;
+    double              myCpn;
+    double              mySmooth;
+
+    vector<Time>        myTimeline;
+    vector<simulData>   myDataline;
+
+    vector<string>      myLabels;
+
+    //  Pre-computed coverages
+    vector<double>      myDt;
+
+public:
+
+    //  Constructor: store data and build timeline
+    //  Timeline = system date to maturity, 
+    //  with steps every payment frequency
+    ContingentBond(
+        const Time      maturity,
+        const double    cpn,
+        const Time      payFreq,
+        const double    smooth)
+        : 
+        myMaturity(maturity),
+        myCpn(cpn),
+        mySmooth(smooth),
+        myLabels(1)
+    {
+        //  Produce timeline
+
+        //  Today
+        myTimeline.push_back(systemTime);
+        Time t = systemTime + payFreq;
+
+        //  Payment schedule
+        while (myMaturity - t > ONE_DAY)
+        {
+            myDt.push_back(t - myTimeline.back());
+            myTimeline.push_back(t);
+            t += payFreq;
+        }
+
+        //  Maturity
+        myDt.push_back(myMaturity - myTimeline.back());
+        myTimeline.push_back(myMaturity);
+
+        //
+
+        //  Dataline
+
+        //  Payoff = sum { (libor(Ti, Ti+1) + cpn) * coverage(Ti, Ti+1) only if Si+1 >= Si }
+        //  We need spot ( = forward (Ti, Ti) ) on every step,
+        //  and libor (Ti, Ti+1) on on every step but the last
+        //  (coverage is assumed act/365)
+
+        const size_t n = myTimeline.size();
+        myDataline.resize(n);
+        for (size_t i = 0; i < n; ++i)
+        {
+            //  spot(Ti) = forward (Ti, Ti) needed on every step
+            myDataline[i].forwardMats.push_back(myTimeline[i]);
+
+            //  libor(Ti, Ti+1) and discount (Ti, Ti+1) needed on every step but last
+            if (i < n - 1)
+            {
+                myDataline[i].liborDefs.push_back(
+                    simulData::rateDef(myTimeline[i], myTimeline[i + 1], "libor"));
+            }
+        }
+
+        //  Identify the product
+        ostringstream ost;
+        ost.precision(2);
+        ost << fixed;
+        ost << "contingent bond " << myMaturity << " " << myCpn;
+        myLabels[0] = ost.str();
+    }
+
+    //  Virtual copy constructor
+    unique_ptr<Product<T>> clone() const override
+    {
+        return unique_ptr<Product<T>>(new ContingentBond<T>(*this));
+    }
+
+    //  Timeline
+    const vector<Time>& timeline() const override
+    {
+        return myTimeline;
+    }
+
+    //  Dataline
+    const vector<simulData>& dataline() const override
+    {
+        return myDataline;
+    }
+
+    //  Labels
+    const vector<string>& payoffLabels() const override
+    {
+        return myLabels;
+    }
+
+    //  Payoff
+    void payoffs(
+        //  path, one entry per time step (on the product timeline)
+        const vector<scenario<T>>&  path,
+        //  pre-allocated space for resulting payoffs
+        vector<T>&                  payoffs)
+        const override
+    {
+        //  We apply the smooth digital technique to stabilize risks
+        //  See Savine's presentation on Fuzzy Logic, Global Derivatives 2016
+        //  Or Andreasen and Savine's publication on scripting
+
+        //  We apply a smoothing factor of x% of the spot both ways, untemplated
+        const double smooth = convert<double>(path[0].forwards[0] * mySmooth),
+            twoSmooth = 2 * smooth;
+
+        //  We start alive
+        T alive(1.0);
+
+        //  Go through path, update alive status
+        //  Period by period
+        const size_t n = path.size() - 1;
+        payoffs[0] = 0;
+        for (size_t i = 0; i < n; ++i)
+        {
+            const auto& start = path[i];
+            const auto& end = path[i + 1];
+
+            const T s0 = start.forwards[0], s1 = end.forwards[0];
+
+            //  Is asset performance positive?
+
+            /*
+                We apply smoothing here otherwise risks are unstable with bumps
+                    and wrong with AAD 
+
+                bool digital = end.forwards[0] >= start.forwards[0];
+            */
+
+            T digital;
+            if (s1 - s0 > smooth)
+            {
+                digital = T(1.0);
+            }
+            else if (s1 - s0 < - smooth)
+            {
+                digital = T(0.0);
+            }
+            else // "fuzzy" barrier = interpolate
+            {
+                digital = (s1 - s0 + smooth) / twoSmooth;
+            }
+
+            //  ~smoothing
+
+            payoffs[0] += 
+                digital             //  contingency
+                * ( start.libors[0] //  libor(Ti, Ti+1)
+                + myCpn)            //  + coupon
+                * myDt[i]           //  day count / 365
+                / end.numeraire;    //  paid at Ti+1
+        }
+        payoffs[0] += 1.0 / path.back().numeraire;  //  redemption at maturity
     }
 };

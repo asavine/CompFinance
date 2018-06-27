@@ -36,8 +36,10 @@ class BlackScholes : public Model<T>
     vector<T>           myNumeraires;
     //  pre-calculated discounts exp(r * (T - t))
     vector<vector<T>>   myDiscounts;
-    //  and forward factors exp((r - d) * (T - t))
+    //  forward factors exp((r - d) * (T - t))
     vector<vector<T>>   myForwardFactors;
+    //  and rates = (exp(r * (T2 - T1)) - 1) / (T2 - T1)
+    vector<vector<T>>   myLibors;
 
     //  Exported parameters
     vector<T*>          myParameters;
@@ -155,10 +157,16 @@ public:
             myDiscounts[j].resize(dataline[j].discountMats.size());
         }
 
-        myForwardFactors.resize(productTimeline.size());
+        myForwardFactors.resize(n);
         for (size_t j = 0; j < n; ++j)
         {
             myForwardFactors[j].resize(dataline[j].forwardMats.size());
+        }
+
+        myLibors.resize(n);
+        for (size_t j = 0; j < n; ++j)
+        {
+            myLibors[j].resize(dataline[j].liborDefs.size());
         }
     }
 
@@ -217,12 +225,22 @@ public:
 
         for (size_t i = 0; i < m; ++i)
         {
-            //  Discount factors
-            const size_t p = dataline[i].forwardMats.size();
             //  Forward factors
+            const size_t p = dataline[i].forwardMats.size();
             for (size_t j = 0; j < p; ++j)
             {
                 myForwardFactors[i][j] = exp(mu * (dataline[i].forwardMats[j] - productTimeline[i]));
+            }
+        }
+
+        for (size_t i = 0; i < m; ++i)
+        {
+            //  Libors
+            const size_t p = dataline[i].liborDefs.size();
+            for (size_t j = 0; j < p; ++j)
+            {
+                const double dt = dataline[i].liborDefs[j].end - dataline[i].liborDefs[j].start;
+                myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
             }
         }
     }
@@ -254,6 +272,9 @@ private:
 
         copy(myDiscounts[idx].begin(), myDiscounts[idx].end(), 
             scen.discounts.begin());
+
+        copy(myLibors[idx].begin(), myLibors[idx].end(),
+            scen.libors.begin());
     }
 
 public:

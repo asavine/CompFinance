@@ -160,6 +160,27 @@ LPXLOPER12 xPutBarrier(
 }
 
 extern "C" __declspec(dllexport)
+LPXLOPER12 xPutContingent(
+    double              coupon,
+    double              maturity,
+    double              payFreq,
+    double              smoothing,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    //  Call and return
+    putContingent(coupon, maturity, payFreq, smoothing, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
 LPXLOPER12 xPutEuropeans(
     FP12*               maturities,
     FP12*               strikes,
@@ -714,6 +735,18 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"QBBBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutBarrier"),
         (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, [smoothingFactor], id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a European call in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutContingent"),
+        (LPXLOPER12)TempStr12(L"QBBBBQ"),
+        (LPXLOPER12)TempStr12(L"xPutContingent"),
+        (LPXLOPER12)TempStr12(L"coupon, maturity, payFreq, [smoothingFactor], id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

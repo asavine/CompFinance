@@ -39,6 +39,18 @@ struct simulData
 {
     vector<Time>    forwardMats;
     vector<Time>    discountMats;
+
+    struct rateDef
+    {
+        Time    start;
+        Time    end;
+        string  curve;
+
+        rateDef(const Time s, const Time e, const string& c) :
+            start(s), end(e), curve(c) {};
+    };
+
+    vector<rateDef> liborDefs;
 };
 
 //  scenario = simulated value
@@ -49,12 +61,14 @@ struct scenario
     T           numeraire;
     vector<T>   forwards;
     vector<T>   discounts;
+    vector<T>   libors;
 
     //  Allocate given simulData
     void allocate(const simulData& data)
     {
         forwards.resize(data.forwardMats.size());
         discounts.resize(data.discountMats.size());
+        libors.resize(data.liborDefs.size());
     }
 
     //  Initialize defaults
@@ -62,6 +76,7 @@ struct scenario
     {
         numeraire = T(1.0);
         fill(discounts.begin(), discounts.end(), T(1.0));
+        fill(libors.begin(), libors.end(), T(0.0));
     }
 };
 

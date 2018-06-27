@@ -106,13 +106,32 @@ void putBarrier(
     const double            smooth,
     const string&           store)
 {
-    const double smoothFactor = smooth <= 0 ? 0.1 : smooth;
+    const double smoothFactor = smooth <= 0 ? EPS : smooth;
 
     //  We create 2 products, one for valuation and one for risk
     unique_ptr<Product<double>> prd = make_unique<UOC<double>>(
         strike, barrier, maturity, monitorFreq, smoothFactor);
     unique_ptr<Product<Number>> riskPrd = make_unique<UOC<Number>>(
         strike, barrier, maturity, monitorFreq, smoothFactor);
+
+    //  And move them into the map
+    productStore[store] = make_pair(move(prd), move(riskPrd));
+}
+
+void putContingent(
+    const double            coupon,
+    const Time              maturity,
+    const double            payFreq,
+    const double            smooth,
+    const string&           store)
+{
+    const double smoothFactor = smooth <= 0 ? 0.0 : smooth;
+
+    //  We create 2 products, one for valuation and one for risk
+    unique_ptr<Product<double>> prd = make_unique<ContingentBond<double>>(
+        maturity, coupon, payFreq, smoothFactor);
+    unique_ptr<Product<Number>> riskPrd = make_unique<ContingentBond<Number>>(
+        maturity, coupon, payFreq, smoothFactor);
 
     //  And move them into the map
     productStore[store] = make_pair(move(prd), move(riskPrd));
