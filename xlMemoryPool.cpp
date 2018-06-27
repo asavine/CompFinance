@@ -15,7 +15,7 @@
 //
 ///***************************************************************************
 
-#include "MemoryPool.h"
+#include "xlMemoryPool.h"
 
 //
 // Constructor creates the memory to be used by the pool

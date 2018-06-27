@@ -52,8 +52,7 @@ class Dupire : public Model<T>
     vector<Time>            myTimeline;
     //  true (1) if the time step is on the product timeline
     //  false (0) if it is an additional simulation step
-    //  note we use vector<int> because vector<bool> is broken in C++
-    vector<int>             myCommonSteps;
+    vector<bool>            myCommonSteps;
 
     //  The pruduct's dataline byref
     const vector<simulData>*    myDataline;
@@ -97,7 +96,7 @@ public:
             for (size_t j = 0; j < myVols.cols(); ++j)
             {
                 ostringstream ost;
-                ost << setprecision(2);
+                ost << setprecision(2) << fixed;
                 ost << "lvol " << mySpots[i] << " " << myTimes[j];
  
                 myParameterLabels[++p] = ost.str();
@@ -189,10 +188,12 @@ public:
     {
         //  Compute the local volatilities
         //      pre-interpolated in time and multiplied by sqrt(dt)
-        for (size_t i = 0; i < myTimeline.size() - 1; ++i)
+        const size_t n = myTimeline.size() - 1;
+        for (size_t i = 0; i < n; ++i)
         {
             const double sqrtdt = sqrt(myTimeline[i + 1] - myTimeline[i]);
-            for (size_t j = 0; j < mySpots.size(); ++j)
+            const size_t m = mySpots.size();
+            for (size_t j = 0; j < m; ++j)
             {
                 myInterpVols[i][j] = sqrtdt * interp(
                     myTimes.begin(),
@@ -215,9 +216,7 @@ private:
     //  Helper function, fills a scenario given the spot
     inline static void fillScen(const T& spot, scenario<T>& scen)
     {
-        scen.numeraire = 1.0;
         fill(scen.forwards.begin(), scen.forwards.end(), spot);
-        fill(scen.discounts.begin(), scen.discounts.end(), 1.0);
     }
 
 public:
@@ -234,25 +233,35 @@ public:
         //  Next index to fill on the product timeline
         size_t idx = 0;
         //  Is today on the product timeline?
-        if (myCommonSteps[idx]) fillScen(spot, path[idx++]);
+        if (myCommonSteps[idx])
+        {
+            fillScen(spot, path[idx]);
+            ++idx;
+        }
 
         //  Iterate through timeline
-        for(size_t i=1; i<myTimeline.size(); ++i)
+        const size_t n = myTimeline.size() - 1;
+        const size_t m = mySpots.size();
+        for (size_t i = 0; i < n; ++i)
         {
             //  Interpolate volatility in spot
-            const T vol = interp(
-                mySpots.begin(), 
-                mySpots.end(), 
-                myInterpVols[i-1], 
-                myInterpVols[i-1] + mySpots.size(), 
+            T vol = interp(
+                mySpots.begin(),
+                mySpots.end(),
+                myInterpVols[i],
+                myInterpVols[i] + m,
                 spot);
             //  vol comes out * sqrt(dt)
 
             //  Apply Euler's scheme
-            spot += vol * gaussVec[i - 1];
+            spot += vol * gaussVec[i];
 
             //  Store on the path?
-            if (myCommonSteps[i]) fillScen(spot, path[idx++]);
+            if (myCommonSteps[i + 1])
+            {
+                fillScen(spot, path[idx]);
+                ++idx;
+            }
         }
     }
 };
@@ -289,9 +298,9 @@ inline void dupireCalibMaturity(
 
     //  Skip spots below and above 2.5 std
     int il = 0;
-    while (spots[il] < ivs.spot() - 2.5 * std) ++il;
+    while (il < nSpots && spots[il] < ivs.spot() - 2.5 * std) ++il;
     int ih = nSpots - 1;
-    while (spots[ih] > ivs.spot() + 2.5 * std) --ih;
+    while (ih >= 0 && spots[ih] > ivs.spot() + 2.5 * std) --ih;
 
     //  Loop on spots
     for (int i = il; i <= ih; ++i)
@@ -301,10 +310,10 @@ inline void dupireCalibMaturity(
     }
 
     //  Extrapolate flat outside std
-    for (int i = 0; i <= il - 1; ++i)
+    for (int i = 0; i < il; ++i)
         lVolsBegin[i] = lVolsBegin[il];
     for (int i = ih + 1; i < nSpots; ++i)
-        lVolsBegin[i] = lVolsBegin[ih - 1];
+        lVolsBegin[i] = lVolsBegin[ih];
 }
 
 #define ONE_HOUR 0.000114469
@@ -346,7 +355,8 @@ inline auto dupireCalib(
     matrix<T> lVolsT(results.times.size(), results.spots.size());
 
     //  Maturity by maturity
-    for (size_t j = 0; j < results.times.size(); ++j)
+    const size_t n = results.times.size();
+    for (size_t j = 0; j < n; ++j)
     {
         dupireCalibMaturity(
             ivs, 

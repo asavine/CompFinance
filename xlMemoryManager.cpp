@@ -19,7 +19,7 @@
 //
 ///***************************************************************************
 
-#include "MemoryManager.h"
+#include "xlMemoryManager.h"
 
 //
 // Singleton instance of the class

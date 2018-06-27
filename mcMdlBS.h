@@ -146,14 +146,17 @@ public:
         myDrifts.resize(myTimeline.size() - 1);
 
         //  Allocate the numeraires, discount and forward factors over product timeline
-        myNumeraires.resize(productTimeline.size());
-        myDiscounts.resize(productTimeline.size());
-        for (size_t j = 0; j < myDiscounts.size(); ++j)
+        const size_t n = productTimeline.size();
+        myNumeraires.resize(n);
+        
+        myDiscounts.resize(n);
+        for (size_t j = 0; j < n; ++j)
         {
             myDiscounts[j].resize(dataline[j].discountMats.size());
         }
+
         myForwardFactors.resize(productTimeline.size());
-        for (size_t j = 0; j < myForwardFactors.size(); ++j)
+        for (size_t j = 0; j < n; ++j)
         {
             myForwardFactors[j].resize(dataline[j].forwardMats.size());
         }
@@ -163,23 +166,28 @@ public:
     {
         //  Pre-compute the standard devs and drifts over simulation timeline        
         const T mu = myRate - myDiv;
-        for (size_t i = 0; i < myTimeline.size() - 1; ++i)
+        const size_t n = myTimeline.size() - 1;
+        if (myNormal)
         {
-            const double dt = myTimeline[i + 1] - myTimeline[i];
-
-            if (myNormal)
+            for (size_t i = 0; i < n; ++i)
             {
+                const double dt = myTimeline[i + 1] - myTimeline[i];
+
                 //  normal model
                 //  Var[ST2 / ST1] = vol^2 * ( exp ( 2 * (r - d) * dt ) - 1) / ( 2 * (r - d) ) 
                 //  E[ST2 / ST1] = ST1 * exp ( (r - d) * dt )
-                myStds[i] = fabs(mu) > EPS 
-                    ? T(myVol * sqrt((exp(2*mu*dt) - 1) / (2*mu)))
-                    : T(myVol * sqrt (dt));
+                myStds[i] = fabs(mu) > EPS
+                    ? T(myVol * sqrt((exp(2 * mu*dt) - 1) / (2 * mu)))
+                    : T(myVol * sqrt(dt));
                 myDrifts[i] = exp((myRate - myDiv)*dt);
-
             }
-            else
+        }
+        else
+        {
+            for (size_t i = 0; i < n; ++i)
             {
+                const double dt = myTimeline[i + 1] - myTimeline[i];
+
                 //  lognormal model
                 //  Var[logST2 / ST1] = vol^2 * dt
                 //  E[logST2 / ST1] = logST1 + ( (r - d) - 0.5 * vol ^ 2 ) * dt
@@ -189,19 +197,30 @@ public:
         }
 
         //  Pre-compute the numeraires, discount and forward factors over product timeline
-        for (size_t i = 0; i < productTimeline.size(); ++i)
+        const size_t m = productTimeline.size();
+
+        for (size_t i = 0; i < m; ++i)
         {
             //  Numeraire
             myNumeraires[i] = exp(myRate * productTimeline[i]);
+        }
 
+        for (size_t i = 0; i < m; ++i)
+        {
             //  Discount factors
-            for (size_t j = 0; j < dataline[i].discountMats.size(); ++j)
+            const size_t p = dataline[i].discountMats.size();
+            for (size_t j = 0; j < p; ++j)
             {
                 myDiscounts[i][j] = exp(-myRate * (dataline[i].discountMats[j] - productTimeline[i]));
             }
+        }
 
+        for (size_t i = 0; i < m; ++i)
+        {
+            //  Discount factors
+            const size_t p = dataline[i].forwardMats.size();
             //  Forward factors
-            for (size_t j = 0; j < dataline[i].forwardMats.size(); ++j)
+            for (size_t j = 0; j < p; ++j)
             {
                 myForwardFactors[i][j] = exp(mu * (dataline[i].forwardMats[j] - productTimeline[i]));
             }
@@ -256,16 +275,16 @@ public:
             ++idx;
         }
 
+        const size_t n = myTimeline.size() - 1;
         if (myNormal)
         {
             //  Iterate through timeline
-            for (size_t i = 1; i < myTimeline.size(); ++i)
+            for (size_t i = 0; i < n; ++i)
             {
                 //  Apply known conditional distributions 
                     //  Bachelier
-                spot *= myDrifts[i - 1];
-                spot += myStds[i - 1] * gaussVec[i - 1];
-
+                spot = spot * myDrifts[i]
+                    + myStds[i] * gaussVec[i];
                 //  Store on the path
                 fillScen(idx, spot, path[idx]);
                 ++idx;
@@ -274,12 +293,12 @@ public:
         else
         {
             //  Iterate through timeline
-            for (size_t i = 1; i < myTimeline.size(); ++i)
+            for (size_t i = 0; i < n; ++i)
             {
                 //  Apply known conditional distributions 
                     //  Black-Scholes
-                spot *= exp(myDrifts[i - 1] + myStds[i - 1] * gaussVec[i - 1]);
-
+                spot = spot * exp(myDrifts[i] 
+                    + myStds[i] * gaussVec[i]);
                 //  Store on the path
                 fillScen(idx, spot, path[idx]);
                 ++idx;

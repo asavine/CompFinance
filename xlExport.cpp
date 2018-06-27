@@ -14,6 +14,8 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
+#pragma warning(disable:4996)
+
 #include "threadPool.h"
 #include "main.h"
 
@@ -21,143 +23,166 @@ As long as this comment is preserved at the top of the file
 #include <windows.h>
 
 #include "xlcall.h"
-#include "framework.h"
+#include "xlframework.h"
+#include "xlOper.h"
+
+//  Helpers
+NumericalParam xl2num(
+    const double              useSobol,
+    const double              seed1,
+    const double              seed2,
+    const double              numPath,
+    const double              parallel)
+{
+    NumericalParam num;
+
+    num.numPath = static_cast<int>(numPath + EPS);
+    num.parallel = parallel > EPS;
+    num.seed1 = static_cast<int>(seed1 + EPS);
+    num.seed2 = static_cast<int>(seed2 + EPS);
+    num.useSobol = useSobol > EPS;
+
+    return num;
+}
 
 //	Wrappers
 
+//  change number of threads in the pool
 extern "C" __declspec(dllexport)
- double xPutDupire(
+double xRestartThreadPool(
+    double              xNthread)
+{
+    const int numThread = int(xNthread + EPS);
+    ThreadPool::getInstance()->stop();
+    ThreadPool::getInstance()->start(numThread);
+
+    return numThread;
+}
+
+extern "C" __declspec(dllexport)
+ LPXLOPER12 xPutDupire(
     //  model parameters
     double              spot,
     FP12*               spots,
     FP12*               times,
     FP12*               vols,
     double              maxDt,
-    double              xid)
+    LPXLOPER12          xid)
 {
-    const int id = int(xid + EPS);
+    FreeAllTempMemory();
 
-    //  Make sure the last inputs are given
-    if (maxDt <= 0.0 || id <= 0) return -1;
+    const string id = getString(xid);
+
+    //  Make sure we have an id
+    if (maxDt <= 0.0 || id.empty()) return TempErr12(xlerrNA);
 
     //  Unpack
 
-    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns) return -1;
-
-    vector<double> vspots;
+    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns)
     {
-        size_t rows = spots->rows;
-        size_t cols = spots->columns;
-        double* numbers = spots->array;
-
-        vspots.resize(rows);
-        copy(numbers, numbers + rows, vspots.begin());
+        return TempErr12(xlerrNA);
     }
 
-    vector<double> vtimes;
-    {
-        size_t rows = times->rows;
-        size_t cols = times->columns;
-        double* numbers = times->array;
-
-        vtimes.resize(cols);
-        copy(numbers, numbers + cols, vtimes.begin());
-    }
-
-    matrix<double> vvols;
-    {
-        size_t rows = vols->rows;
-        size_t cols = vols->columns;
-        double* numbers = vols->array;
-
-        vvols.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vvols.begin());
-    }
+    vector<double> vspots = to_vector(spots);
+    vector<double> vtimes = to_vector(times);
+    matrix<double> vvols = to_matrix(vols);
 
     //  Call and return
     putDupire(spot, vspots, vtimes, vvols, maxDt, id);
 
-    return id;
+    return TempStr12(id);
 }
 
 extern "C" __declspec(dllexport)
- double xPutBlackScholes(
+LPXLOPER12 xPutBlackScholes(
     double              spot,
     double              vol,
     double              normal,
     double              rate,
     double              div,
-    double              xid)
+    LPXLOPER12          xid)
 {
-    const int id = int(xid + EPS);
+    FreeAllTempMemory();
 
-    //  Make sure the last inputs are given
-    if (id <= 0) return -1;
+    const string id = getString(xid);
+
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
 
     //  Call and return
     putBlackScholes(spot, vol, normal > 0, rate, div, id);
 
-    return id;
+    return TempStr12(id);
 }
 
 extern "C" __declspec(dllexport)
- double xPutEuropean(
+ LPXLOPER12 xPutEuropean(
     double              strike,
     double              exerciseDate,
     double              settlementDate,
-    double              xid)
+     LPXLOPER12         xid)
 {
-    const int id = int(xid + EPS);
+    FreeAllTempMemory();
 
-    //  Make sure the last inputs are given
-    if (id <= 0) return -1;
+    const string id = getString(xid);
+
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
 
     if (settlementDate <= 0) settlementDate = exerciseDate;
 
     //  Call and return
     putEuropean(strike, exerciseDate, settlementDate, id);
 
-    return id;
+    return TempStr12(id);
 }
 
 extern "C" __declspec(dllexport)
- double xPutBarrier(
+LPXLOPER12 xPutBarrier(
     double              strike,
     double              barrier,
     double              maturity,
     double              monitorFreq,
-    double              xid)
+    double              smoothing,
+    LPXLOPER12          xid)
 {
-    const int id = int(xid + EPS);
+    FreeAllTempMemory();
 
-    //  Make sure the last inputs are given
-    if (monitorFreq <= 0.0 || id <= 0) return -1;
+    const string id = getString(xid);
 
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
 
     //  Call and return
-    putBarrier(strike, barrier, maturity, monitorFreq, id);
+    putBarrier(strike, barrier, maturity, monitorFreq, smoothing, id);
 
-    return id;
+    return TempStr12(id);
 }
 
 extern "C" __declspec(dllexport)
- double xPutEuropeans(
+LPXLOPER12 xPutEuropeans(
     FP12*               maturities,
     FP12*               strikes,
-    double              xid)
+    LPXLOPER12          xid)
 {
-    const int id = int(xid + EPS);
+    FreeAllTempMemory();
 
-    //  Make sure the last input is given
-    if (!strikes->rows || !strikes->columns || id <= 0) return -1;
+    const string id = getString(xid);
 
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    //  Make sure we have options
+    if (!strikes->rows || !strikes->columns) return TempErr12(xlerrNA);
+
+    //  Maturities and strikes, removing blanks
     vector<double> vmats;
     vector<double> vstrikes;
     {
         size_t rows = maturities->rows;
         size_t cols = maturities->columns;
         
-        if (strikes->rows * strikes->columns != rows * cols) return -1;
+        if (strikes->rows * strikes->columns != rows * cols) return TempErr12(xlerrNA);
         
         double* mats= maturities->array;
         double* strs = strikes->array;
@@ -172,16 +197,60 @@ extern "C" __declspec(dllexport)
         }
     }
 
+    //  Make sure we still have options
+    if (vmats.empty()) return TempErr12(xlerrNA);
+
     //  Call and return
     putEuropeans(vmats, vstrikes, id);
 
-    return id;
+    return TempStr12(id);
+}
+
+//  Access payoff identifiers and parameters
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xPayoffIds(
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    const auto* prd = getProduct<double>(id);
+    //  Make sure we have a product
+    if (!prd) return TempErr12(xlerrNA);
+
+    return from_strVector(prd->payoffLabels());
 }
 
 extern "C" __declspec(dllexport)
- FP12* xValue(
-    double              modelid,
-    double              productid,
+LPXLOPER12 xParameters(
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    Model<double>* mdl = const_cast<Model<double>*>(getModel<double>(id));
+    //  Make sure we have a model
+    if (!mdl) return TempErr12(xlerrNA);
+
+    const auto& paramLabels = mdl->parameterLabels();
+    const auto& params = mdl->parameters();
+    vector<double> paramsCopy(params.size());
+    transform(params.begin(), params.end(), paramsCopy.begin(), [](const double* p) { return *p; });
+
+    return from_labelsAndNumbers(paramLabels, paramsCopy);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xValue(
+    LPXLOPER12          modelid,
+    LPXLOPER12          productid,
     //  numerical parameters
     double              useSobol,
     double              seed1,
@@ -189,68 +258,44 @@ extern "C" __declspec(dllexport)
     double              numPath,
     double              parallel)
 {
-    const int mid = int(modelid + EPS);
-    const int pid = int(productid + EPS);
+    FreeAllTempMemory();
 
-    //  Make sure the last input is given
-    if (!mid || !pid || numPath <= 0)
-    {
-        FP12* result = (FP12*)GetTempMemory(1);
-        result->rows = 1;
-        result->columns = 1;
-        result->array[0] = -1;
-        return result;
-    }
+    const string pid = getString(productid);
+    //  Make sure we have an id
+    if (pid.empty()) return TempErr12(xlerrNA);
 
-    //  Call and return
-    vector<double> res;
+    const auto* prd = getProduct<double>(pid);
+    //  Make sure we have a product
+    if (!prd) return TempErr12(xlerrNA);
 
+    const string mid = getString(modelid);
+    //  Make sure we have an id
+    if (mid.empty()) return TempErr12(xlerrNA);
+
+    Model<double>* mdl = const_cast<Model<double>*>(getModel<double>(mid));
+    //  Make sure we have a model
+    if (!mdl) return TempErr12(xlerrNA);
+
+    //  Numerical params
+    const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+
+    //  Call and return;
     try 
     {
-        auto results = value(mid, pid, parallel>0,
-            useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
-        res = move(results.values);
+        auto results = value(mid, pid, num);
+        return from_labelsAndNumbers(results.identifiers, results.values);
     }
     catch (const exception&)
     {
-        res.push_back(-1);
+        return TempErr12(xlerrNA);
     }
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = res.size(),
-        resultCols = 1,
-        resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < res.size(); ++i)
-        result->array[i] = res[i];
- 
-    // Return it
-    return result;
 }
 
 extern "C" __declspec(dllexport)
-FP12* xAADrisk(
-    double              modelid,
-    double              productid,
+LPXLOPER12 xAADrisk(
+    LPXLOPER12          modelid,
+    LPXLOPER12          productid,
+    LPXLOPER12          xRiskPayoff,
     //  numerical parameters
     double              useSobol,
     double              seed1,
@@ -258,87 +303,55 @@ FP12* xAADrisk(
     double              numPath,
     double              parallel)
 {
-    const int mid = int(modelid + EPS);
-    const int pid = int(productid + EPS);
+    FreeAllTempMemory();
 
-    //  Make sure the last input is given
-    if (!mid || !pid || numPath <= 0)
-    {
-        FP12* result = (FP12*)GetTempMemory(1);
-        result->rows = 1;
-        result->columns = 1;
-        result->array[0] = -1;
-        return result;
-    }
+    const string pid = getString(productid);
+    //  Make sure we have an id
+    if (pid.empty()) return TempErr12(xlerrNA);
 
-    //  Call and return
-    vector<double> payoffs;
-    double aggregate;
-    vector<double> risks;
+    const string mid = getString(modelid);
+    //  Make sure we have an id
+    if (mid.empty()) return TempErr12(xlerrNA);
+
+    //  Numerical params
+    const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+
+    //  Risk payoff
+    const string riskPayoff = getString(xRiskPayoff);
 
     try
     {
-        auto results = AADrisk(mid, pid, parallel>0,
-            useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
-        payoffs = move(results.payoffValues);
-        aggregate = results.riskPayoffValue;
-        risks = move(results.risks);
+        auto results = AADriskOne(mid, pid, num, riskPayoff);
+        const size_t n = results.risks.size(), N = n + 2;
+
+        LPXLOPER12 oper = TempXLOPER12();
+        resize(oper, N, 2);
+
+        setString(oper, "value", 0, 0);
+        setNum(oper, results.riskPayoffValue, 0, 1);
+        setString(oper, "params", 1, 0);
+        setString(oper, "risks", 1, 1);
+
+        for (size_t i = 0; i < n; ++i)
+        {
+            setString(oper, results.paramIds[i], i + 2, 0);
+            setNum(oper, results.risks[i], i + 2, 1);
+        }
+
+        return oper;
     }
     catch (const exception&)
     {
-        payoffs.push_back(-1);
-        aggregate = -1;
-        risks.push_back(-1);
+        return TempErr12(xlerrNA);
     }
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = 2 + risks.size(),
-        resultCols = payoffs.size(),
-        resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    for (size_t i = 0; i < payoffs.size(); ++i)
-        result->array[i] = payoffs[i];
-    result->array[resultCols] = aggregate;
-    for (size_t i = 0; i < risks.size(); ++i)
-        result->array[(i + 2)*resultCols] = risks[i];
-
-    // Return it
-    return result;
 }
 
 extern "C" __declspec(dllexport)
- double xUocDupire(
-    //  model parameters
-    double              spot,
-    FP12*               spots,
-    FP12*               times,
-    FP12*               vols,   
-    double              maxDt,
-    //  product parameters
-    double              strike,
-    double              barrier,
-    double              maturity,
-    double              monitorFreq,
+LPXLOPER12 xAADriskAggregate(
+    LPXLOPER12          modelid,
+    LPXLOPER12          productid,
+    LPXLOPER12          xPayoffs,
+    FP12*               xNotionals,
     //  numerical parameters
     double              useSobol,
     double              seed1,
@@ -346,727 +359,105 @@ extern "C" __declspec(dllexport)
     double              numPath,
     double              parallel)
 {
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  MaxDt = 0 crashes
-    if (maxDt <= 0) return 0;
-
-    //  Same thing for frequency
-    if (monitorFreq <= 0) return 0;
-    
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Unpack
-
-    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns) return -1;
-
-    vector<double> vspots;
-    {
-        size_t rows = spots->rows;
-        size_t cols = spots->columns;
-        double* numbers = spots->array;
-
-        vspots.resize(rows);
-        copy(numbers, numbers + rows, vspots.begin());
-    }
-
-    vector<double> vtimes;
-    {
-        size_t rows = times->rows;
-        size_t cols = times->columns;
-        double* numbers = times->array;
-
-        vtimes.resize(cols);
-        copy(numbers, numbers + cols, vtimes.begin());
-    }
-
-    matrix<double> vvols;
-    {
-        size_t rows = vols->rows;
-        size_t cols = vols->columns;
-        double* numbers = vols->array;
-
-        vvols.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vvols.begin());
-    }
-
-    //  Call and return
-
-    return uocDupire(spot, vspots, vtimes, vvols, maxDt, strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
-
-}
-
-extern "C" __declspec(dllexport)
- FP12* xEuropeansDupire(
-    //  model parameters
-    double              spot,
-    FP12*               spots,
-    FP12*               times,
-    FP12*               vols,
-    double              maxDt,
-    //  product parameters
-    FP12*               maturities,
-    FP12*               strikes,
-    //  numerical parameters
-    double              useSobol,
-    double              seed1,
-    double              seed2,
-    double              numPath,
-    double              parallel)
-{
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  MaxDt = 0 crashes
-    if (maxDt <= 0) return 0;
-
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Unpack
-
-    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns)
-    {
-        FP12* result = (FP12*)GetTempMemory(1);
-        result->rows = 1;
-        result->columns = 1;
-        result->array[0] = -1;
-        return result;
-    }
-
-    vector<double> vspots;
-    {
-        size_t rows = spots->rows;
-        size_t cols = spots->columns;
-        double* numbers = spots->array;
-
-        vspots.resize(rows);
-        copy(numbers, numbers + rows, vspots.begin());
-    }
-
-    vector<double> vtimes;
-    {
-        size_t rows = times->rows;
-        size_t cols = times->columns;
-        double* numbers = times->array;
-
-        vtimes.resize(cols);
-        copy(numbers, numbers + cols, vtimes.begin());
-    }
-
-    matrix<double> vvols;
-    {
-        size_t rows = vols->rows;
-        size_t cols = vols->columns;
-        double* numbers = vols->array;
-
-        vvols.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vvols.begin());
-    }
-
-    vector<double> vmats;
-    {
-        size_t rows = maturities->rows;
-        size_t cols = maturities->columns;
-        double* numbers = maturities->array;
-
-        vmats.resize(cols * rows);
-        copy(numbers, numbers + cols * rows, vmats.begin());
-    }
-
-    vector<vector<double>> vvstrikes;
-    {
-        size_t rows = strikes->rows;
-        size_t cols = strikes->columns;
-        double* numbers = strikes->array;
-
-        vvstrikes.resize(rows);
-
-        for (size_t i = 0; i < rows; ++i)
-        {
-            copy_if(numbers, numbers + cols, back_inserter(vvstrikes[i]), [](const double x) {return x > EPS; });
-            numbers += cols;
-        }
-    }
-
-
-    //  Call and return
-    map <Time, vector<double>> options;
-    for (size_t i = 0; i < vmats.size(); ++i)
-    {
-        options[vmats[i]] = vvstrikes[i];
-    }
-
-    auto res =  europeansDupire(spot, vspots, vtimes, vvols, maxDt, options, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = res.size(), 
-        resultCols = accumulate(res.begin(), res.end(), 0, 
-            [](const int acc, const vector<double>& v) 
-            { 
-                return max<int>(acc, v.size()); 
-            }
-        ),
-        resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
     FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    for (size_t i = 0; i < res.size(); ++i)
-        for (size_t j = 0; j < res[i].size(); ++j)
+
+    const string pid = getString(productid);
+    //  Make sure we have an id
+    if (pid.empty()) return TempErr12(xlerrNA);
+
+    const string mid = getString(modelid);
+    //  Make sure we have an id
+    if (mid.empty()) return TempErr12(xlerrNA);
+
+    //  Numerical params
+    const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+
+    //  Payoffs and notionals, removing blanks
+    map<string, double> notionals;
+    {
+        size_t rows = getRows(xPayoffs);
+        size_t cols = getCols(xPayoffs);
+
+        if (rows * cols == 0 ||
+            xNotionals->rows * xNotionals->columns != rows * cols) 
+                return TempErr12(xlerrNA);
+
+        size_t idx = 0;
+        for (size_t i = 0; i < rows; ++i) for (size_t j = 0; j < cols; ++j)
         {
-            result->array[i*resultCols + j] = res[i][j];
-        }
-
-    // Return it
-    return result;
-}
-
-extern "C" __declspec(dllexport)
- double xUocBS(
-    //  model parameters
-    double              spot,
-    double              vol,
-    double              normal,
-    double              rate,
-    double              div,
-    //  product parameters
-    double              strike,
-    double              barrier,
-    double              maturity,
-    double              monitorFreq,
-    //  numerical parameters
-    double              useSobol,
-    double              seed1,
-    double              seed2,
-    double              numPath,
-    double              parallel)
-{
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  Same thing for frequency
-    if (monitorFreq <= 0) return 0;
-
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Call and return
-
-    return uocBS(spot, vol, normal > 0, rate, div, strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), static_cast<int>(seed1), static_cast<int>(seed2));
-
-}
-
-extern "C" __declspec(dllexport)
- FP12* xUocDupireBump(
-    //  model parameters
-    double              spot,
-    FP12*               spots,
-    FP12*               times,
-    FP12*               vols,
-    double              maxDt,
-    //  product parameters
-    double              strike,
-    double              barrier,
-    double              maturity,
-    double              monitorFreq,
-    //  numerical parameters
-    double              useSobol,
-    double              seed1,
-    double              seed2,
-    double              numPath,
-    double              parallel)
-{
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  MaxDt = 0 crashes
-    if (maxDt <= 0) return 0;
-
-    //  Same thing for frequency
-    if (monitorFreq <= 0) return 0;
-
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Unpack
-
-    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns)
-    {
-        FP12* result = (FP12*)GetTempMemory(1);
-        result->rows = 1;
-        result->columns = 1;
-        result->array[0] = -1;
-        return result;
-    }
-
-    vector<double> vspots;
-    {
-        size_t rows = spots->rows;
-        size_t cols = spots->columns;
-        double* numbers = spots->array;
-
-        vspots.resize(rows);
-        copy(numbers, numbers + rows, vspots.begin());
-    }
-
-    vector<double> vtimes;
-    {
-        size_t rows = times->rows;
-        size_t cols = times->columns;
-        double* numbers = times->array;
-
-        vtimes.resize(cols);
-        copy(numbers, numbers + cols, vtimes.begin());
-    }
-
-    matrix<double> vvols;
-    {
-        size_t rows = vols->rows;
-        size_t cols = vols->columns;
-        double* numbers = vols->array;
-
-        vvols.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vvols.begin());
-    }
-
-    //  Call 
-    auto res = uocDupireBumpRisk(spot, vspots, vtimes, vvols, maxDt, 
-        strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), 
-        static_cast<int>(seed1), static_cast<int>(seed2));
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = res.vega.rows()+2, resultCols = res.vega.cols(), resultSize = resultRows * resultCols;
-    
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = res.value;
-    result->array[resultCols] = res.delta;
-    for (size_t i = 0; i < res.vega.rows(); ++i) 
-        for (size_t j = 0; j < res.vega.cols(); ++j)
-    {
-        result->array[(i+2)*resultCols + j] = res.vega[i][j];
-    }
-
-    // Return it
-    return result;
-}
-
-extern "C" __declspec(dllexport)
-     FP12* xUocDupireAAD(
-        //  model parameters
-        double              spot,
-        FP12*               spots,
-        FP12*               times,
-        FP12*               vols,
-        double              maxDt,
-        //  product parameters
-        double              strike,
-        double              barrier,
-        double              maturity,
-        double              monitorFreq,
-        //  numerical parameters
-        double              useSobol,
-        double              seed1,
-        double              seed2,
-        double              numPath,
-        double              parallel)
-{
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  MaxDt = 0 crashes
-    if (maxDt <= 0) return 0;
-
-    //  Same thing for frequency
-    if (monitorFreq <= 0) return 0;
-
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Unpack
-
-    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns)
-    {
-        FP12* result = (FP12*)GetTempMemory(1);
-        result->rows = 1;
-        result->columns = 1;
-        result->array[0] = -1;
-        return result;
-    }
-
-    vector<double> vspots;
-    {
-        size_t rows = spots->rows;
-        size_t cols = spots->columns;
-        double* numbers = spots->array;
-
-        vspots.resize(rows);
-        copy(numbers, numbers + rows, vspots.begin());
-    }
-
-    vector<double> vtimes;
-    {
-        size_t rows = times->rows;
-        size_t cols = times->columns;
-        double* numbers = times->array;
-
-        vtimes.resize(cols);
-        copy(numbers, numbers + cols, vtimes.begin());
-    }
-
-    matrix<double> vvols;
-    {
-        size_t rows = vols->rows;
-        size_t cols = vols->columns;
-        double* numbers = vols->array;
-
-        vvols.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vvols.begin());
-    }
-
-    //  Call 
-    auto res = uocDupireAADRisk(spot, vspots, vtimes, vvols, maxDt,
-        strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath), 
-        static_cast<int>(seed1), static_cast<int>(seed2));
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = res.vega.rows() + 2, resultCols = res.vega.cols(), resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = res.value;
-    result->array[resultCols] = res.delta;
-    for (size_t i = 0; i < res.vega.rows(); ++i) 
-        for (size_t j = 0; j < res.vega.cols(); ++j)
-    {
-        result->array[(i + 2)*resultCols + j] = res.vega[i][j];
-    }
-
-    // Return it
-    return result;
-}
-
-extern "C" __declspec(dllexport)
-     FP12* xEuroBookDupireAAD(
-        //  model parameters
-        double              spot,
-        FP12*               spots,
-        FP12*               times,
-        FP12*               vols,
-        double              maxDt,
-        //  product parameters
-        FP12*               msn,
-        //  numerical parameters
-        double              useSobol,
-        double              seed1,
-        double              seed2,
-        double              numPath,
-        double              parallel)
-{
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  MaxDt = 0 crashes
-    if (maxDt <= 0) return 0;
-
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Unpack
-
-    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns)
-    {
-        FP12* result = (FP12*)GetTempMemory(1);
-        result->rows = 1;
-        result->columns = 1;
-        result->array[0] = -1;
-        return result;
-    }
-
-    vector<double> vspots;
-    {
-        size_t rows = spots->rows;
-        size_t cols = spots->columns;
-        double* numbers = spots->array;
-
-        vspots.resize(rows);
-        copy(numbers, numbers + rows, vspots.begin());
-    }
-
-    vector<double> vtimes;
-    {
-        size_t rows = times->rows;
-        size_t cols = times->columns;
-        double* numbers = times->array;
-
-        vtimes.resize(cols);
-        copy(numbers, numbers + cols, vtimes.begin());
-    }
-
-    matrix<double> vvols;
-    {
-        size_t rows = vols->rows;
-        size_t cols = vols->columns;
-        double* numbers = vols->array;
-
-        vvols.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, vvols.begin());
-    }
-
-    if (msn->rows * msn->columns == 0)
-    {
-        FP12* result = (FP12*)GetTempMemory(1);
-        result->rows = 1;
-        result->columns = 1;
-        result->array[0] = -1;
-        return result;
-    }
-
-    vector<double> vmats, vstrikes, vnots;
-    {
-        if (msn->columns != 3)
-        {
-            FP12* result = (FP12*)GetTempMemory(1);
-            result->rows = 1;
-            result->columns = 1;
-            result->array[0] = -1;
-            return result;
-        }
-
-        for (size_t i = 0; i < msn->rows; ++i)
-        {
-            if (msn->array[3 * i] > EPS)
+            string payoff = getString(xPayoffs, i, j);
+            double notional = xNotionals->array[idx++];
+            if (payoff != "" && fabs(notional) > EPS)
             {
-                vmats.push_back(msn->array[3 * i]);
-                vstrikes.push_back(msn->array[3 * i + 1]);
-                vnots.push_back(msn->array[3 * i + 2]);
+                notionals[payoff] = notional;
             }
         }
     }
 
+    try
+    {
+        auto results = AADriskAggregate(mid, pid, notionals, num);
+        const size_t n = results.risks.size(), N = n + 2;
 
-    //  Call 
-    auto res = europeansDupireAADRisk(spot, vspots, vtimes, vvols, maxDt,
-        vmats, vstrikes, vnots, parallel>0,
-        useSobol > 0, static_cast<int>(numPath),
-        static_cast<int>(seed1), static_cast<int>(seed2));
+        LPXLOPER12 oper = TempXLOPER12();
+        resize(oper, N, 2);
 
-    //  Build return
+        setString(oper, "value", 0, 0);
+        setNum(oper, results.riskPayoffValue, 0, 1);
+        setString(oper, "params", 1, 0);
+        setString(oper, "risks", 1, 1);
 
-    // Allocate result
-    // Calculate size
-    size_t resultRows = res.vega.rows() + 2, resultCols = res.vega.cols(), resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = res.value;
-    result->array[resultCols] = res.delta;
-    for (size_t i = 0; i < res.vega.rows(); ++i)
-        for (size_t j = 0; j < res.vega.cols(); ++j)
+        for (size_t i = 0; i < n; ++i)
         {
-            result->array[(i + 2)*resultCols + j] = res.vega[i][j];
+            setString(oper, results.paramIds[i], i + 2, 0);
+            setNum(oper, results.risks[i], i + 2, 1);
         }
 
-    // Return it
-    return result;
+        return oper;
+    }
+    catch (const exception&)
+    {
+        return TempErr12(xlerrNA);
+    }
 }
 
 extern "C" __declspec(dllexport)
-     FP12* xUocBSAAD(
-        //  model parameters
-        double              spot,
-        double              vol,
-        double              normal,
-        double              rate,
-        double              div,
-        //  product parameters
-        double              strike,
-        double              barrier,
-        double              maturity,
-        double              monitorFreq,
-        //  numerical parameters
-        double              useSobol,
-        double              seed1,
-        double              seed2,
-        double              numPath,
-        double              parallel)
+LPXLOPER12 xBumprisk(
+    LPXLOPER12          modelid,
+    LPXLOPER12          productid,
+    //  numerical parameters
+    double              useSobol,
+    double              seed1,
+    double              seed2,
+    double              numPath,
+    double              parallel)
 {
-    //  Make sure the last input is given
-    if (!numPath) return 0;
-
-    //  Same thing for frequency
-    if (monitorFreq <= 0) return 0;
-
-    //  Default seeds
-    if (seed1 <= 0) seed1 = 12345;
-    if (seed2 <= 0) seed2 = 12346;
-
-    //  Unpack
-
-    //  Call 
-    auto res = uocBSAADRisk(spot, vol, normal > 0, rate, div,
-        strike, barrier, maturity, monitorFreq, parallel>0,
-        useSobol > 0, static_cast<int>(numPath),
-        static_cast<int>(seed1), static_cast<int>(seed2));
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = 5, resultCols = 1, resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
     FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    result->array[0] = res.value;
-    result->array[1] = res.delta;
-    result->array[2] = res.vega;
-    result->array[3] = res.rho;
-    result->array[4] = res.ddiv;
 
-    // Return it
-    return result;
+    const string pid = getString(productid);
+    //  Make sure we have an id
+    if (pid.empty()) return TempErr12(xlerrNA);
+
+    const string mid = getString(modelid);
+    //  Make sure we have an id
+    if (mid.empty()) return TempErr12(xlerrNA);
+
+    //  Numerical params
+    const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+
+    try
+    {
+        auto results = bumpRisk(mid, pid, num);
+        return from_labelledMatrix(results.params, results.payoffs, results.risks);
+    }
+    catch (const exception&)
+    {
+        return TempErr12(xlerrNA);
+    }
 }
 
 extern "C" __declspec(dllexport)
-     double xLinterp2D(
-        FP12*               xs,
-        FP12*               ys,
-        FP12*               zs,
-        double              x0,
-        double              y0)
-{
-    vector<double> x;
-    {
-        size_t rows = xs->rows;
-        size_t cols = xs->columns;
-        double* numbers = xs->array;
-
-        x.resize(rows);
-        copy(numbers, numbers + rows, x.begin());
-    }
-
-    vector<double> y;
-    {
-        size_t rows = ys->rows;
-        size_t cols = ys->columns;
-        double* numbers = ys->array;
-
-        y.resize(cols);
-        copy(numbers, numbers + cols, y.begin());
-    }
-
-    matrix<double> z;
-    {
-        size_t rows = zs->rows;
-        size_t cols = zs->columns;
-        double* numbers = zs->array;
-
-        z.resize(rows, cols);
-        copy(numbers, numbers + rows * cols, z.begin());
-    }
-
-    //  Call 
-    return interp2D(x, y, z, x0, y0);
-}
-
-extern "C" __declspec(dllexport)
- FP12* xDupireCalib(
+ LPXLOPER12 xDupireCalib(
     //  model parameters
     const double ivsType, //  0: Bach, 1: BS, 2: Merton
     const double spot,
@@ -1080,6 +471,8 @@ extern "C" __declspec(dllexport)
     FP12* times,
     const double maxDt)
 {
+    FreeAllTempMemory();
+
     //  Make sure the last input is given
     if (maxDs == 0 || maxDt == 0) return 0;
 
@@ -1108,48 +501,12 @@ extern "C" __declspec(dllexport)
         ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
         spot, vol, jmpIntens, jmpAverage, jmpStd);
 
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = results.spots.size() + 1, resultCols = results.times.size() + 1, resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    result->array[0] = 0.0;
-    for (size_t j = 0; j < results.times.size(); ++j)
-    {
-        result->array[j + 1] = results.times[j];
-    }
-    for (size_t i = 0; i < results.spots.size(); ++i)
-    {
-        result->array[(i + 1)*resultCols] = results.spots[i];
-        for (size_t j = 0; j < results.times.size(); ++j)
-        {
-            result->array[(i + 1)*resultCols + j + 1] = results.lVols[i][j];
-        }
-    }
-
-    // Return it
-    return result;
+    //  Return
+    return from_labelledMatrix(results.spots, results.times, results.lVols);
 }
 
 extern "C" __declspec(dllexport)
- FP12* xDupireSuperbucket(
+ LPXLOPER12 xDupireSuperbucket(
     //  model parameters
     const double ivsType, //  0: Bach, 1: BS, 2: Merton
     const double spot,
@@ -1162,133 +519,132 @@ extern "C" __declspec(dllexport)
     FP12* mats,
     //  calibration
     FP12* spots,
-    const double maxDs,
+    double maxDs,
     FP12* times,
-    const double maxDtVol,
+    double maxDtVol,
     //  MC
     double              maxDtSimul,
-    //  product parameters
-    double              strike,
-    double              barrier,
-    double              maturity,
-    double              monitorFreq,
+    //  product 
+    LPXLOPER12          productid,
+    LPXLOPER12          xPayoffs,
+    FP12*               xNotionals,
     //  numerical parameters
     double              useSobol,
     double              seed1,
     double              seed2,
     double              numPath,
-    double              parallel)
+    double              parallel,
+    //  bump or AAD?
+    double              bump)
 
 {
+    FreeAllTempMemory();
+
     //  Make sure the last input is given
-    if (numPath <= 0) return 0;
+    if (numPath <= 0) return TempErr12(xlerrNA);
+
+    //  Make sure we have a product
+    const string pid = getString(productid);
+    //  Make sure we have an id
+    if (pid.empty()) return TempErr12(xlerrNA);
 
     //  Unpack
-    vector<double> vstrikes;
-    {
-        size_t rows = strikes->rows;
-        size_t cols = strikes->columns;
-        double* numbers = strikes->array;
+    vector<double> vstrikes = to_vector(strikes);
+    vector<double> vmats = to_vector(mats);
+    vector<double> vspots = to_vector(spots);
+    vector<double> vtimes = to_vector(times);
 
-        vstrikes.resize(rows*cols);
-        copy(numbers, numbers + rows*cols, vstrikes.begin());
+    //  Numerical params
+    const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+
+    //  Payoffs and notionals, removing blanks
+    map<string, double> notionals;
+    {
+        size_t rows = getRows(xPayoffs);
+        size_t cols = getCols(xPayoffs);;
+
+        if (rows * cols == 0 ||
+            xNotionals->rows * xNotionals->columns != rows * cols)
+            return TempErr12(xlerrNA);
+
+        size_t idx = 0;
+        for (size_t i = 0; i < rows; ++i) for (size_t j = 0; j < cols; ++j)
+        {
+            string payoff = getString(xPayoffs, i, j);
+            double notional = xNotionals->array[idx++];
+            if (payoff != "" && fabs(notional) > EPS)
+            {
+                notionals[payoff] = notional;
+            }
+        }
     }
 
-    vector<double> vmats;
+    try
     {
-        size_t rows = mats->rows;
-        size_t cols = mats->columns;
-        double* numbers = mats->array;
+        auto results = bump < EPS
+            ? dupireSuperbucket(
+                spot,
+                maxDtSimul,
+                pid,
+                notionals,
+                vspots,
+                maxDs,
+                vtimes,
+                maxDtVol,
+                vstrikes,
+                vmats,
+                ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
+                vol,
+                jmpIntens,
+                jmpAverage,
+                jmpStd,
+                num)
+            : dupireSuperbucketBump(
+                spot,
+                maxDtSimul,
+                pid,
+                notionals,
+                vspots,
+                maxDs,
+                vtimes,
+                maxDtVol,
+                vstrikes,
+                vmats,
+                ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
+                vol,
+                jmpIntens,
+                jmpAverage,
+                jmpStd,
+                num);
 
-        vmats.resize(rows*cols);
-        copy(numbers, numbers + rows*cols, vmats.begin());
+        //  Build return
+        const size_t n = results.vega.rows(), m = results.vega.cols();
+        const size_t N = n + 4, M = m + 2;
+
+        LPXLOPER12 oper = TempXLOPER12();
+        resize(oper, N, M);
+
+        setString(oper, "value", 0, 0);
+        setNum(oper, results.value, 0, 1);
+        setString(oper, "delta", 1, 0);
+        setNum(oper, results.delta, 1, 1);
+        setString(oper, "vega", 2, 0);
+        setString(oper, "mats", 2, 1);
+        for (size_t i = 0; i < m; ++i) setNum(oper, results.mats[i], 2, 2 + i);
+        setString(oper, "strikes", 3, 0);
+        for (size_t i = 0; i < n; ++i)
+        {
+            setNum(oper, results.strikes[i], 4 + i, 0);
+            for (size_t j = 0; j < m; ++j) setNum(oper, results.vega[i][j], 4 + i, 2 + j);
+        }
+
+        // Return it
+        return oper;
     }
-
-    vector<double> vspots;
+    catch (const exception&)
     {
-        size_t rows = spots->rows;
-        size_t cols = spots->columns;
-        double* numbers = spots->array;
-
-        vspots.resize(rows*cols);
-        copy(numbers, numbers + rows*cols, vspots.begin());
+        return TempErr12(xlerrNA);
     }
-
-    vector<double> vtimes;
-    {
-        size_t rows = times->rows;
-        size_t cols = times->columns;
-        double* numbers = times->array;
-
-        vtimes.resize(rows*cols);
-        copy(numbers, numbers + rows*cols, vtimes.begin());
-    }
-
-    auto results = dupireSuperbucket(
-        spot,
-        strike,
-        barrier,
-        maturity,
-        monitorFreq,
-        maxDtSimul,
-        parallel>0,
-        useSobol > 0,
-        static_cast<int>(numPath), 
-        vspots,
-        maxDs,
-        vtimes,
-        maxDtVol,
-        vstrikes,
-        vmats, 
-        ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
-        vol,
-        jmpIntens,
-        jmpAverage,
-        jmpStd,
-        static_cast<int>(seed1), 
-        static_cast<int>(seed2));
-
-    //  Build return
-
-    // Allocate result
-    // Calculate size
-    size_t resultRows = results.vega.rows() + 3, resultCols = results.vega.cols() + 1, resultSize = resultRows * resultCols;
-
-    // Return an error if size is 0
-    if (resultSize <= 0) return nullptr;
-
-    // First, free all memory previously allocated
-    // the function is defined in framework.h
-    FreeAllTempMemory();
-    // Then, allocate the memory for this result
-    // We don't need to de-allocate it, that will be done by the next call
-    // to this function or another function calling FreeAllTempMemory()
-    // Memory size required, details in Dalton's book, section 6.2.2
-    size_t memSize = sizeof(FP12) + (resultSize - 1) * sizeof(double);
-    // Finally allocate, function definition in framework.h
-    FP12* result = (FP12*)GetTempMemory(memSize);
-    // Compute result
-    result->rows = resultRows;
-    result->columns = resultCols;
-    for (size_t i = 0; i < resultSize; ++i) result->array[i] = 0.0;
-    result->array[0] = results.value;
-    result->array[resultCols] = results.delta;
-    for (size_t j = 0; j < results.vega.cols(); ++j)
-    {
-        result->array[2*resultCols + j + 1] = vmats[j];
-    }
-    for (size_t i = 0; i < results.vega.rows(); ++i)
-    {
-        result->array[(3 + i) * resultCols] = vstrikes[i];
-    }
-    for (size_t i = 0; i < results.vega.rows(); ++i) 
-        for (size_t j = 0; j < results.vega.cols(); ++j)
-    {
-        result->array[(3 + i)*resultCols + j + 1] = results.vega[i][j];
-    }
-
-    // Return it
-    return result;
 }
 
 extern "C" __declspec(dllexport)
@@ -1306,8 +662,20 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 	Excel12f(xlGetName, &xDLL, 0);
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xRestartThreadPool"),
+        (LPXLOPER12)TempStr12(L"BB"),
+        (LPXLOPER12)TempStr12(L"xRestartThreadPool"),
+        (LPXLOPER12)TempStr12(L"numThreads"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Restarts the thread pool with n threads"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutBlackScholes"),
-        (LPXLOPER12)TempStr12(L"BBBBBBB"),
+        (LPXLOPER12)TempStr12(L"QBBBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutBlackScholes"),
         (LPXLOPER12)TempStr12(L"spot, vol, normal, rate, div, id"),
         (LPXLOPER12)TempStr12(L"1"),
@@ -1319,7 +687,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutDupire"),
-        (LPXLOPER12)TempStr12(L"BBK%K%K%BB"),
+        (LPXLOPER12)TempStr12(L"QBK%K%K%BQ"),
         (LPXLOPER12)TempStr12(L"xPutDupire"),
         (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, id"),
         (LPXLOPER12)TempStr12(L"1"),
@@ -1331,7 +699,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutEuropean"),
-        (LPXLOPER12)TempStr12(L"BBBBB"),
+        (LPXLOPER12)TempStr12(L"QBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutEuropean"),
         (LPXLOPER12)TempStr12(L"strike, exerciseDate, [settlementDate], id"),
         (LPXLOPER12)TempStr12(L"1"),
@@ -1343,9 +711,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutBarrier"),
-        (LPXLOPER12)TempStr12(L"BBBBBB"),
+        (LPXLOPER12)TempStr12(L"QBBBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutBarrier"),
-        (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, id"),
+        (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, [smoothingFactor], id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -1355,7 +723,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutEuropeans"),
-        (LPXLOPER12)TempStr12(L"BK%K%B"),
+        (LPXLOPER12)TempStr12(L"QK%K%Q"),
         (LPXLOPER12)TempStr12(L"xPutEuropeans"),
         (LPXLOPER12)TempStr12(L"maturities, strikes, id"),
         (LPXLOPER12)TempStr12(L"1"),
@@ -1366,8 +734,32 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPayoffIds"),
+        (LPXLOPER12)TempStr12(L"QQ"),
+        (LPXLOPER12)TempStr12(L"xPayoffIds"),
+        (LPXLOPER12)TempStr12(L"id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"The payoff identifiers in a product"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xParameters"),
+        (LPXLOPER12)TempStr12(L"QQ"),
+        (LPXLOPER12)TempStr12(L"xParameters"),
+        (LPXLOPER12)TempStr12(L"id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"The parameters of a model"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xValue"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBB"),
+        (LPXLOPER12)TempStr12(L"QQQBBBBB"),
         (LPXLOPER12)TempStr12(L"xValue"),
         (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
@@ -1379,9 +771,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xAADrisk"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBB"),
+        (LPXLOPER12)TempStr12(L"QQQQBBBBB"),
         (LPXLOPER12)TempStr12(L"xAADrisk"),
-        (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"modelId, productId, riskPayoff, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -1389,129 +781,45 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"AAD risk report"),
         (LPXLOPER12)TempStr12(L""));
 
-	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-		(LPXLOPER12)TempStr12(L"xUocDupire"),
-		(LPXLOPER12)TempStr12(L"BBK%K%K%BBBBBBBBBB"),
-		(LPXLOPER12)TempStr12(L"xUocDupire"),
-		(LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
-		(LPXLOPER12)TempStr12(L"1"),
-		(LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
-		(LPXLOPER12)TempStr12(L""),
-		(LPXLOPER12)TempStr12(L""),
-		(LPXLOPER12)TempStr12(L"Computes the value of an up and out call in Dupire"),
-		(LPXLOPER12)TempStr12(L""));
-
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xEuropeansDupire"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BK%K%BBBBB"),
-        (LPXLOPER12)TempStr12(L"xEuropeansDupire"),
-        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, maturities, strikes, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"xAADriskAggregate"),
+        (LPXLOPER12)TempStr12(L"QQQQK%BBBBB"),
+        (LPXLOPER12)TempStr12(L"xAADriskAggregate"),
+        (LPXLOPER12)TempStr12(L"modelId, productId, payoffs, notionals, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the values of n calls in Dupire"),
+        (LPXLOPER12)TempStr12(L"AAD risk report for aggregate book of payoffs"),
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xUocBS"),
-        (LPXLOPER12)TempStr12(L"BBBBBBBBBBBBBBB"),
-        (LPXLOPER12)TempStr12(L"xUocBS"),
-        (LPXLOPER12)TempStr12(L"spot, vol, normal, rate, div, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"xBumprisk"),
+        (LPXLOPER12)TempStr12(L"QQQBBBBB"),
+        (LPXLOPER12)TempStr12(L"xBumprisk"),
+        (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the value of an up and out call in Black-Scholes"),
-        (LPXLOPER12)TempStr12(L""));
-
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xLinterp2D"),
-        (LPXLOPER12)TempStr12(L"BK%K%K%BB"),
-        (LPXLOPER12)TempStr12(L"xLinterp2D"),
-        (LPXLOPER12)TempStr12(L"xs, ys, zs, x0, y0"),
-        (LPXLOPER12)TempStr12(L"1"),
-        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Linear interpolation"),
-        (LPXLOPER12)TempStr12(L""));
-
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xUocDupireBump"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBB"),
-        (LPXLOPER12)TempStr12(L"xUocDupireBump"),
-        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
-        (LPXLOPER12)TempStr12(L"1"),
-        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the risk of an up and out call in Dupire"),
-        (LPXLOPER12)TempStr12(L""));
-
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xUocDupireAAD"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBB"),
-        (LPXLOPER12)TempStr12(L"xUocDupireAAD"),
-        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
-        (LPXLOPER12)TempStr12(L"1"),
-        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the risk of an up and out call in Dupire"),
-        (LPXLOPER12)TempStr12(L""));
-
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xEuroBookDupireAAD"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BK%BBBBB"),
-        (LPXLOPER12)TempStr12(L"xEuroBookDupireAAD"),
-        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, maxDt, matsStrikesNots, useSobol, [seed1], [seed2], N, [Parallel]"),
-        (LPXLOPER12)TempStr12(L"1"),
-        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the risk of a European book in Dupire"),
-        (LPXLOPER12)TempStr12(L""));
-
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xUocBSAAD"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBBBBBBBBB"),
-        (LPXLOPER12)TempStr12(L"xUocBSAAD"),
-        (LPXLOPER12)TempStr12(L"spot, vol, normal, rate, div, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
-        (LPXLOPER12)TempStr12(L"1"),
-        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the risk of an up and out call in Black-Scholes"),
+        (LPXLOPER12)TempStr12(L"Bump risk report"),
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBK%K%K%BK%BBBBBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"QBBBBBBK%K%K%BK%BBQQK%BBBBBB"),
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"ivs, spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, K, B, T, Bfreq, sobol, s1, s2, numPth, parallel"),
+        (LPXLOPER12)TempStr12(L"ivsType, spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, productId, payoffs, notionals, sobol, s1, s2, numPth, parallel, [bump?]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the risk of an up and out call in Dupire"),
-        (LPXLOPER12)TempStr12(L""));
-
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
-        (LPXLOPER12)TempStr12(L"xUocDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"K%BK%K%K%BBBBBBBBBB"),
-        (LPXLOPER12)TempStr12(L"xUocDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"spot, strikes, mats, calls, maxDt, K, B, T, freq, useSobol, [seed1], [seed2], N, [Parallel]"),
-        (LPXLOPER12)TempStr12(L"1"),
-        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Computes the risk of an up and out call in Dupire"),
+        (LPXLOPER12)TempStr12(L"Computes the risk of a product in Dupire"),
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireCalib"),
-        (LPXLOPER12)TempStr12(L"K%BBBBBBK%BK%B"),
+        (LPXLOPER12)TempStr12(L"QBBBBBBK%BK%B"),
         (LPXLOPER12)TempStr12(L"xDupireCalib"),
         (LPXLOPER12)TempStr12(L"type, spot, vol, jumpIntensity, jumpAverage, jumpStd, spots, maxds, times, mxdt"),
         (LPXLOPER12)TempStr12(L"1"),
@@ -1537,7 +845,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 	Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);
 
     /*  Start the thread pool   */
-    ThreadPool::getInstance()->start();
+    ThreadPool::getInstance()->start(4 * thread::hardware_concurrency() - 1);
 
 	return 1;
 }

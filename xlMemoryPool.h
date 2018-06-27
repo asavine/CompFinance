@@ -10,13 +10,15 @@
 //
 ///***************************************************************************
 
+#pragma once
+
 #include <windows.h>
 
 //
 // Total amount of memory to allocate for all temporary XLOPERs
 //
 
-#define MEMORYSIZE 1260000
+#define MEMORYSIZE  2097152 
 
 class MemoryPool
 {

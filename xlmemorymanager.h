@@ -9,9 +9,11 @@
 //
 ///***************************************************************************
 
+#pragma once
+
 #ifdef __cplusplus
 
-#include "MemoryPool.h"
+#include "xlMemoryPool.h"
 
 //
 // Total number of memory allocation pools to manage

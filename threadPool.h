@@ -16,8 +16,6 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
-//	ThreadPool.h
-
 #include <future>
 #include <thread>
 #include "ConcurrentQueue.h"
@@ -33,7 +31,7 @@ class ThreadPool
 	static ThreadPool myInstance;
 
 	//	The task queue
-	ConcurrentQueue<Task> myQueue;
+    ConcurrentQueue<Task> myQueue;
 
 	//	The threads
 	vector<thread> myThreads;
@@ -111,7 +109,18 @@ public:
             //	Wait for them all to join
             for_each(myThreads.begin(), myThreads.end(), mem_fn(&thread::join));
 
+            //  Clear all threads
+            myThreads.clear();
+
+            //  Clear the queue and reset interrupt
+            myQueue.clear();
+            myQueue.resetInterrupt();
+
+            //  Mark as inactive
             myActive = false;
+
+            //  Reset interrupt
+            myInterrupt = false;
         }
 	}
 

@@ -24,16 +24,7 @@
     <ClInclude Include="matrix.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="memorymanager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MemoryPool.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="xlcall.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="framework.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="threadPool.h">
@@ -93,9 +84,6 @@
     <ClInclude Include="mcMdlBS.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="mcMdlMulti.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="mcMdl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -105,14 +93,20 @@
     <ClInclude Include="store.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="xlframework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xlmemorymanager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xlMemoryPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xlOper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="MemoryManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MemoryPool.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="xlcall.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -132,6 +126,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="AAD.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="xlMemoryManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="xlMemoryPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

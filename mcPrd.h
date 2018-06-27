@@ -58,6 +58,7 @@ public:
         //  Identify the product
         ostringstream ost;
         ost.precision(2);
+        ost << fixed;
         if (settlementDate == exerciseDate)
         {
             ost << "call " << myStrike << " " << exerciseDate;
@@ -117,6 +118,9 @@ class UOC : public Product<T>
     double              myStrike;
     double              myBarrier;
     Time                myMaturity;
+    
+    double              mySmooth;
+    
     vector<Time>        myTimeline;
     vector<simulData>   myDataline;
 
@@ -127,14 +131,16 @@ public:
     //  Constructor: store data and build timeline
     //  Timeline = system date to maturity, 
     //  with steps every monitoring frequency
-    UOC(const double strike, 
-        const double barrier, 
-        const Time maturity, 
-        const Time monitorFreq)
+    UOC(const double    strike, 
+        const double    barrier, 
+        const Time      maturity, 
+        const Time      monitorFreq,
+        const double    smooth = 0.1)
         : myStrike(strike), 
         myBarrier(barrier), 
         myMaturity(maturity),
-        myLabels(1)
+        mySmooth(smooth),
+        myLabels(2)
     {
         //  Produce timeline
 
@@ -169,8 +175,13 @@ public:
         //  Identify the product
         ostringstream ost;
         ost.precision(2);
-        ost << "call " << myStrike << " up and out " 
-            << myBarrier << " monitoring freq " << monitorFreq;
+        ost << fixed;
+        ost << "call " << myStrike;
+        myLabels[1] = ost.str();
+
+        ost << " up and out "
+            << myBarrier << " monitoring freq " << monitorFreq
+            << " smooth " << mySmooth;
         myLabels[0] = ost.str();
     }
 
@@ -211,7 +222,7 @@ public:
         //  Or Andreasen and Savine's publication on scripting
 
         //  We apply a smoothing factor of 1% of the spot both ways, untemplated
-        const double smooth = convert<double>(path[0].forwards[0] * 0.01);
+        const double smooth = convert<double>(path[0].forwards[0] * mySmooth);
 
         //  We start alive
         T alive(1.0);
@@ -222,8 +233,8 @@ public:
             //  Breached
             if (scen.forwards[0] > myBarrier + smooth)
             {
-                payoffs[0] = T(0.0);
-                return;
+                alive = T(0.0);
+                break;
             }
 
             //  Semi-breached: apply smoothing
@@ -234,8 +245,8 @@ public:
         }
 
         //  Payoff
-        payoffs[0] = alive * max(path.back().forwards[0] - myStrike, 0.0)
-            / path.back().numeraire;
+        payoffs[1] = max(path.back().forwards[0] - myStrike, 0.0) / path.back().numeraire;
+        payoffs[0] = alive * payoffs[1];
     }
 };
 
@@ -276,6 +287,7 @@ public:
             {
                 ostringstream ost;
                 ost.precision(2);
+                ost << fixed;
                 ost << "call " << option.first << " " << strike;
                 myLabels.push_back(ost.str());
             }

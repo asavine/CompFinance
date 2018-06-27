@@ -18,14 +18,13 @@ As long as this comment is preserved at the top of the file
 
 #include <queue>
 #include <mutex>
-
 using namespace std;
 
 template <class T>
 class ConcurrentQueue
 {
 
-	queue<T> myQueue;
+    queue<T> myQueue;
 	mutable mutex myMutex;
 	condition_variable myCV;
 	bool myInterrupt;
@@ -101,4 +100,15 @@ public:
         }
 		myCV.notify_all();
 	}
+
+    void resetInterrupt()
+    {
+        myInterrupt = false;
+    }
+
+    void clear()
+    {
+        queue<T> empty;
+        swap(myQueue, empty);
+    }
 };

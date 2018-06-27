@@ -66,6 +66,12 @@ public:
     iterator end() { return mySpreads.end(); }
     const_iterator begin() const { return mySpreads.begin(); }
     const_iterator end() const { return mySpreads.end(); }
+
+    //  For bump risk
+    void bump(const size_t i, const size_t j, const double bumpBy)
+    {
+        mySpreads[i][j] += bumpBy;
+    }
 };
 
 class IVS

@@ -130,7 +130,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <StructMemberAlignment>8Bytes</StructMemberAlignment>
-      <AdditionalOptions>/Zo %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zo /Qvec-report:1 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -176,30 +176,30 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="mcMdl.h" />
     <ClInclude Include="mcMdlBS.h" />
-    <ClInclude Include="mcMdlMulti.h" />
     <ClInclude Include="sobol.h" />
     <ClInclude Include="mcBase.h" />
     <ClInclude Include="mcMdlDupire.h" />
     <ClInclude Include="mcPrd.h" />
     <ClInclude Include="mrg32k3a.h" />
     <ClInclude Include="primitivepolynomials.h" />
-    <ClInclude Include="framework.h" />
+    <ClInclude Include="xlframework.h" />
     <ClInclude Include="gaussians.h" />
     <ClInclude Include="matrix.h" />
-    <ClInclude Include="memorymanager.h" />
-    <ClInclude Include="MemoryPool.h" />
+    <ClInclude Include="xlmemorymanager.h" />
+    <ClInclude Include="xlMemoryPool.h" />
     <ClInclude Include="store.h" />
     <ClInclude Include="threadPool.h" />
     <ClInclude Include="utility.h" />
     <ClInclude Include="xlcall.h" />
+    <ClInclude Include="xlOper.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AAD.cpp" />
     <ClCompile Include="initializers.cpp" />
     <ClCompile Include="mcBase.cpp" />
     <ClCompile Include="primitivepolynomials.cpp" />
-    <ClCompile Include="MemoryManager.cpp" />
-    <ClCompile Include="MemoryPool.cpp" />
+    <ClCompile Include="xlMemoryManager.cpp" />
+    <ClCompile Include="xlMemoryPool.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
     <ClCompile Include="xlcall.cpp" />
     <ClCompile Include="xlExport.cpp" />

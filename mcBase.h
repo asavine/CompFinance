@@ -56,6 +56,13 @@ struct scenario
         forwards.resize(data.forwardMats.size());
         discounts.resize(data.discountMats.size());
     }
+
+    //  Initialize defaults
+    void initialize()
+    {
+        numeraire = T(1.0);
+        fill(discounts.begin(), discounts.end(), T(1.0));
+    }
 };
 
 template <class T>
@@ -66,6 +73,12 @@ inline void allocatePath(const vector<simulData>& dataline, vector<scenario<T>>&
     {
         path[i].allocate(dataline[i]);
     }
+}
+
+template <class T>
+inline void initializePath(vector<scenario<T>>& path)
+{
+    for (auto& scen : path) scen.initialize();
 }
 
 template <class T>
@@ -196,6 +209,7 @@ inline vector<vector<double>> mcSimul(
     //  Allocate path
     vector<scenario<double>> path;
     allocatePath(prd.dataline(), path);
+    initializePath(path);
 
     //	Iterate through paths	
     for (size_t i = 0; i<nPath; i++)
@@ -234,7 +248,11 @@ inline vector<vector<double>> mcParallelSimul(
     vector<vector<double>> gaussVecs(nThread+1);    //  +1 for main
     vector<vector<scenario<double>>> paths(nThread+1);
     for (auto& vec : gaussVecs) vec.resize(cMdl->simDim());
-    for (auto& path : paths) allocatePath(prd.dataline(), path);
+    for (auto& path : paths)
+    {
+        allocatePath(prd.dataline(), path);
+        initializePath(path);
+    }
     
     //  One RNG per thread
     vector<unique_ptr<RNG>> rngs(nThread + 1);
@@ -336,6 +354,10 @@ mcSimulAAD(
     auto cMdl = mdl.clone();
     auto cRng = rng.clone();
 
+    //  Allocate path
+    vector<scenario<Number>> path;
+    allocatePath(prd.dataline(), path);
+
     //  AAD - 1
     //  Access to tape
     Tape& tape = *Number::tape;
@@ -349,6 +371,8 @@ mcSimulAAD(
     //  Hence moved here
     cMdl->allocate(prd.timeline(), prd.dataline());
     cMdl->init(prd.timeline(), prd.dataline());
+    //  Initialize path
+    initializePath(path);
     //  Mark the tape straight after initialization
     tape.mark();
     //
@@ -365,9 +389,6 @@ mcSimulAAD(
     vector<Number> nPayoffs(nPay);
     //  Gaussian vector
     vector<double> gaussVec(cMdl->simDim());            
-    //  Path
-    vector<scenario<Number>> path;
-    allocatePath(prd.dataline(), path);
 
     //  Results
     AADSimulResults results(nPath, nPay, nParam);
@@ -419,12 +440,13 @@ mcSimulAAD(
 }
 
 //  Init model and out on tape
-template<class T>
-void initModel4ParallelAAD(
+inline void initModel4ParallelAAD(
     //  Inputs
-    const Product<T>&       prd,
+    const Product<Number>&      prd,
     //  Cloned model, must have been allocated prior
-    Model<T>&               clonedMdl)
+    Model<Number>&              clonedMdl,
+    //  Path, also allocated prior
+    vector<scenario<Number>>&   path)
 {
     //  Access to tape
     Tape& tape = *Number::tape;
@@ -437,6 +459,8 @@ void initModel4ParallelAAD(
     //  CAREFUL: simulation timeline must be on tape
     //  Hence moved here
     clonedMdl.init(prd.timeline(), prd.dataline());
+    //  Path
+    initializePath(path);
     //  Mark the tape straight after parameters
     tape.mark();
     //
@@ -492,7 +516,7 @@ mcParallelSimulAAD(
     vector<int> mdlInit(nThread + 1, false);
 
     //  Initialize main thread
-    initModel4ParallelAAD(prd, *models[0]);
+    initModel4ParallelAAD(prd, *models[0], paths[0]);
 
     //  Mark main thread as initialized
     mdlInit[0] = true;
@@ -540,7 +564,7 @@ mcParallelSimulAAD(
             if (!mdlInit[threadNum])
             {
                 //  Initialize
-                initModel4ParallelAAD(prd, *models[threadNum]);
+                initModel4ParallelAAD(prd, *models[threadNum], paths[threadNum]);
 
                 //  Mark as initialized
                 mdlInit[threadNum] = true;
