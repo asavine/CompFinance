@@ -310,3 +310,10 @@ $RECYCLE.BIN/
 *.*.*.bak
 *.*.*.*.bak
 *.*.*.*.*.bak
+*.txt
+*.db
+*.opendb
+*.*.opendb
+*.*.*.opendb
+*.*.*.*.opendb
+

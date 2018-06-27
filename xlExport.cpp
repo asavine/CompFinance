@@ -19,6 +19,7 @@ As long as this comment is preserved at the top of the file
 #include "threadPool.h"
 #include "main.h"
 
+#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
 
