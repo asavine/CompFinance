@@ -195,7 +195,7 @@ public:
             const size_t m = mySpots.size();
             for (size_t j = 0; j < m; ++j)
             {
-                myInterpVols[i][j] = sqrtdt * interp(
+                myInterpVols[i][j] = sqrtdt * interp<false>(
                     myTimes.begin(),
                     myTimes.end(),
                     myVols[j],
@@ -245,7 +245,7 @@ public:
         for (size_t i = 0; i < n; ++i)
         {
             //  Interpolate volatility in spot
-            T vol = interp(
+            T vol = interp<false>(
                 mySpots.begin(),
                 mySpots.end(),
                 myInterpVols[i],

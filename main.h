@@ -248,10 +248,70 @@ inline auto AADriskAggregate(
     return results;
 }
 
-//  Returns a matrix of risks 
+//  Returns a vector of values and a matrix of risks 
 //      with payoffs in columns and parameters in rows
 //      along with ids of payoffs and parameters
-inline auto bumpRisk(
+
+struct RiskReports
+{
+    vector<string> payoffs;
+    vector<string> params;
+    vector<double> values;
+    matrix<double> risks;
+};
+
+inline RiskReports AADriskMulti(
+    const string&           modelId,
+    const string&           productId,
+    const NumericalParam&   num)
+{
+    const Model<Number>* model = getModel<Number>(modelId);
+    const Product<Number>* product = getProduct<Number>(productId);
+
+    if (!model || !product)
+    {
+        throw runtime_error("AADrisk() : Could not retrieve model and product");
+    }
+
+    RiskReports results;
+
+    //  Random Number Generator
+    unique_ptr<RNG> rng;
+    if (num.useSobol) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(num.seed1, num.seed2);
+
+    //  Simulate
+    const auto simulResults = num.parallel
+		? mcParallelSimulAADMulti(*product, *model, *rng, num.numPath)
+        : mcSimulAADMulti(*product, *model, *rng, num.numPath);
+
+    results.params = model->parameterLabels();
+    results.payoffs = product->payoffLabels();
+	results.risks = move(simulResults.risks);
+
+	//	Average values across paths
+	const size_t nPayoffs = product->payoffLabels().size();
+	results.values.resize(nPayoffs);
+	for (size_t i = 0; i < nPayoffs; ++i)
+	{
+		results.values[i] = accumulate(
+			simulResults.payoffs.begin(),
+			simulResults.payoffs.end(),
+			0.0,
+			[i](const double acc, const vector<double>& v) { return acc + v[i]; }
+		) / num.numPath;
+	}
+
+    return results;
+}
+
+//  Returns a vector of values and a matrix of risks 
+//      with payoffs in columns and parameters in rows
+//      along with ids of payoffs and parameters
+
+//  Same format as AADriskMulti
+
+inline RiskReports bumpRisk(
     const string&           modelId,
     const string&           productId,
     const NumericalParam&   num)
@@ -264,17 +324,13 @@ inline auto bumpRisk(
         throw runtime_error("bumpRisk() : Could not retrieve model and product");
     }
 
-    struct
-    {
-        vector<string> payoffs;
-        vector<string> params;
-        matrix<double> risks;
-    } results;
+    RiskReports results;
 
     //  base values
     auto baseRes = value(*orig, *product, num);
     results.payoffs = baseRes.identifiers;
-    
+	results.values = baseRes.values;
+
     //  make copy so we don't modify the model in memory
     auto model = orig->clone();
     
@@ -491,7 +547,7 @@ inline auto
     }
     
     //  Propagate
-    Number::propagateAdjoints(tape->back(), tape->begin());
+    Number::propagateAdjoints(prev(tape->end()), tape->begin());
 
     //  Results: superbucket = risk view
 

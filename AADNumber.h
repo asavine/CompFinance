@@ -24,37 +24,57 @@ class Number
     double myValue;
     Node* myNode;
 
-    //  Node creation on tape
+    //  Create node
 
-    template <class NodeType>
-    inline void createNode()
+	template <size_t N>
+	Node* createNode()
     {
-        //  Placement syntax to allocate in place on tape
-        myNode = new (tape->allocate<sizeof(NodeType)>()) NodeType;
+		return tape->recordNode<N>();
     }
 
-    //  Access to node for friends
-    template <class NodeType = Node>
-    inline NodeType* node() const
+	//	Access node (friends only)
+	Node& node() const 
     {
-        return static_cast<NodeType*>(myNode);
+		return const_cast<Node&>(*myNode);
     }
 
-    //  To help overloading
-    static const struct LeafType {} leaf;
-    static const struct UnaryType {} unary;
-    static const struct BinaryType {} binary;
+    //	Convenient access for friends
 
-    Number(const double val, UnaryType) :
-        myValue(val)
+    double& derivative() { return myNode->pDerivatives[0]; }
+    double& lDer() { return myNode->pDerivatives[0]; }
+    double& rDer() { return myNode->pDerivatives[1]; }
+
+    double*& adjPtr() { return myNode->pAdjPtrs[0]; }
+    double*& leftAdj() { return myNode->pAdjPtrs[0]; }
+    double*& rightAdj() { return myNode->pAdjPtrs[1]; }
+
+	//	Private constructors for operator overloading
+	
+	//	Unary
+	Number(Node& arg, const double val) :
+		myValue(val),
+		myNode(createNode<1>())
     {
-        createNode<UnaryNode>();
+		myNode->pAdjPtrs[0] = Tape::multi
+			? arg.pAdjoints 
+			: &arg.mAdjoint;
     }
 
-    Number(const double val, BinaryType) :
-        myValue(val)
+	//	Binary
+	Number(Node& lhs, Node& rhs, const double val) :
+		myValue(val),
+		myNode(createNode<2>())
+	{
+		if (Tape::multi)
+		{
+			myNode->pAdjPtrs[0] = lhs.pAdjoints;
+			myNode->pAdjPtrs[1] = rhs.pAdjoints;
+		}
+		else
     {
-        createNode<BinaryNode>();
+			myNode->pAdjPtrs[0] = &lhs.mAdjoint;
+			myNode->pAdjPtrs[1] = &rhs.mAdjoint;
+		}
     }
 
 public:
@@ -62,22 +82,21 @@ public:
     //  Static access to tape
     static thread_local Tape* tape;
 
-    //  Constructors
+    //  Public constructors for leaves
 
     Number() {}
 
     explicit Number(const double val) :
-        myValue(val)
-    {
-        createNode<Leaf>();
-    }
+		myValue(val),
+		myNode(createNode<0>())
+    {}
 
     //  Assignments
 
     Number& operator=(const double val)
     {
         myValue = val;
-        createNode<Leaf>();
+		myNode = createNode<0>();
 
         return *this;
     }
@@ -85,8 +104,12 @@ public:
     //  Put on tape
     void putOnTape()
     {
-        createNode<Leaf>();
+		myNode = createNode<0>();
     }
+
+    //  Explicit coversion to double
+    explicit operator double& () { return myValue; }
+    explicit operator double() const { return myValue; }
 
     //  Accessors: value and adjoint
 
@@ -100,20 +123,30 @@ public:
     }
     double& adjoint()
     {
-        return myNode->adjoint;
+        return myNode->adjoint();
     }
     double adjoint() const
     {
-        return myNode->adjoint;
+        return myNode->adjoint();
     }
-
-    //  Propagation
+	double& adjoint(const size_t n)
+	{
+		return myNode->adjoint(n);
+	}
+	double adjoint(const size_t n) const
+	{
+		return myNode->adjoint(n);
+    }
 
     //  Reset all adjoints on the tape
-    static void resetAdjoints()
+	//		note we don't use this method
+    void resetAdjoints()
     {
-        for (Node& node : *tape) node.adjoint = 0.0;
+		tape->resetAdjoints();
     }
+
+	//  Propagation
+
     //  Propagate adjoints
     //      from and to both INCLUSIVE
     static void propagateAdjoints(
@@ -123,10 +156,10 @@ public:
         auto it = propagateFrom;
         while (it != propagateTo)
         {
-            it->propagate();
+            it->propagateOne();
             --it;
         }
-        it->propagate();
+        it->propagateOne();
     }
 
     //  Convenient overloads
@@ -135,12 +168,8 @@ public:
     //  Then propagate from the node
     void propagateAdjoints(
         //  We start on this number's node
-        Tape::iterator propagateTo,
-        //  reset adjoints first?
-        const bool reset = false)
+        Tape::iterator propagateTo)
     {
-        //  Reset
-        if (reset) resetAdjoints();
         //  Set this adjoint to 1
         adjoint() = 1.0;
         //  Find node on tape
@@ -148,54 +177,66 @@ public:
         //  Reverse and propagate until we hit the stop
         while (it != propagateTo)
         {
-            it->propagate();
+            it->propagateOne();
             --it;
         }
-        it->propagate();
+        it->propagateOne();
     }
 
     //  These 2 set the adjoint to 1 on this node
     void propagateToStart(
         const bool reset = false)
     {
-        propagateAdjoints(tape->begin(), reset);
+        propagateAdjoints(tape->begin());
     }
     void propagateToMark(
         const bool reset = false)
     {
-        propagateAdjoints(tape->markIt(), reset);
+        propagateAdjoints(tape->markIt());
     }
 
     //  This one only propagates
     //  Note: propagation starts at mark - 1
     static void propagateMarkToStart()
     {
-        propagateAdjoints(--tape->markIt(), tape->begin());
+        propagateAdjoints(prev(tape->markIt()), tape->begin());
+    }
+
+	//  Propagate adjoints
+	//      from and to both INCLUSIVE
+	static void propagateAdjointsMulti(
+		Tape::iterator propagateFrom,
+		Tape::iterator propagateTo)
+	{
+		auto it = propagateFrom;
+		while (it != propagateTo)
+		{
+			it->propagateAll();
+			--it;
+		}
+		it->propagateAll();
     }
 
     //  Operator overloading
 
     inline friend Number operator+(const Number& lhs, const Number& rhs)
     {
+		const double e = lhs.value() + rhs.value();
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() + rhs.value(), binary);
-        //  Set arguments
-        result.node<BinaryNode>()->arguments[0] = lhs.node();
-        result.node<BinaryNode>()->arguments[1] = rhs.node();
+        Number result(lhs.node(), rhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<BinaryNode>()->derivatives[0] = 1.0;
-        result.node<BinaryNode>()->derivatives[1] = 1.0;
+        result.lDer() = 1.0;
+		result.rDer() = 1.0;
 
         return result;
     }
     inline friend Number operator+(const Number& lhs, const double& rhs)
     {
+		const double e = lhs.value() + rhs;
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() + rhs, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = lhs.node();
+		Number result(lhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = 1.0;
+		result.derivative() = 1.0;
 
         return result;
 
@@ -207,62 +248,55 @@ public:
 
     inline friend Number operator-(const Number& lhs, const Number& rhs)
     {
+		const double e = lhs.value() - rhs.value();
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() - rhs.value(), binary);
-        //  Set arguments
-        result.node<BinaryNode>()->arguments[0] = lhs.node();
-        result.node<BinaryNode>()->arguments[1] = rhs.node();
+		Number result(lhs.node(), rhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<BinaryNode>()->derivatives[0] = 1.0;
-        result.node<BinaryNode>()->derivatives[1] = -1.0;
+		result.lDer() = 1.0;
+		result.rDer() = -1.0;
 
         return result;
     }
     inline friend Number operator-(const Number& lhs, const double& rhs)
     {
+		const double e = lhs.value() - rhs;
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() - rhs, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = lhs.node();
+		Number result(lhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = 1.0;
+		result.derivative() = 1.0;
 
         return result;
 
     }
     inline friend Number operator-(const double& lhs, const Number& rhs)
     {
+		const double e = lhs - rhs.value();
         //  Eagerly evaluate and put on tape
-        Number result(lhs - rhs.value(), unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = rhs.node();
+		Number result(rhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = -1.0;
+		result.derivative() = -1.0;
 
         return result;
     }
 
     inline friend Number operator*(const Number& lhs, const Number& rhs)
     {
+		const double e = lhs.value() * rhs.value();
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() * rhs.value(), binary);
-        //  Set arguments
-        result.node<BinaryNode>()->arguments[0] = lhs.node();
-        result.node<BinaryNode>()->arguments[1] = rhs.node();
+		Number result(lhs.node(), rhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<BinaryNode>()->derivatives[0] = rhs.value();
-        result.node<BinaryNode>()->derivatives[1] = lhs.value();
+		result.lDer() = rhs.value();
+		result.rDer() = lhs.value();
 
         return result;
     }
     inline friend Number operator*(const Number& lhs, const double& rhs)
     {
+		const double e = lhs.value() * rhs;
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() * rhs, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = lhs.node();
+		Number result(lhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = rhs;
+		result.derivative() = rhs;
 
         return result;
 
@@ -274,38 +308,146 @@ public:
 
     inline friend Number operator/(const Number& lhs, const Number& rhs)
     {
+		const double e = lhs.value() / rhs.value();
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() / rhs.value(), binary);
-        //  Set arguments
-        result.node<BinaryNode>()->arguments[0] = lhs.node();
-        result.node<BinaryNode>()->arguments[1] = rhs.node();
+		Number result(lhs.node(), rhs.node(), e);
         //  Eagerly compute derivatives
         const double invRhs = 1.0 / rhs.value();
-        result.node<BinaryNode>()->derivatives[0] = 1.0 * invRhs;
-        result.node<BinaryNode>()->derivatives[1] = -lhs.value() * invRhs * invRhs;
+		result.lDer() = invRhs;
+		result.rDer() = -lhs.value() * invRhs * invRhs;
 
         return result;
     }
     inline friend Number operator/(const Number& lhs, const double& rhs)
     {
+		const double e = lhs.value() / rhs;
         //  Eagerly evaluate and put on tape
-        Number result(lhs.value() / rhs, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = lhs.node();
+		Number result(lhs.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = 1.0 / rhs;
+		result.derivative() = 1.0 / rhs;
 
         return result;
 
     }
     inline friend Number operator/(const double& lhs, const Number& rhs)
     {
+		const double e = lhs / rhs.value();
+		//  Eagerly evaluate and put on tape
+		Number result(rhs.node(), e);
+		//  Eagerly compute derivatives
+		result.derivative() = -lhs / rhs.value() / rhs.value();
+
+        return result;
+    }
+
+	inline friend Number pow(const Number& lhs, const Number& rhs)
+	{
+		const double e = pow(lhs.value(), rhs.value());
+		//  Eagerly evaluate and put on tape
+		Number result(lhs.node(), rhs.node(), e);
+		//  Eagerly compute derivatives
+		result.lDer() = rhs.value() * e / lhs.value();
+		result.rDer() = log(lhs.value()) * e;
+
+		return result;
+	}
+	inline friend Number pow(const Number& lhs, const double& rhs)
+	{
+		const double e = pow(lhs.value(), rhs);
+		//  Eagerly evaluate and put on tape
+		Number result(lhs.node(), e);
+		//  Eagerly compute derivatives
+		result.derivative() = rhs * e / lhs.value();
+
+		return result;
+	}
+	inline friend Number pow(const double& lhs, const Number& rhs)
+	{
+		const double e = pow(lhs, rhs.value());
+		//  Eagerly evaluate and put on tape
+		Number result(rhs.node(), e);
+		//  Eagerly compute derivatives
+		result.derivative() = log(lhs) * e;
+
+		return result;
+	}
+
+	inline friend Number max(const Number& lhs, const Number& rhs)
+	{
+		const bool lmax = lhs.value() > rhs.value();
+		//  Eagerly evaluate and put on tape
+		Number result(lhs.node(), rhs.node(), lmax? lhs.value() : rhs.value());
+		//  Eagerly compute derivatives
+		if (lmax)
+		{
+			result.lDer() = 1.0;
+			result.rDer() = 0.0;
+		}
+		else
+		{
+			result.lDer() = 0.0;
+			result.rDer() = 1.0;
+		}
+
+		return result;
+	}
+	inline friend Number max(const Number& lhs, const double& rhs)
+	{
+		const bool lmax = lhs.value() > rhs;
+		//  Eagerly evaluate and put on tape
+		Number result(lhs.node(), lmax ? lhs.value() : rhs);
+		//  Eagerly compute derivatives
+		result.derivative() = lmax ? 1.0 : 0.0;
+
+		return result;
+	}
+	inline friend Number max(const double& lhs, const Number& rhs)
+	{
+		const bool rmax = rhs.value() > lhs;
+		//  Eagerly evaluate and put on tape
+		Number result(rhs.node(), rmax ? rhs.value() : lhs);
+		//  Eagerly compute derivatives
+		result.derivative() = rmax ? 1.0 : 0.0;
+
+		return result;
+	}
+
+	inline friend Number min(const Number& lhs, const Number& rhs)
+	{
+		const bool lmin = lhs.value() < rhs.value();
+		//  Eagerly evaluate and put on tape
+		Number result(lhs.node(), rhs.node(), lmin ? lhs.value() : rhs.value());
+		//  Eagerly compute derivatives
+		if (lmin)
+		{
+			result.lDer() = 1.0;
+			result.rDer() = 0.0;
+		}
+		else
+		{
+			result.lDer() = 0.0;
+			result.rDer() = 1.0;
+		}
+
+		return result;
+	}
+	inline friend Number min(const Number& lhs, const double& rhs)
+	{
+		const bool lmin = lhs.value() < rhs;
+		//  Eagerly evaluate and put on tape
+		Number result(lhs.node(), lmin ? lhs.value() : rhs);
+		//  Eagerly compute derivatives
+		result.derivative() = lmin ? 1.0 : 0.0;
+
+		return result;
+	}
+	inline friend Number min(const double& lhs, const Number& rhs)
+	{
+		const bool rmin = rhs.value() < lhs;
         //  Eagerly evaluate and put on tape
-        Number result(lhs / rhs.value(), unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = rhs.node();
+		Number result(rhs.node(), rmin ? rhs.value() : lhs);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = -lhs / rhs.value() / rhs.value();
+		result.derivative() = rmin ? 1.0 : 0.0;
 
         return result;
     }
@@ -369,23 +511,20 @@ public:
     {
         const double e = exp(arg.value());
         //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = arg.node();
+        Number result(arg.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = e;
+		result.derivative() = e;
 
         return result;
     }
 
     inline friend Number log(const Number& arg)
     {
+		const double e = log(arg.value());
         //  Eagerly evaluate and put on tape
-        Number result(log(arg.value()), unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = arg.node();
+		Number result(arg.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = 1.0 / arg.value();
+        result.derivative() = 1.0 / arg.value();
 
         return result;
     }
@@ -394,11 +533,9 @@ public:
     {
         const double e = sqrt(arg.value());
         //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = arg.node();
+		Number result(arg.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = 0.5 / e;
+		result.derivative() = 0.5 / e;
 
         return result;
     }
@@ -407,11 +544,9 @@ public:
     {
         const double e = fabs(arg.value());
         //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = arg.node();
+		Number result(arg.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = arg.value() > 0.0 ? 1.0 : -1.0;
+		result.derivative() = arg.value() > 0.0 ? 1.0 : -1.0;
 
         return result;
     }
@@ -420,11 +555,9 @@ public:
     {
         const double e = normalDens(arg.value());
         //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = arg.node();
+		Number result(arg.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = - arg.value() * e;
+		result.derivative() = - arg.value() * e;
 
         return result;
     }
@@ -433,145 +566,9 @@ public:
     {
         const double e = normalCdf(arg.value());
         //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = arg.node();
+		Number result(arg.node(), e);
         //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = normalDens(arg.value());
-
-        return result;
-    }
-
-    //  Binary functions
-    inline friend Number pow(const Number& lhs, const Number& rhs)
-    {
-        const double e = pow(lhs.value(), rhs.value());
-        //  Eagerly evaluate and put on tape
-        Number result(e, binary);
-        //  Set arguments
-        result.node<BinaryNode>()->arguments[0] = lhs.node();
-        result.node<BinaryNode>()->arguments[1] = rhs.node();
-        //  Eagerly compute derivatives
-        result.node<BinaryNode>()->derivatives[0] = rhs.value() * e / lhs.value();
-        result.node<BinaryNode>()->derivatives[1] = log(lhs.value()) * e;
-
-        return result;
-    }
-    inline friend Number pow(const Number& lhs, const double& rhs)
-    {
-        const double e = pow(lhs.value(), rhs);
-        //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = lhs.node();
-        //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = rhs * e / lhs.value();
-
-        return result;
-    }
-    inline friend Number pow(const double& lhs, const Number& rhs)
-    {
-        const double e = pow(lhs, rhs.value());
-        //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = rhs.node();
-        //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = log(lhs) * e;
-
-        return result;
-    }
-
-    inline friend Number max(const Number& lhs, const Number& rhs)
-    {
-        const double e = max(lhs.value(), rhs.value());
-        //  Eagerly evaluate and put on tape
-        Number result(e, binary);
-        //  Set arguments
-        result.node<BinaryNode>()->arguments[0] = lhs.node();
-        result.node<BinaryNode>()->arguments[1] = rhs.node();
-        //  Eagerly compute derivatives
-        if (lhs.value() > rhs.value())
-        {
-            result.node<BinaryNode>()->derivatives[0] = 1.0;
-            result.node<BinaryNode>()->derivatives[1] = 0.0;
-        }
-        else
-        {
-            result.node<BinaryNode>()->derivatives[0] = 0.0;
-            result.node<BinaryNode>()->derivatives[1] = 1.0;
-        }
-
-        return result;
-    }
-    inline friend Number max(const Number& lhs, const double& rhs)
-    {
-        const double e = max(lhs.value(), rhs);
-        //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = lhs.node();
-        //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = lhs.value() > rhs? 1.0 : 0.0;
-
-        return result;
-    }
-    inline friend Number max(const double& lhs, const Number& rhs)
-    {
-        const double e = max(lhs, rhs.value());
-        //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = rhs.node();
-        //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = rhs.value() > lhs ? 1.0 : 0.0;
-
-        return result;
-    }
-
-    inline friend Number min(const Number& lhs, const Number& rhs)
-    {
-        const double e = min(lhs.value(), rhs.value());
-        //  Eagerly evaluate and put on tape
-        Number result(e, binary);
-        //  Set arguments
-        result.node<BinaryNode>()->arguments[0] = lhs.node();
-        result.node<BinaryNode>()->arguments[1] = rhs.node();
-        //  Eagerly compute derivatives
-        if (lhs.value() < rhs.value())
-        {
-            result.node<BinaryNode>()->derivatives[0] = 1.0;
-            result.node<BinaryNode>()->derivatives[1] = 0.0;
-        }
-        else
-        {
-            result.node<BinaryNode>()->derivatives[0] = 0.0;
-            result.node<BinaryNode>()->derivatives[1] = 1.0;
-        }
-
-        return result;
-    }
-    inline friend Number min(const Number& lhs, const double& rhs)
-    {
-        const double e = min(lhs.value(), rhs);
-        //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = lhs.node();
-        //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = lhs.value() < rhs ? 1.0 : 0.0;
-
-        return result;
-    }
-    inline friend Number min(const double& lhs, const Number& rhs)
-    {
-        const double e = min(lhs, rhs.value());
-        //  Eagerly evaluate and put on tape
-        Number result(e, unary);
-        //  Set arguments
-        result.node<UnaryNode>()->argument = rhs.node();
-        //  Eagerly compute derivatives
-        result.node<UnaryNode>()->derivative = rhs.value() < lhs ? 1.0 : 0.0;
+		result.derivative() = normalDens(arg.value());
 
         return result;
     }

@@ -17,11 +17,8 @@ As long as this comment is preserved at the top of the file
 #include "AAD.h"
 #include <algorithm>
 
-#if !AADET
-const struct Number::LeafType Number::leaf;
-const struct Number::UnaryType Number::unary;
-const struct Number::BinaryType Number::binary;
-#endif
+size_t Node::numAdj = 1;
+bool Tape::multi = false;
 
 Tape globalTape;
 thread_local Tape* Number::tape = &globalTape;
@@ -85,7 +82,7 @@ inline pair<double, vector<double>> checkPoint(const vector<double>& X)
     }
 
     //  8
-    Number::propagateAdjoints(tape->back(), tape->begin());
+    Number::propagateAdjoints(prev(tape->end()), tape->begin());
 
     //  9
     pair<double, vector<double>> results;

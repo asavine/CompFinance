@@ -1,415 +1,143 @@
-
-/*
-Written by Antoine Savine in 2018
-
-This code is the strict IP of Antoine Savine
-
-License to use and alter this code for personal and commercial applications
-is freely granted to any person or company who purchased a copy of the book
-
-Modern Computational Finance: AAD and Parallel Simulations
-Antoine Savine
-Wiley, 2018
-
-As long as this comment is preserved at the top of the file
-*/
-
 #pragma once
 
-#include <exception>
-
-#include <vector>
-#include <list>
-
+#include "blocklist.h"
 #include "AADNode.h"
 
-using namespace std;
+constexpr size_t BLOCKSIZE  = 16384;		//	Number of nodes
+constexpr size_t ADJSIZE    = 32768;		//	Number of adjoints
+constexpr size_t DATASIZE   = 65536;		//	Data in bytes
 
-#define DEFAULT_BLOCK_SIZE 524288
-#define DEFAULT_INDEX_SIZE 32768
-
-using Ptr = char*;
-
-class MemoryBlock 
+class Tape
 {
-    //	Pointers to the first, 
-    //      next available and last memory address
-    Ptr myBegin;
-    Ptr myNext;
-    Ptr	myEnd;
+	//	Working with multiple results / adjoints?
+	static bool							multi;
+
+	//  Storage for adjoints
+    blocklist<double, ADJSIZE>			myAdjointsMulti;
+    
+	//  Storage for derivatives and child adjoint pointers
+	blocklist<double, DATASIZE>			myDers;
+	blocklist<double*, DATASIZE>		myArgPtrs;
+
+    //  Storage for the nodes
+	blocklist<Node, BLOCKSIZE>		    myNodes;
+
+	//	Padding so tapes in a vector don't interfere
+    char                                myPad[64];
+
+    friend auto setNumResultsForAAD(const bool, const size_t);
+    friend struct numResultsResetterForAAD;
+	friend class Number;
 
 public:
 
-    //	Constructor allocates memory, throws if unsuccessful
-    MemoryBlock(const size_t size = DEFAULT_BLOCK_SIZE)
+    //  Build note in place and return a pointer
+	//	N : number of childs (arguments)
+    template <size_t N>
+    Node* recordNode()
     {
-        myBegin = (Ptr)malloc(size);
-        if (!myBegin) throw bad_alloc();
+        //  Construct the node in place on tape
+        Node* node = myNodes.emplace_back(N);
+        
+        //  Store and zero the adjoint(s)
+        if (multi)
+        {
+            node->pAdjoints = myAdjointsMulti.emplace_back_multi(Node::numAdj);
+            fill(node->pAdjoints, node->pAdjoints + Node::numAdj, 0.0);
+        }
 
-        myNext = myBegin;
-        myEnd = myBegin + size;
+		//	Store the derivatives and child adjoint pointers unless leaf
+		if constexpr(N)
+		{
+			node->pDerivatives = myDers.emplace_back_multi<N>();
+			node->pAdjPtrs = myArgPtrs.emplace_back_multi<N>();
+
+		}
+
+        return node;
     }
 
-    //	Provides the requested amount of memory if available or nullptr
-    template <size_t size>
-    Ptr requestMemory()
-    {
-        if (myNext + size > myEnd) return nullptr;
+	void resetAdjoints()
+	{
+		if (multi)
+		{
+			myAdjointsMulti.memset(0);
+		}
+		else
+		{
+			for (Node& node : myNodes)
+			{
+				node.mAdjoint = 0;
+			}
+		}
+	}
 
-        Ptr prevNext = myNext;
-        myNext += size;
-        return prevNext;
+    //  Clear
+    void clear()
+    {
+        myAdjointsMulti.clear();
+		myDers.clear();
+		myArgPtrs.clear();
+        myNodes.clear();
     }
 
-    //	Disable copy construction and assignment
-    MemoryBlock(const MemoryBlock& rhs) = delete;
-    MemoryBlock& operator=(const MemoryBlock& rhs) = delete;
-
-    //	But enable move semantics
-    MemoryBlock(MemoryBlock&& rhs)
-    {
-        myBegin = rhs.myBegin;
-        myNext = rhs.myNext;
-        myEnd = rhs.myEnd;
-        rhs.myBegin = rhs.myNext = rhs.myEnd = nullptr;
-    }
-    MemoryBlock& operator=(MemoryBlock&& rhs)
-    {
-        if (this == &rhs) return *this;
-        myBegin = rhs.myBegin;
-        myNext = rhs.myNext;
-        myEnd = rhs.myEnd;
-        rhs.myBegin = rhs.myNext = rhs.myEnd = nullptr;
-        return *this;
-    }
-
-    //	Release the block
-    void free()
-    {
-        if (myBegin) ::free(myBegin);
-        myBegin = nullptr;
-    }
-
-    //	Destructor frees the allocated memory
-    ~MemoryBlock() { free(); }
-
-    //	Rewind the block without freeing the memory
+    //  Rewind
     void rewind()
     {
-        myNext = myBegin;
+        if (multi)
+        {
+            myAdjointsMulti.rewind();
+        }
+		myDers.rewind();
+		myArgPtrs.rewind();
+		myNodes.rewind();
     }
 
-    //  Put a mark on the current position
-
-private:
-    
-    Ptr myMark;
-
-public:
-    
+    //  Set mark
     void mark()
     {
-        myMark = myNext;
+        if (multi)
+        {
+            myAdjointsMulti.setmark();
+        }
+		myDers.setmark();
+		myArgPtrs.setmark();
+		myNodes.setmark();
     }
 
     //  Rewind to mark
     void rewindToMark()
     {
-        myNext = myMark;
-    }
-};
-
-class Tape
-{
-    //	Memory blocks for the storage of tape entries
-    list<MemoryBlock> myBlocks;
-    //  Size of each block
-    size_t myBlockSize;		
-
-    //	In order to iterate through the tape in forward or reverse order, 
-    //      we need to keep a list of entries as they are constructed
-    //	We keep pointers to entries in a list of vectors (for efficiency) 
-    //      and provide iterators
-
-    //	Memory blocks for indices
-    //	List of vectors of pointers to allocated bits
-    list<vector<Node*>> myPointers;
-    //	Size of each vector 
-    size_t myVectorSize;
-
-    //  Current state = position 
-    struct State
-    {
-        //  block
-        list<MemoryBlock>::iterator block;
-        //  vector
-        list<vector<Node*>>::iterator vec;
-        //  position in vector
-        //  index of the next free slot in the current vector
-        size_t idx;
-    };
-    State myState;
-
-    //	Private methods
-
-    //	Create a new block
-    void newBlock()
-    {
-        myBlocks.push_back(MemoryBlock(myBlockSize));
-        
-        //  current = last
-        myState.block = myBlocks.end();
-        --myState.block;
-    }
-
-    //	Move to next block, if none create one
-    void nextBlock()
-    {
-        ++myState.block;
-        if (myState.block == myBlocks.end()) newBlock();
-    }
-
-    //	Create a new vector of pointers
-    void newVector()
-    {
-        myPointers.push_back(vector<Node*>(myVectorSize));
-        
-        //  current = last
-        myState.vec = myPointers.end();
-        --myState.vec;
-
-        //  set index (in vector) to 0
-        myState.idx = 0;
-    }
-
-    //	Move to next vector, if none create one
-    void nextVector()
-    {
-        ++myState.vec;
-        myState.idx = 0;
-        if (myState.vec == myPointers.end()) newVector();
-    }
-
-public:
-
-    Tape(const size_t blockSize = DEFAULT_BLOCK_SIZE,
-        const size_t vectorSize = DEFAULT_INDEX_SIZE)
-        :
-        myBlockSize(blockSize), myVectorSize(vectorSize)
-    {
-        //  Create one block on construction
-        myBlocks.push_back(MemoryBlock(blockSize));
-        myPointers.push_back(vector<Node*>(vectorSize));
-
-        //  Set state
-        myState.block = myBlocks.begin();
-        myState.vec = myPointers.begin();
-        myState.idx = 0;
-    }
-
-    //  Get memory, this is what we call in place of new/malloc/calloc
-    //  Note the is no free - all tape is released at once
-    //	We assume that the requested size is always smaller than the block size, otherwise will fail
-    template <size_t size>
-    inline Ptr allocate()
-    {
-        //  Get memory from current block
-        Ptr mem = myState.block->requestMemory<size>();
-
-        if (!mem) 
+        if (multi)
         {
-            //	Failed : try next block, create one if necessary, then retry
-            nextBlock();
-            mem = myState.block->requestMemory<size>();
-            //	If allocation failed, will have thrown by now, 
-            //      the only way it could have failed is if size > myBlockSize, 
-            //      which we assume never happens
+            myAdjointsMulti.rewind_to_mark();
         }
-
-        //	Register pointer to the node so we can iterate
-        (*myState.vec)[myState.idx++] = reinterpret_cast<Node*>(mem);
-        if (myState.idx == myVectorSize) nextVector();
-
-        return mem;
+		myDers.rewind_to_mark();
+		myArgPtrs.rewind_to_mark();
+		myNodes.rewind_to_mark();
     }
 
-    //	Rewind the tape without freeing the memory
-    void rewind()
-    {
-        //	Rewind all blocks
-        for (auto& block : myBlocks) block.rewind();
+    //  Iterators
+    
+    using iterator = blocklist<Node, BLOCKSIZE>::iterator;
 
-        //	Reset state
-        myState.block = myBlocks.begin();
-        myState.vec = myPointers.begin();
-        myState.idx = 0;
+    auto begin()
+    {
+        return myNodes.begin();
     }
 
-    //  Mark the current position
-private:
-    State myMark;
-public:
-    void mark()
+    auto end()
     {
-        myMark = myState;
-        //  Put a mark on the current block
-        myState.block->mark();
+        return myNodes.end();
     }
 
-    //	Rewind to mark
-    void rewindToMark()
+    auto markIt()
     {
-        //	Rewind all blocks after mark
-        
-        //  position on the block next to mark
-        auto it = myMark.block;
-        ++it;
-        //  rewind
-        while (it != myBlocks.end())
-        {
-            it->rewind();
-            ++it;
-        }
-
-        //  Rewind the marked block
-        myMark.block->rewindToMark();
-
-        //	Reset state
-        myState = myMark;
+        return myNodes.mark();
     }
 
-    //	Free all the allocated memory
-    void clear() 
+    auto find(Node* node)
     {
-
-        myBlocks.clear();
-        myPointers.clear();
-
-        //  Create one block so the tape is usable
-        myBlocks.push_back(MemoryBlock(myBlockSize));
-        myPointers.push_back(vector<Node*>(myVectorSize));
-
-        myState.block = myBlocks.begin();
-        myState.vec = myPointers.begin();
-        myState.idx = 0;
-    }
-
-    //  Tape iterators
-
-    class iterator
-    {
-        //  Vector and index
-        list<vector<Node*>>::iterator myVector;
-        size_t myIdx;
-
-    public:
-
-        //	Default constructor 
-        iterator() {}
-
-        //	Constructor 
-        iterator(const list<vector<Node*>>::iterator vec, 
-            const size_t idx)
-            : myVector(vec), myIdx(idx) {}
-
-        //	Pre-increment (we do not provide post)
-        iterator& operator++()
-        {
-            ++myIdx;
-            if (myIdx >= myVector->size()) 
-            {
-                ++myVector;
-                myIdx = 0;
-            }
-
-            return *this;
-        }
-
-        //	Pre-decrement 
-        iterator& operator--()
-        {
-            if (myIdx > 0) 
-            {
-                --myIdx;
-            }
-            else 
-            {
-                --myVector;
-                myIdx = myVector->size() - 1;
-            }
-
-            return *this;
-        }
-
-        //	Access to the node by dereferencing
-        Node& operator*()
-        {
-            return *(*myVector)[myIdx];
-        }
-        const Node& operator*() const
-        {
-            return *(*myVector)[myIdx];
-        }
-        Node* operator->()
-        {
-            return (*myVector)[myIdx];
-        }
-        const Node* operator->() const
-        {
-            return (*myVector)[myIdx];
-        }
-
-        //	Check equality
-        bool operator ==(const iterator& rhs) const
-        {
-            return (myIdx == rhs.myIdx && myVector == rhs.myVector);
-        }
-        bool operator !=(const iterator& rhs) const
-        {
-            return (myIdx != rhs.myIdx || myVector != rhs.myVector);
-        }
-    };
-
-    //  Basic iterator facilities
-    iterator begin()
-    {
-        return iterator(myPointers.begin(), 0);
-    }
-
-    iterator end()
-    {
-        return iterator(myState.vec, myState.idx);
-    }
-
-    //  Iterator on last
-    iterator back()
-    {
-        iterator it = end();
-        --it;
-        return it;
-    }
-
-    //  Iterator on mark
-    iterator markIt()
-    {
-        return iterator(myMark.vec, myMark.idx);
-    }
-
-    //  Find specific node, searching from the end
-    iterator find(Node* node)
-    {
-        //	Search from the end
-        iterator it = end();
-        iterator b = begin();
-
-        while (it != b) 
-        {
-            --it;
-            if (&*it == node) return it;
-        }
-
-        if (&*it == node) return it;
-
-        return end();
+        return myNodes.find(node);
     }
 };

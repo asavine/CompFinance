@@ -48,7 +48,7 @@ public:
     {
         return myEmpty
             ? convert<T>(0.0) 
-            : interp2D(myStrikes, myMats, mySpreads, strike, mat, true);
+            : interp2D<true>(myStrikes, myMats, mySpreads, strike, mat);
     }
 
     //  Accessors by const ref

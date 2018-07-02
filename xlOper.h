@@ -174,7 +174,6 @@ vector<string> to_strVector(const LPXLOPER12& oper)
     }
     else if (oper->xltype == xltypeMulti)
     {
-        vstr.resize(getRows(oper) * getCols(oper));
         for (size_t i = 0; i < getRows(oper); ++i) for (size_t j = 0; j < getCols(oper); ++j)
         {
             vstr.push_back(getString(oper, i, j));
@@ -260,4 +259,21 @@ LPXLOPER12 from_labelledMatrix(const vector<double>& rowLabels, const vector<dou
     for (size_t i = 0; i < n; ++i)  for (size_t j = 0; j < m; ++j) setNum(oper, mat[i][j], i + 1, j + 1);
 
     return oper;
+}
+
+LPXLOPER12 from_labelledMatrix(const vector<string>& rowLabels, const vector<string>& colLabels, const matrix<double>& mat,
+	const string& firstLineLabel, const vector<double>& firstLine)
+{
+	const size_t n = rowLabels.size(), m = colLabels.size();
+	if (n == 0 || m == 0 || n != mat.rows() || m != mat.cols() || m != firstLine.size()) return TempErr12(xlerrNA);
+
+	LPXLOPER12 oper = TempXLOPER12();
+	resize(oper, n + 2, m + 1);
+	setString(oper, firstLineLabel, 1, 0);
+	for (size_t i = 0; i < m; ++i) setString(oper, colLabels[i], 0, i + 1);
+	for (size_t i = 0; i < m; ++i) setNum(oper, firstLine[i], 1, i + 1);
+	for (size_t i = 0; i < n; ++i) setString(oper, rowLabels[i], i + 2, 0);
+	for (size_t i = 0; i < n; ++i)  for (size_t j = 0; j < m; ++j) setNum(oper, mat[i][j], i + 2, j + 1);
+
+	return oper;
 }
