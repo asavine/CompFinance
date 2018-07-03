@@ -591,8 +591,7 @@ LPXLOPER12 xDisplayRisk(
 
 extern "C" __declspec(dllexport)
  LPXLOPER12 xDupireCalib(
-    //  model parameters
-    const double ivsType, //  0: Bach, 1: BS, 2: Merton
+    //  Merton market parameters
     const double spot,
     const double vol,
     const double jmpIntens,
@@ -631,7 +630,6 @@ extern "C" __declspec(dllexport)
     }
 
     auto results = dupireCalib(vspots, maxDs, vtimes, maxDt,
-        ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
         spot, vol, jmpIntens, jmpAverage, jmpStd);
 
     //  Return
@@ -640,8 +638,7 @@ extern "C" __declspec(dllexport)
 
 extern "C" __declspec(dllexport)
  LPXLOPER12 xDupireSuperbucket(
-    //  model parameters
-    const double ivsType, //  0: Bach, 1: BS, 2: Merton
+    //  Merton market parameters
     const double spot,
     const double vol,
     const double jmpIntens,
@@ -728,7 +725,6 @@ extern "C" __declspec(dllexport)
                 maxDtVol,
                 vstrikes,
                 vmats,
-                ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
                 vol,
                 jmpIntens,
                 jmpAverage,
@@ -745,7 +741,6 @@ extern "C" __declspec(dllexport)
                 maxDtVol,
                 vstrikes,
                 vmats,
-                ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
                 vol,
                 jmpIntens,
                 jmpAverage,
@@ -786,6 +781,12 @@ extern "C" __declspec(dllexport)
 double xMerton(double spot, double vol, double mat, double strike, double intens, double meanJmp, double stdJmp)
 {
     return merton(spot, strike, vol, mat, intens, meanJmp, stdJmp);
+}
+
+extern "C" __declspec(dllexport)
+double xBarrierBlackScholes(double spot, double rate, double div, double vol, double mat, double strike, double barrier)
+{
+    return BlackScholesKO(spot, rate, div, strike, barrier, mat, vol);
 }
 
 //	Registers
@@ -978,9 +979,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"QBBBBBBK%K%K%BK%BBQQK%BBBBBB"),
+        (LPXLOPER12)TempStr12(L"QBBBBBK%K%K%BK%BBQQK%BBBBBB"),
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"ivsType, spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, productId, payoffs, notionals, sobol, s1, s2, numPth, parallel, [bump?]"),
+        (LPXLOPER12)TempStr12(L"spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, productId, payoffs, notionals, sobol, s1, s2, numPth, parallel, [bump?]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -990,9 +991,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireCalib"),
-        (LPXLOPER12)TempStr12(L"QBBBBBBK%BK%B"),
+        (LPXLOPER12)TempStr12(L"QBBBBBK%BK%B"),
         (LPXLOPER12)TempStr12(L"xDupireCalib"),
-        (LPXLOPER12)TempStr12(L"type, spot, vol, jumpIntensity, jumpAverage, jumpStd, spots, maxds, times, mxdt"),
+        (LPXLOPER12)TempStr12(L"spot, vol, jumpIntensity, jumpAverage, jumpStd, spots, maxds, times, mxdt"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -1012,6 +1013,18 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"Merton"),
         (LPXLOPER12)TempStr12(L""));
 
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xBarrierBlackScholes"),
+        (LPXLOPER12)TempStr12(L"BBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"xBarrierBlackScholes"),
+        (LPXLOPER12)TempStr12(L"spot, rate, div, vol, mat, strike, barrier"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Merton"),
+        (LPXLOPER12)TempStr12(L""));
+    
 	/* Free the XLL filename */
 	Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);
 

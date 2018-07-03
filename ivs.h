@@ -127,7 +127,7 @@ public:
         const T ckk = (c10 + c20 - 2.0 * c00) * 1.0e08;
         
         //  Dupire's formula
-        return sqrt(2.0 * ct / ckk);
+        return sqrt(2.0 * ct / ckk) / strike;
     }
 
     //  Virtual destructor needed for polymorphic class
@@ -135,38 +135,6 @@ public:
 };
 
 //  Concrete IVS just override (raw) call prices
-
-class BachelierIVS : public IVS
-{
-    double myBachVol;
-
-public:
-
-    BachelierIVS(const double spot, const double logVol)
-        : IVS(spot), myBachVol(logVol * spot) {}
-
-    double impliedVol(const double strike, const Time mat) const override
-    {
-        //  Bachelier formula in analytics.h
-        const double call = bachelier(spot(), strike, myBachVol, mat);
-        return blackScholesIvol(spot(), strike, call, mat);
-    }
-};
-
-class BlackScholesIVS : public IVS
-{
-    double myVol;
-
-public:
-
-    BlackScholesIVS(const double spot, const double vol)
-        : IVS(spot), myVol(vol) {}
-
-    double impliedVol(const double strike, const Time mat) const override
-    {
-        return myVol;
-    }
-};
 
 class MertonIVS : public IVS
 {

@@ -422,7 +422,6 @@ dupireCalib(
     const double maxDt,
     //  The IVS we calibrate to
     //  'B'achelier, Black'S'choles or 'M'erton
-    const char ivsType,
     const double spot,
     const double vol,
     const double jmpIntens = 0.0,
@@ -430,13 +429,10 @@ dupireCalib(
     const double jmpStd = 0.0)
 {
     //  Create IVS
-    auto ivs = ivsType == 'B' || ivsType == 'b'
-        ? unique_ptr<IVS>(new BachelierIVS(spot, vol))
-        : ivsType == 'S' || ivsType == 's'
-        ? unique_ptr<IVS>(new BlackScholesIVS(spot, vol))
-        : unique_ptr<IVS>(new MertonIVS(spot, vol, jmpIntens, jmpAverage, jmpStd));
+    MertonIVS ivs(spot, vol, jmpIntens, jmpAverage, jmpStd);
 
-    return dupireCalib(*ivs, inclSpots, maxDs, inclTimes, maxDt);
+    //  Go
+    return dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDt);
 }
 
 struct SuperbucketResults
@@ -471,8 +467,7 @@ inline auto
     //  Risk view
     const vector<double>&   strikes,
     const vector<Time>&     mats,
-    //  'B'achelier, Black'S'choles or 'M'erton
-    const char              ivsType,
+    //  Merton params
     const double            vol,
     const double            jmpIntens,
     const double            jmpAverage,
@@ -493,7 +488,6 @@ inline auto
         maxDs, 
         inclTimes, 
         maxDtVol, 
-        ivsType, 
         spot, 
         vol, 
         jmpIntens, 
@@ -523,18 +517,14 @@ inline auto
     //  Convert market inputs to numbers, put on tape
             
     //  Create IVS
-    auto ivs = ivsType == 'B' || ivsType == 'b'
-        ? unique_ptr<IVS>(new BachelierIVS(spot, vol))
-        : ivsType == 'S' || ivsType == 's'
-        ? unique_ptr<IVS>(new BlackScholesIVS(spot, vol))
-        : unique_ptr<IVS>(new MertonIVS(spot, vol, jmpIntens, jmpAverage, jmpStd));
+    MertonIVS ivs(spot, vol, jmpIntens, jmpAverage, jmpStd);
     
     //  Risk view --> that is the AAD input
     //  Note: that puts the view on tape
     RiskView<Number> riskView(strikes, mats);
 
     //  Calibrate again, in AAD mode, make tape
-    auto nParams = dupireCalib(*ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
+    auto nParams = dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
     matrix<Number>& nLvols = nParams.lVols;
 
     //  Seed local vol adjoints on tape with microbucket results
@@ -591,8 +581,7 @@ inline auto
         //  Risk view
         const vector<double>&   strikes,
         const vector<Time>&     mats,
-        //  'B'achelier, Black'S'choles or 'M'erton
-        const char              ivsType,
+        //  Merton params
         const double            vol,
         const double            jmpIntens,
         const double            jmpAverage,
@@ -609,7 +598,6 @@ inline auto
         maxDs,
         inclTimes,
         maxDtVol,
-        ivsType,
         spot,
         vol,
         jmpIntens,
@@ -645,11 +633,7 @@ inline auto
     results.value = inner_product(vnots.begin(), vnots.end(), baseVals.values.begin(), 0.0);
 
     //  Create IVS
-    auto ivs = ivsType == 'B' || ivsType == 'b'
-        ? unique_ptr<IVS>(new BachelierIVS(spot, vol))
-        : ivsType == 'S' || ivsType == 's'
-        ? unique_ptr<IVS>(new BlackScholesIVS(spot, vol))
-        : unique_ptr<IVS>(new MertonIVS(spot, vol, jmpIntens, jmpAverage, jmpStd));
+    MertonIVS ivs(spot, vol, jmpIntens, jmpAverage, jmpStd);
 
     //  Create risk view 
     RiskView<double> riskView(strikes, mats);
@@ -678,7 +662,7 @@ inline auto
         //  Bump
         riskView.bump(i, j, 1.0e-04);
         //  Recalibrate
-        auto bumpedCalib = dupireCalib(*ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
+        auto bumpedCalib = dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
         //  Recreate model
         Dupire<double> bumpedModel(spot, bumpedCalib.spots, bumpedCalib.times, bumpedCalib.lVols, maxDt);
         //  Reprice
