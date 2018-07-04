@@ -60,8 +60,8 @@ public:
     const matrix<T>& risks() const { return mySpreads; }
 
     //  Iterators
-    typedef typename matrix<T>::iterator iterator;
-    typedef typename matrix<T>::const_iterator const_iterator;
+    using iterator = typename matrix<T>::iterator;
+    using const_iterator = typename matrix<T>::const_iterator;
     iterator begin() { return mySpreads.begin(); }
     iterator end() { return mySpreads.end(); }
     const_iterator begin() const { return mySpreads.begin(); }

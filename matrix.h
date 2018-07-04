@@ -96,8 +96,8 @@ public:
     bool empty() const { return myVector.empty(); }
 
     //  Iterators
-    typedef typename vector<T>::iterator iterator;
-    typedef typename vector<T>::const_iterator const_iterator;
+    using iterator = typename vector<T>::iterator;
+    using const_iterator = typename vector<T>::const_iterator;
     iterator begin() { return myVector.begin(); }
     iterator end() { return myVector.end(); }
     const_iterator begin() const { return myVector.begin(); }
