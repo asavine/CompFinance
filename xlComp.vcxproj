@@ -190,7 +190,7 @@
     <ClInclude Include="xlmemorymanager.h" />
     <ClInclude Include="xlMemoryPool.h" />
     <ClInclude Include="store.h" />
-    <ClInclude Include="threadPool.h" />
+    <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="utility.h" />
     <ClInclude Include="xlcall.h" />
     <ClInclude Include="xlOper.h" />

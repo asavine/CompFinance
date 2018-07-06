@@ -27,9 +27,6 @@
     <ClInclude Include="xlcall.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="threadPool.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ConcurrentQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -103,6 +100,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="xlOper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

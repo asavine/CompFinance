@@ -28,7 +28,7 @@ As long as this comment is preserved at the top of the file
 using namespace std;
 
 #include "matrix.h"
-#include "threadPool.h"
+#include "ThreadPool.h"
 
 using Time = double;
 extern Time systemTime;

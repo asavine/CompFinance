@@ -13,7 +13,7 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
-#include "threadPool.h"
+#include "ThreadPool.h"
 
 ThreadPool ThreadPool::myInstance;
 
