@@ -48,7 +48,7 @@ public:
     {
         return myEmpty
             ? convert<T>(0.0) 
-            : interp2D<true>(myStrikes, myMats, mySpreads, strike, mat);
+            : interp2D(myStrikes, myMats, mySpreads, strike, mat, true);
     }
 
     //  Accessors by const ref
@@ -60,8 +60,8 @@ public:
     const matrix<T>& risks() const { return mySpreads; }
 
     //  Iterators
-    typedef typename matrix<T>::iterator iterator;
-    typedef typename matrix<T>::const_iterator const_iterator;
+    using iterator = typename matrix<T>::iterator;
+    using const_iterator = typename matrix<T>::const_iterator;
     iterator begin() { return mySpreads.begin(); }
     iterator end() { return mySpreads.end(); }
     const_iterator begin() const { return mySpreads.begin(); }
@@ -127,7 +127,7 @@ public:
         const T ckk = (c10 + c20 - 2.0 * c00) * 1.0e08;
         
         //  Dupire's formula
-        return sqrt(2.0 * ct / ckk) / strike;
+        return sqrt(2.0 * ct / ckk);
     }
 
     //  Virtual destructor needed for polymorphic class
@@ -135,6 +135,38 @@ public:
 };
 
 //  Concrete IVS just override (raw) call prices
+
+class BachelierIVS : public IVS
+{
+    double myBachVol;
+
+public:
+
+    BachelierIVS(const double spot, const double logVol)
+        : IVS(spot), myBachVol(logVol * spot) {}
+
+    double impliedVol(const double strike, const Time mat) const override
+    {
+        //  Bachelier formula in analytics.h
+        const double call = bachelier(spot(), strike, myBachVol, mat);
+        return blackScholesIvol(spot(), strike, call, mat);
+    }
+};
+
+class BlackScholesIVS : public IVS
+{
+    double myVol;
+
+public:
+
+    BlackScholesIVS(const double spot, const double vol)
+        : IVS(spot), myVol(vol) {}
+
+    double impliedVol(const double strike, const Time mat) const override
+    {
+        return myVol;
+    }
+};
 
 class MertonIVS : public IVS
 {

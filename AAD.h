@@ -16,8 +16,8 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
-//  AAD with expression templates
-#define AADET   true        
+#define AADET   true        //  AAD with expression templates
+#define AADETNV false       //  Non-virtual nodes (experimental)
 
 //  So we can instrument Gaussians like standard math functions
 #include "Gaussians.h"
@@ -32,34 +32,11 @@ As long as this comment is preserved at the top of the file
 
 #endif
 
-//	Globally set number of results (adjoints) on node and tape
-//	Get an object that resets to 1 on destruction
-
-struct numResultsResetterForAAD
-{
-	~numResultsResetterForAAD()
-	{
-		Tape::multi = false;
-		Node::numAdj = 1;
-	}
-};
-
-inline auto setNumResultsForAAD(const bool multi = false, const size_t numResults = 1)
-{
-	Tape::multi = multi;
-	Node::numAdj = numResults;
-	return make_unique<numResultsResetterForAAD>();
-}
-
-//	Put collection on tape
-
 template <class IT>
 inline void putOnTape(IT begin, IT end)
 {
     for_each(begin, end, [](Number& n) {n.putOnTape(); });
 }
-
-//	Converters
 
 template<class To, class From>
 struct Convert;

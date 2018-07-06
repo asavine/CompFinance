@@ -19,77 +19,97 @@ As long as this comment is preserved at the top of the file
 #include <exception>
 using namespace std;
 
-class Node 
+#if AADET && AADETNV
+
+struct Node
 {
-	friend class Tape;
-	friend class Number;
-	friend auto setNumResultsForAAD(const bool, const size_t);
-	friend struct numResultsResetterForAAD;
+    inline Node(const size_t N) :
+        n(N),
+        adjoint(0),
+        derivatives(reinterpret_cast<double*>((char*)(this) + sizeof(Node))),
+        argAdjoints(reinterpret_cast<double**>((char*)(this) + sizeof(Node) + N * sizeof(double)))
+    {}
 
-    //  Number of adjoints (results) to propagate, usually 1
-    static size_t   numAdj;
-
-    //  Number of childs (arguments)
     const size_t n;
+    double adjoint;
 
-    //  The adjoint(s) 
-	//	in single case, self held
-	double			mAdjoint = 0;
-	//	in multi case, held separately and accessed by pointer
-    double*         pAdjoints;  
+    double* derivatives;
+    double **argAdjoints;
 
-	//  Data lives in separate memory
-
-    //  the n derivatives to arguments,
-    double*         pDerivatives;    
-
-    //  the n pointers to the adjoints of arguments
-    double**        pAdjPtrs;
-
-public:
-
-    Node(const size_t N = 0) : n(N) {}
-
-    //  Access to adjoint(s)
-	//	single
-    double& adjoint() 
-{
-		return mAdjoint;
-	}
-	//	multi
-	double& adjoint(const size_t n) { return pAdjoints[n]; }
-    
-    //  Back-propagate adjoints to arguments adjoints
-
-    //  Single case
-    void propagateOne() 
-{
-		//  Nothing to propagate
-		if (!n || !mAdjoint) return;
-
-		for (size_t i = 0; i < n; ++i)
+    inline void propagate() const
     {
-			*(pAdjPtrs[i]) += pDerivatives[i] * mAdjoint;
-    }
-    }
-
-    //  Multi case
-    void propagateAll()
-{
-        //  No adjoint to propagate
-        if (!n || all_of(pAdjoints, pAdjoints + numAdj,
-            [](const double& x) { return !x; }))
-            return;
+        if (adjoint == 0.0) return;
 
         for (size_t i = 0; i < n; ++i)
-    {
-            double *adjPtrs = pAdjPtrs[i], ders = pDerivatives[i];
-
-            //  Vectorized!
-            for (size_t j = 0; j < numAdj; ++j)
         {
-                adjPtrs[j] += ders * pAdjoints[j];
+            *argAdjoints[i] += derivatives[i] * adjoint;
         }
     }
+};
+
+#else
+
+struct Node
+{
+    double adjoint = 0.0;
+
+    virtual void propagate() {}
+    virtual ~Node() {}
+};
+
+struct Leaf : public Node
+{
+    
+};
+
+struct UnaryNode : public Node
+{
+    double derivative;
+    Node* argument;
+
+    void propagate() override
+    {
+        if (adjoint == 0.0) return;
+        argument->adjoint += derivative * adjoint;
     }
 };
+
+struct BinaryNode : public Node
+{
+    double derivatives[2];
+    Node* arguments[2];
+
+    void propagate() override
+    {
+        if (adjoint == 0.0) return;
+        arguments[0]->adjoint += derivatives[0] * adjoint;
+        arguments[1]->adjoint += derivatives[1] * adjoint;
+    }
+};
+
+template <size_t N>
+struct MultiNode : public Node
+{
+    double derivatives[N];
+    Node* arguments[N];
+
+    void propagate() override
+    {
+        if (adjoint == 0.0) return;
+
+        //  The compiler should unroll the loop
+        for (int i = 0; i < N; ++i)
+        {
+            arguments[i]->adjoint += derivatives[i] * adjoint;
+        }
+    }
+};
+
+//  Specialization for leaf
+template<>
+struct MultiNode<0> : public Node
+{
+
+};
+
+#endif

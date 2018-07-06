@@ -31,7 +31,7 @@ class European : public Product<T>
     Time                mySettlementDate;
 
     vector<Time>        myTimeline;
-    vector<SimulDef>   myDataline;
+    vector<simulData>   myDataline;
 
     vector<string>      myLabels;
 
@@ -51,8 +51,6 @@ public:
 
         //  Dataline
         myDataline.resize(1);   //  only exercise date
-        //  Numeraire needed
-        myDataline[0].numeraire = true;
         //  Forward to settlement needed at exercise
         myDataline[0].forwardMats.push_back(settlementDate);
         //  Discount to settlement needed at exercise
@@ -90,7 +88,7 @@ public:
     }
 
     //  Dataline
-    const vector<SimulDef>& dataline() const override
+    const vector<simulData>& dataline() const override
     {
         return myDataline;
     }
@@ -104,7 +102,7 @@ public:
     //  Payoffs, maturity major
     void payoffs(
         //  path, one entry per time step (on the product timeline)
-        const Scenario<T>&          path,
+        const vector<scenario<T>>&  path,
         //  pre-allocated space for resulting payoffs
         vector<T>&                  payoffs)
             const override
@@ -125,7 +123,7 @@ class UOC : public Product<T>
     double              mySmooth;
     
     vector<Time>        myTimeline;
-    vector<SimulDef>   myDataline;
+    vector<simulData>   myDataline;
 
     vector<string>      myLabels;
 
@@ -169,14 +167,9 @@ public:
         myDataline.resize(n);
         for (size_t i = 0; i < n; ++i)
         {
-            //  Numeraire needed only on last step
-            myDataline[i].numeraire = false;
-
             //  spot(t) = forward (t, t) needed on every step
             myDataline[i].forwardMats.push_back(myTimeline[i]);
         }
-        //  Numeraire needed only on last step
-        myDataline.back().numeraire = true;
 
         //
 
@@ -206,7 +199,7 @@ public:
     }
 
     //  Dataline
-    const vector<SimulDef>& dataline() const override
+    const vector<simulData>& dataline() const override
     {
         return myDataline;
     }
@@ -220,7 +213,7 @@ public:
     //  Payoff
     void payoffs(
         //  path, one entry per time step (on the product timeline)
-        const Scenario<T>&          path,
+        const vector<scenario<T>>&  path,
         //  pre-allocated space for resulting payoffs
         vector<T>&                  payoffs)
             const override
@@ -265,7 +258,7 @@ class Europeans : public Product<T>
 {
     vector<Time>            myMaturities;   //  = timeline
     vector<vector<double>>  myStrikes;      //  a vector of strikes per maturity
-    vector<SimulDef>       myDataline;
+    vector<simulData>       myDataline;
 
     vector<string>          myLabels;
 
@@ -283,11 +276,10 @@ public:
             myStrikes.push_back(p.second);
         }
 
-        //  Dataline = num and spot(t) = forward(t,t) on every step
+        //  Dataline = spot(t) = forward(t,t) one every step
         myDataline.resize(n);
         for (size_t i = 0; i < n; ++i)
         {
-            myDataline[i].numeraire = true;
             myDataline[i].forwardMats.push_back(myMaturities[i]);
         }
 
@@ -329,7 +321,7 @@ public:
     }
 
     //  Dataline
-    const vector<SimulDef>& dataline() const override
+    const vector<simulData>& dataline() const override
     {
         return myDataline;
     }
@@ -343,7 +335,7 @@ public:
     //  Payoffs, maturity major
     void payoffs(
         //  path, one entry per time step (on the product timeline)
-        const Scenario<T>&          path,
+        const vector<scenario<T>>&  path,
         //  pre-allocated space for resulting payoffs
         vector<T>&                  payoffs)
         const override
@@ -377,7 +369,7 @@ class ContingentBond : public Product<T>
     double              mySmooth;
 
     vector<Time>        myTimeline;
-    vector<SimulDef>   myDataline;
+    vector<simulData>   myDataline;
 
     vector<string>      myLabels;
 
@@ -438,11 +430,8 @@ public:
             if (i < n - 1)
             {
                 myDataline[i].liborDefs.push_back(
-                    SimulDef::RateDef(myTimeline[i], myTimeline[i + 1], "libor"));
+                    simulData::rateDef(myTimeline[i], myTimeline[i + 1], "libor"));
             }
-
-            //  Numeraire needed only on every step but first
-            myDataline[i].numeraire = i > 0;
         }
 
         //  Identify the product
@@ -466,7 +455,7 @@ public:
     }
 
     //  Dataline
-    const vector<SimulDef>& dataline() const override
+    const vector<simulData>& dataline() const override
     {
         return myDataline;
     }
@@ -480,7 +469,7 @@ public:
     //  Payoff
     void payoffs(
         //  path, one entry per time step (on the product timeline)
-        const Scenario<T>&          path,
+        const vector<scenario<T>>&  path,
         //  pre-allocated space for resulting payoffs
         vector<T>&                  payoffs)
         const override

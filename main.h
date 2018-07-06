@@ -248,70 +248,10 @@ inline auto AADriskAggregate(
     return results;
 }
 
-//  Returns a vector of values and a matrix of risks 
+//  Returns a matrix of risks 
 //      with payoffs in columns and parameters in rows
 //      along with ids of payoffs and parameters
-
-struct RiskReports
-{
-    vector<string> payoffs;
-    vector<string> params;
-    vector<double> values;
-    matrix<double> risks;
-};
-
-inline RiskReports AADriskMulti(
-    const string&           modelId,
-    const string&           productId,
-    const NumericalParam&   num)
-{
-    const Model<Number>* model = getModel<Number>(modelId);
-    const Product<Number>* product = getProduct<Number>(productId);
-
-    if (!model || !product)
-    {
-        throw runtime_error("AADrisk() : Could not retrieve model and product");
-    }
-
-    RiskReports results;
-
-    //  Random Number Generator
-    unique_ptr<RNG> rng;
-    if (num.useSobol) rng = make_unique<Sobol>();
-    else rng = make_unique<mrg32k3a>(num.seed1, num.seed2);
-
-    //  Simulate
-    const auto simulResults = num.parallel
-		? mcParallelSimulAADMulti(*product, *model, *rng, num.numPath)
-        : mcSimulAADMulti(*product, *model, *rng, num.numPath);
-
-    results.params = model->parameterLabels();
-    results.payoffs = product->payoffLabels();
-	results.risks = move(simulResults.risks);
-
-	//	Average values across paths
-	const size_t nPayoffs = product->payoffLabels().size();
-	results.values.resize(nPayoffs);
-	for (size_t i = 0; i < nPayoffs; ++i)
-	{
-		results.values[i] = accumulate(
-			simulResults.payoffs.begin(),
-			simulResults.payoffs.end(),
-			0.0,
-			[i](const double acc, const vector<double>& v) { return acc + v[i]; }
-		) / num.numPath;
-	}
-
-    return results;
-}
-
-//  Returns a vector of values and a matrix of risks 
-//      with payoffs in columns and parameters in rows
-//      along with ids of payoffs and parameters
-
-//  Same format as AADriskMulti
-
-inline RiskReports bumpRisk(
+inline auto bumpRisk(
     const string&           modelId,
     const string&           productId,
     const NumericalParam&   num)
@@ -324,13 +264,17 @@ inline RiskReports bumpRisk(
         throw runtime_error("bumpRisk() : Could not retrieve model and product");
     }
 
-    RiskReports results;
+    struct
+    {
+        vector<string> payoffs;
+        vector<string> params;
+        matrix<double> risks;
+    } results;
 
     //  base values
     auto baseRes = value(*orig, *product, num);
     results.payoffs = baseRes.identifiers;
-	results.values = baseRes.values;
-
+    
     //  make copy so we don't modify the model in memory
     auto model = orig->clone();
     
@@ -422,6 +366,7 @@ dupireCalib(
     const double maxDt,
     //  The IVS we calibrate to
     //  'B'achelier, Black'S'choles or 'M'erton
+    const char ivsType,
     const double spot,
     const double vol,
     const double jmpIntens = 0.0,
@@ -429,10 +374,13 @@ dupireCalib(
     const double jmpStd = 0.0)
 {
     //  Create IVS
-    MertonIVS ivs(spot, vol, jmpIntens, jmpAverage, jmpStd);
+    auto ivs = ivsType == 'B' || ivsType == 'b'
+        ? unique_ptr<IVS>(new BachelierIVS(spot, vol))
+        : ivsType == 'S' || ivsType == 's'
+        ? unique_ptr<IVS>(new BlackScholesIVS(spot, vol))
+        : unique_ptr<IVS>(new MertonIVS(spot, vol, jmpIntens, jmpAverage, jmpStd));
 
-    //  Go
-    return dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDt);
+    return dupireCalib(*ivs, inclSpots, maxDs, inclTimes, maxDt);
 }
 
 struct SuperbucketResults
@@ -467,7 +415,8 @@ inline auto
     //  Risk view
     const vector<double>&   strikes,
     const vector<Time>&     mats,
-    //  Merton params
+    //  'B'achelier, Black'S'choles or 'M'erton
+    const char              ivsType,
     const double            vol,
     const double            jmpIntens,
     const double            jmpAverage,
@@ -488,6 +437,7 @@ inline auto
         maxDs, 
         inclTimes, 
         maxDtVol, 
+        ivsType, 
         spot, 
         vol, 
         jmpIntens, 
@@ -517,14 +467,18 @@ inline auto
     //  Convert market inputs to numbers, put on tape
             
     //  Create IVS
-    MertonIVS ivs(spot, vol, jmpIntens, jmpAverage, jmpStd);
+    auto ivs = ivsType == 'B' || ivsType == 'b'
+        ? unique_ptr<IVS>(new BachelierIVS(spot, vol))
+        : ivsType == 'S' || ivsType == 's'
+        ? unique_ptr<IVS>(new BlackScholesIVS(spot, vol))
+        : unique_ptr<IVS>(new MertonIVS(spot, vol, jmpIntens, jmpAverage, jmpStd));
     
     //  Risk view --> that is the AAD input
     //  Note: that puts the view on tape
     RiskView<Number> riskView(strikes, mats);
 
     //  Calibrate again, in AAD mode, make tape
-    auto nParams = dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
+    auto nParams = dupireCalib(*ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
     matrix<Number>& nLvols = nParams.lVols;
 
     //  Seed local vol adjoints on tape with microbucket results
@@ -537,7 +491,7 @@ inline auto
     }
     
     //  Propagate
-    Number::propagateAdjoints(prev(tape->end()), tape->begin());
+    Number::propagateAdjoints(tape->back(), tape->begin());
 
     //  Results: superbucket = risk view
 
@@ -581,7 +535,8 @@ inline auto
         //  Risk view
         const vector<double>&   strikes,
         const vector<Time>&     mats,
-        //  Merton params
+        //  'B'achelier, Black'S'choles or 'M'erton
+        const char              ivsType,
         const double            vol,
         const double            jmpIntens,
         const double            jmpAverage,
@@ -598,6 +553,7 @@ inline auto
         maxDs,
         inclTimes,
         maxDtVol,
+        ivsType,
         spot,
         vol,
         jmpIntens,
@@ -633,7 +589,11 @@ inline auto
     results.value = inner_product(vnots.begin(), vnots.end(), baseVals.values.begin(), 0.0);
 
     //  Create IVS
-    MertonIVS ivs(spot, vol, jmpIntens, jmpAverage, jmpStd);
+    auto ivs = ivsType == 'B' || ivsType == 'b'
+        ? unique_ptr<IVS>(new BachelierIVS(spot, vol))
+        : ivsType == 'S' || ivsType == 's'
+        ? unique_ptr<IVS>(new BlackScholesIVS(spot, vol))
+        : unique_ptr<IVS>(new MertonIVS(spot, vol, jmpIntens, jmpAverage, jmpStd));
 
     //  Create risk view 
     RiskView<double> riskView(strikes, mats);
@@ -662,7 +622,7 @@ inline auto
         //  Bump
         riskView.bump(i, j, 1.0e-04);
         //  Recalibrate
-        auto bumpedCalib = dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
+        auto bumpedCalib = dupireCalib(*ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
         //  Recreate model
         Dupire<double> bumpedModel(spot, bumpedCalib.spots, bumpedCalib.times, bumpedCalib.lVols, maxDt);
         //  Reprice

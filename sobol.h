@@ -58,10 +58,7 @@ class Sobol : public RNG
     matrix<unsigned long>	    myDirectionIntegers;
 
     //	Cached Uniforms
-	//  The current numbers, as integers
-    vector<unsigned long>	    myIntegerSequence;  
-	//	The uniforms
-	vector<double>				myUniforms;
+    vector<unsigned long>	    myIntegerSequence;  //  The current numbers, as integers
 
     //  The current point number
     unsigned long				mySimCount;
@@ -160,7 +157,6 @@ public:
 
         //	Resize
         myIntegerSequence.resize(myDim);
-		myUniforms.resize(myDim);
     }
 
     void reset()
@@ -195,8 +191,10 @@ public:
         }
         if (!gaussVec.empty())
         {
-			transform(myIntegerSequence.begin(), myIntegerSequence.end(), myUniforms.begin(), [](const auto& i) {return ONEOVER2POW32 * i; });
-			transform(myUniforms.begin(), myUniforms.end(), gaussVec.begin(), invNormalCdf);
+            for (int i = 0; i < myDim; ++i)
+            {
+                gaussVec[i] = invNormalCdf(ONEOVER2POW32 * myIntegerSequence[i]);
+            }
         }
 
         //	Update count
