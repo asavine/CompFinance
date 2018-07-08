@@ -157,13 +157,15 @@ public:
 
         //	Resize
         myIntegerSequence.resize(myDim);
+
+        //  Set initial state
+        reset();
     }
 
     void reset()
     {
         //  Generate the first point
-        unsigned i;
-        for (i = 0; i<myDim; ++i)
+        for (unsigned i = 0; i<myDim; ++i)
         {
             myIntegerSequence[i] = myDirectionIntegers[i][0];
         }
@@ -211,9 +213,7 @@ public:
     void skipTo(const long b) override
     {
         //	Check skip
-        if (b <= 0) return;
-
-        reset();
+        if (!b) return;
 
         //	Reset Sobol to entry 0 
         //  (not 1, hence must reset even though reset has already been called in init)
