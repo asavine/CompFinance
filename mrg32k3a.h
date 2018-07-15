@@ -38,7 +38,7 @@ class mrg32k3a : public RNG
         //  Compute uniform
         const double u = x > y ? double((x - y) % m1) / m1 : double((x + m1 - y) % m1) / m1;
         //  Return Gaussian
-        return invNormalCdf(u);
+        return u;
     }
 
 public:
@@ -68,9 +68,14 @@ public:
         myDim = simDim;
     }
 
+	void nextU(vector<double>& uVec) override
+	{
+		for (size_t i = 0; i < myDim; ++i) uVec[i] = nextNumber();
+	}
+
     void nextG(vector<double>& gaussVec) override
     {
-        for (size_t i = 0; i < myDim; ++i) gaussVec[i] = nextNumber();
+        for (size_t i = 0; i < myDim; ++i) gaussVec[i] = invNormalCdf(nextNumber());
     }
 
     //  Access dimension

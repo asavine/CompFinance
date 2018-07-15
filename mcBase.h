@@ -182,9 +182,10 @@ public:
     //  Initialise with dimension simDim
     virtual void init(const size_t simDim) = 0;
 
-    //  Compute the next vector[simDim] of independent Gaussians
+    //  Compute the next vector[simDim] of independent Uniforms or Gaussians
     //  The vector is filled by the function and must be pre-allocated
-    virtual void nextG(vector<double>& gaussVec) = 0;
+	virtual void nextU(vector<double>& uVec) = 0;
+	virtual void nextG(vector<double>& gaussVec) = 0;
 
     virtual unique_ptr<RNG> clone() const = 0;
 

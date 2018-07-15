@@ -175,32 +175,39 @@ public:
     }
 	
 	//	next point
-    void nextG(vector<double>& gaussVec) override
+	void next() 
+	{
+		//	For the n'th draw use the gray code
+		unsigned long n = mySimCount;
+		unsigned int  j = 0;
+		while (n & 1)
+		{
+			n >>= 1;
+			++j;
+		}
+
+		//	XOR the appropriate direction number into each component of the integer sequence
+		for (int i = 0; i<myDim; ++i)
+		{
+			myIntegerSequence[i] ^= myDirectionIntegers[i][j];
+		}
+
+		//	Update count
+		++mySimCount;
+	}
+
+	void nextU(vector<double>& uVec) override
+	{
+		next();
+		transform(myIntegerSequence.begin(), myIntegerSequence.end(), uVec.begin(), 
+			[](const unsigned long i) {return ONEOVER2POW32 * i; });
+	}
+
+	void nextG(vector<double>& gaussVec) override
     {
-        //	For the n'th draw use the gray code
-        unsigned long n = mySimCount;
-        unsigned int  j = 0;
-        while (n & 1)
-        {
-            n >>= 1;
-            ++j;
-        }
-
-        //	XOR the appropriate direction number into each component of the integer sequence
-        for (int i = 0; i<myDim; ++i)
-        {
-            myIntegerSequence[i] ^= myDirectionIntegers[i][j];
-        }
-        if (!gaussVec.empty())
-        {
-            for (int i = 0; i < myDim; ++i)
-            {
-                gaussVec[i] = invNormalCdf(ONEOVER2POW32 * myIntegerSequence[i]);
-            }
-        }
-
-        //	Update count
-        ++mySimCount;
+		next();
+		transform(myIntegerSequence.begin(), myIntegerSequence.end(), gaussVec.begin(),
+			[](const unsigned long i) {return invNormalCdf(ONEOVER2POW32 * i); });
     }
 
     //  Access dimension
@@ -243,7 +250,7 @@ public:
 
         //	Update next entry
         mySimCount = unsigned long(b);
-        nextG(vector<double>());
+        next();
     }
 };
 
