@@ -146,13 +146,6 @@ inline double BlackScholesKO(
     const double d2 = (log(spot / barrier) + v * mat) / std;
     const double d2prime = (log(barrier / spot) + v * mat) / std;
 
-    /*
-    const double bar = fwd * (normalCdf(d1(fwd, strike, std)) - normalCdf(d1(fwd, barrier, std)))
-        + barrier * (normalCdf(-d1(barrier*barrier, fwd*strike, std)) - normalCdf(-d1(barrier, fwd, std)))
-        + strike * (-normalCdf(d2(fwd, strike, std)) + normalCdf(d2(fwd, barrier, std)))
-        - (fwd * strike / barrier) * (normalCdf(-d2(barrier*barrier, fwd*strike, std)) - normalCdf(-d2(barrier, fwd, std)));
-    */
-
     const double bar = blackScholes(fwd, strike, vol, mat)
         - blackScholes(fwd, barrier, vol, mat)
         - (barrier - strike) * normalCdf(d2)

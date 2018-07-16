@@ -92,14 +92,13 @@
     <ClInclude Include="xlOper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-<<<<<<< HEAD
     <ClInclude Include="ThreadPool.h">
-=======
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="blocklist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="AADTape.h">
->>>>>>> parent of 8640852... Merge branch 'master' of https://github.com/asavine/CompFinance
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
