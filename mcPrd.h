@@ -31,7 +31,7 @@ class European : public Product<T>
     Time                mySettlementDate;
 
     vector<Time>        myTimeline;
-    vector<SimulDef>   myDataline;
+    vector<SampleDef>   myDefline;
 
     vector<string>      myLabels;
 
@@ -49,14 +49,14 @@ public:
         //  Timeline = { exercise date }
         myTimeline.push_back(exerciseDate);
 
-        //  Dataline
-        myDataline.resize(1);   //  only exercise date
+        //  Defline
+        myDefline.resize(1);   //  only exercise date
         //  Numeraire needed
-        myDataline[0].numeraire = true;
+        myDefline[0].numeraire = true;
         //  Forward to settlement needed at exercise
-        myDataline[0].forwardMats.push_back(settlementDate);
+        myDefline[0].forwardMats.push_back(settlementDate);
         //  Discount to settlement needed at exercise
-        myDataline[0].discountMats.push_back(settlementDate);
+        myDefline[0].discountMats.push_back(settlementDate);
 
         //  Identify the product
         ostringstream ost;
@@ -89,10 +89,10 @@ public:
         return myTimeline;
     }
 
-    //  Dataline
-    const vector<SimulDef>& dataline() const override
+    //  Defline
+    const vector<SampleDef>& defline() const override
     {
-        return myDataline;
+        return myDefline;
     }
 
     //  Labels
@@ -125,7 +125,7 @@ class UOC : public Product<T>
     double              mySmooth;
     
     vector<Time>        myTimeline;
-    vector<SimulDef>   myDataline;
+    vector<SampleDef>   myDefline;
 
     vector<string>      myLabels;
 
@@ -163,20 +163,20 @@ public:
 
         //
 
-        //  Dataline
+        //  Defline
 
         const size_t n = myTimeline.size();
-        myDataline.resize(n);
+        myDefline.resize(n);
         for (size_t i = 0; i < n; ++i)
         {
             //  Numeraire needed only on last step
-            myDataline[i].numeraire = false;
+            myDefline[i].numeraire = false;
 
             //  spot(t) = forward (t, t) needed on every step
-            myDataline[i].forwardMats.push_back(myTimeline[i]);
+            myDefline[i].forwardMats.push_back(myTimeline[i]);
         }
         //  Numeraire needed only on last step
-        myDataline.back().numeraire = true;
+        myDefline.back().numeraire = true;
 
         //
 
@@ -205,10 +205,10 @@ public:
         return myTimeline;
     }
 
-    //  Dataline
-    const vector<SimulDef>& dataline() const override
+    //  Defline
+    const vector<SampleDef>& defline() const override
     {
-        return myDataline;
+        return myDefline;
     }
 
     //  Labels
@@ -265,7 +265,7 @@ class Europeans : public Product<T>
 {
     vector<Time>            myMaturities;   //  = timeline
     vector<vector<double>>  myStrikes;      //  a vector of strikes per maturity
-    vector<SimulDef>       myDataline;
+    vector<SampleDef>       myDefline;
 
     vector<string>          myLabels;
 
@@ -283,12 +283,12 @@ public:
             myStrikes.push_back(p.second);
         }
 
-        //  Dataline = num and spot(t) = forward(t,t) on every step
-        myDataline.resize(n);
+        //  Defline = num and spot(t) = forward(t,t) on every step
+        myDefline.resize(n);
         for (size_t i = 0; i < n; ++i)
         {
-            myDataline[i].numeraire = true;
-            myDataline[i].forwardMats.push_back(myMaturities[i]);
+            myDefline[i].numeraire = true;
+            myDefline[i].forwardMats.push_back(myMaturities[i]);
         }
 
         //  Identify the payoffs
@@ -328,10 +328,10 @@ public:
         return myMaturities;
     }
 
-    //  Dataline
-    const vector<SimulDef>& dataline() const override
+    //  Defline
+    const vector<SampleDef>& defline() const override
     {
-        return myDataline;
+        return myDefline;
     }
 
     //  Labels
@@ -377,7 +377,7 @@ class ContingentBond : public Product<T>
     double              mySmooth;
 
     vector<Time>        myTimeline;
-    vector<SimulDef>   myDataline;
+    vector<SampleDef>   myDefline;
 
     vector<string>      myLabels;
 
@@ -420,7 +420,7 @@ public:
 
         //
 
-        //  Dataline
+        //  Defline
 
         //  Payoff = sum { (libor(Ti, Ti+1) + cpn) * coverage(Ti, Ti+1) only if Si+1 >= Si }
         //  We need spot ( = forward (Ti, Ti) ) on every step,
@@ -428,21 +428,21 @@ public:
         //  (coverage is assumed act/365)
 
         const size_t n = myTimeline.size();
-        myDataline.resize(n);
+        myDefline.resize(n);
         for (size_t i = 0; i < n; ++i)
         {
             //  spot(Ti) = forward (Ti, Ti) needed on every step
-            myDataline[i].forwardMats.push_back(myTimeline[i]);
+            myDefline[i].forwardMats.push_back(myTimeline[i]);
 
             //  libor(Ti, Ti+1) and discount (Ti, Ti+1) needed on every step but last
             if (i < n - 1)
             {
-                myDataline[i].liborDefs.push_back(
-                    SimulDef::RateDef(myTimeline[i], myTimeline[i + 1], "libor"));
+                myDefline[i].liborDefs.push_back(
+                    SampleDef::RateDef(myTimeline[i], myTimeline[i + 1], "libor"));
             }
 
             //  Numeraire needed only on every step but first
-            myDataline[i].numeraire = i > 0;
+            myDefline[i].numeraire = i > 0;
         }
 
         //  Identify the product
@@ -465,10 +465,10 @@ public:
         return myTimeline;
     }
 
-    //  Dataline
-    const vector<SimulDef>& dataline() const override
+    //  Defline
+    const vector<SampleDef>& defline() const override
     {
-        return myDataline;
+        return myDefline;
     }
 
     //  Labels

@@ -22,8 +22,8 @@ class BlackScholes : public Model<T>
     //  Similuation timeline = today + product timeline
     vector<Time>        myTimeline;
     bool                myTodayOnTimeline;  //  Is today on product timeline?
-    //  The pruduct's dataline byref
-    const vector<SimulDef>*    myDataline;
+    //  The pruduct's defline byref
+    const vector<SampleDef>*    myDefline;
 
     //  Pre-calculated on initialization
 
@@ -127,7 +127,7 @@ public:
     }
 
     //  Initialize timeline
-    void allocate(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
+    void allocate(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
     {
         //  Simulation timeline = today + product timeline
         myTimeline.clear();
@@ -140,8 +140,8 @@ public:
         //  Mark steps on timeline that are on the product timeline
         myTodayOnTimeline = (productTimeline[0] == systemTime);
 
-        //  Take a reference on the product's dataline
-        myDataline = &dataline;
+        //  Take a reference on the product's defline
+        myDefline = &defline;
 
         //  Allocate the standard devs and drifts over simulation timeline
         myStds.resize(myTimeline.size() - 1);
@@ -154,23 +154,23 @@ public:
         myDiscounts.resize(n);
         for (size_t j = 0; j < n; ++j)
         {
-            myDiscounts[j].resize(dataline[j].discountMats.size());
+            myDiscounts[j].resize(defline[j].discountMats.size());
         }
 
         myForwardFactors.resize(n);
         for (size_t j = 0; j < n; ++j)
         {
-            myForwardFactors[j].resize(dataline[j].forwardMats.size());
+            myForwardFactors[j].resize(defline[j].forwardMats.size());
         }
 
         myLibors.resize(n);
         for (size_t j = 0; j < n; ++j)
         {
-            myLibors[j].resize(dataline[j].liborDefs.size());
+            myLibors[j].resize(defline[j].liborDefs.size());
         }
     }
 
-    void init(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
+    void init(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
     {
         //  Pre-compute the standard devs and drifts over simulation timeline        
         const T mu = myRate - myDiv;
@@ -204,7 +204,7 @@ public:
         for (size_t i = 0; i < m; ++i)
         {
             //  Numeraire
-            if (dataline[i].numeraire)
+            if (defline[i].numeraire)
             {
                 //  Under the spot measure, the numeraire is the spot with reinvested dividend
                 //      num(t) = spot(t) / spot(0) * exp(div * t)
@@ -224,30 +224,30 @@ public:
         for (size_t i = 0; i < m; ++i)
         {
             //  Discount factors
-            const size_t p = dataline[i].discountMats.size();
+            const size_t p = defline[i].discountMats.size();
             for (size_t j = 0; j < p; ++j)
             {
-                myDiscounts[i][j] = exp(-myRate * (dataline[i].discountMats[j] - productTimeline[i]));
+                myDiscounts[i][j] = exp(-myRate * (defline[i].discountMats[j] - productTimeline[i]));
             }
         }
 
         for (size_t i = 0; i < m; ++i)
         {
             //  Forward factors
-            const size_t p = dataline[i].forwardMats.size();
+            const size_t p = defline[i].forwardMats.size();
             for (size_t j = 0; j < p; ++j)
             {
-                myForwardFactors[i][j] = exp(mu * (dataline[i].forwardMats[j] - productTimeline[i]));
+                myForwardFactors[i][j] = exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
             }
         }
 
         for (size_t i = 0; i < m; ++i)
         {
             //  Libors
-            const size_t p = dataline[i].liborDefs.size();
+            const size_t p = defline[i].liborDefs.size();
             for (size_t j = 0; j < p; ++j)
             {
-                const double dt = dataline[i].liborDefs[j].end - dataline[i].liborDefs[j].start;
+                const double dt = defline[i].liborDefs[j].end - defline[i].liborDefs[j].start;
                 myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
             }
         }
@@ -268,7 +268,7 @@ private:
         Sample<T>&      scen   //  Sample to fill
     ) const
     {
-        if ((*myDataline)[idx].numeraire)
+        if ((*myDefline)[idx].numeraire)
         {
         scen.numeraire = myNumeraires[idx];
             if (mySpotMeasure) scen.numeraire *= spot;

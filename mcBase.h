@@ -33,9 +33,9 @@ using namespace std;
 using Time = double;
 extern Time systemTime;
 
-//  SimulDef = definition 
+//  SampleDef = definition 
 //      of what data must be simulated
-struct SimulDef
+struct SampleDef
 {
     //  need numeraire?
     bool            numeraire = true;
@@ -66,8 +66,8 @@ struct Sample
     vector<T>   discounts;
     vector<T>   libors;
 
-    //  Allocate given SimulDef
-    void allocate(const SimulDef& data)
+    //  Allocate given SampleDef
+    void allocate(const SampleDef& data)
     {
         forwards.resize(data.forwardMats.size());
         discounts.resize(data.discountMats.size());
@@ -87,12 +87,12 @@ template <class T>
 using Scenario = vector<Sample<T>>;
 
 template <class T>
-inline void allocatePath(const vector<SimulDef>& dataline, Scenario<T>& path)
+inline void allocatePath(const vector<SampleDef>& defline, Scenario<T>& path)
 {
-    path.resize(dataline.size());
-    for (size_t i = 0; i < dataline.size(); ++i)
+    path.resize(defline.size());
+    for (size_t i = 0; i < defline.size(); ++i)
     {
-        path[i].allocate(dataline[i]);
+        path[i].allocate(defline[i]);
     }
 }
 
@@ -108,9 +108,9 @@ class Product
 public:
 
     //  Access to the product timeline
-    //      along with the necessary SimulDef
+    //      along with the necessary SampleDef
     virtual const vector<Time>& timeline() const = 0;
-    virtual const vector<SimulDef>& dataline() const = 0;
+    virtual const vector<SampleDef>& defline() const = 0;
 
     //  Number of payoffs in the product, 1 by default
     virtual const vector<string>& payoffLabels() const = 0;
@@ -134,8 +134,8 @@ class Model
 public:
 
     //  Initialize with product timeline
-    virtual void allocate(const vector<Time>& prdTimeline, const vector<SimulDef>& prdDataline) = 0;
-    virtual void init(const vector<Time>& prdTimeline, const vector<SimulDef>& prdDataline) = 0;
+    virtual void allocate(const vector<Time>& prdTimeline, const vector<SampleDef>& prdDefline) = 0;
+    virtual void init(const vector<Time>& prdTimeline, const vector<SampleDef>& prdDefline) = 0;
 
     //  Access to the MC dimension
     virtual size_t simDim() const = 0;
@@ -222,15 +222,15 @@ inline vector<vector<double>> mcSimul(
     const size_t nPay = prd.payoffLabels().size();
     vector<vector<double>> results(nPath, vector<double>(nPay));
     //  Init the simulation timeline
-    cMdl->allocate(prd.timeline(), prd.dataline());
-    cMdl->init(prd.timeline(), prd.dataline());              
+    cMdl->allocate(prd.timeline(), prd.defline());
+    cMdl->init(prd.timeline(), prd.defline());              
     //  Init the RNG
     cRng->init(cMdl->simDim());                        
     //  Allocate Gaussian vector
     vector<double> gaussVec(cMdl->simDim());           
     //  Allocate path
     Scenario<double> path;
-    allocatePath(prd.dataline(), path);
+    allocatePath(prd.defline(), path);
     initializePath(path);
 
     //	Iterate through paths	
@@ -260,8 +260,8 @@ inline vector<vector<double>> mcParallelSimul(
     const size_t nPay = prd.payoffLabels().size();
     vector<vector<double>> results(nPath, vector<double>(nPay));
 
-    cMdl->allocate(prd.timeline(), prd.dataline());
-    cMdl->init(prd.timeline(), prd.dataline());
+    cMdl->allocate(prd.timeline(), prd.defline());
+    cMdl->init(prd.timeline(), prd.defline());
 
     //  Allocate space for Gaussian vectors and paths, 
     //      one for each thread
@@ -272,7 +272,7 @@ inline vector<vector<double>> mcParallelSimul(
     for (auto& vec : gaussVecs) vec.resize(cMdl->simDim());
     for (auto& path : paths)
     {
-        allocatePath(prd.dataline(), path);
+        allocatePath(prd.defline(), path);
         initializePath(path);
     }
     
@@ -377,7 +377,7 @@ mcSimulAAD(
 
     //  Allocate path
     Scenario<Number> path;
-    allocatePath(prd.dataline(), path);
+    allocatePath(prd.defline(), path);
 
     //  Dimensions
     const size_t nPay = prd.payoffLabels().size();
@@ -396,8 +396,8 @@ mcSimulAAD(
     //  Init the simulation timeline
     //  CAREFUL: simulation timeline must be on tape
     //  Hence moved here
-    cMdl->allocate(prd.timeline(), prd.dataline());
-    cMdl->init(prd.timeline(), prd.dataline());
+    cMdl->allocate(prd.timeline(), prd.defline());
+    cMdl->init(prd.timeline(), prd.defline());
     //  Initialize path
     initializePath(path);
     //  Mark the tape straight after initialization
@@ -479,7 +479,7 @@ inline void initModel4ParallelAAD(
     //  Init the simulation timeline
     //  CAREFUL: simulation timeline must be on tape
     //  Hence moved here
-    clonedMdl.init(prd.timeline(), prd.dataline());
+    clonedMdl.init(prd.timeline(), prd.defline());
     //  Path
     initializePath(path);
     //  Mark the tape straight after parameters
@@ -518,14 +518,14 @@ mcParallelSimulAAD(
     for (auto& model : models)
     {
         model = mdl.clone();
-        model->allocate(prd.timeline(), prd.dataline());
+        model->allocate(prd.timeline(), prd.defline());
     }
 
     //  One scenario per thread
     vector<Scenario<Number>> paths(nThread + 1);
     for (auto& path : paths)
     {
-        allocatePath(prd.dataline(), path);
+        allocatePath(prd.defline(), path);
     }
 
     //  One vector of payoffs per thread
@@ -707,7 +707,7 @@ mcSimulAADMulti(
 
 	//  Allocate path
 	Scenario<Number> path;
-	allocatePath(prd.dataline(), path);
+	allocatePath(prd.defline(), path);
 
 	//  Dimensions
 	const size_t nPay = prd.payoffLabels().size();
@@ -728,8 +728,8 @@ mcSimulAADMulti(
 	//  Init the simulation timeline
 	//  CAREFUL: simulation timeline must be on tape
 	//  Hence moved here
-	cMdl->allocate(prd.timeline(), prd.dataline());
-	cMdl->init(prd.timeline(), prd.dataline());
+	cMdl->allocate(prd.timeline(), prd.defline());
+	cMdl->init(prd.timeline(), prd.defline());
 	//  Initialize path
 	initializePath(path);
 	//  Mark the tape straight after initialization
@@ -824,14 +824,14 @@ mcParallelSimulAADMulti(
 	for (auto& model : models)
 	{
 		model = mdl.clone();
-		model->allocate(prd.timeline(), prd.dataline());
+		model->allocate(prd.timeline(), prd.defline());
 	}
 
 	//  One scenario per thread
 	vector<Scenario<Number>> paths(nThread + 1);
 	for (auto& path : paths)
 	{
-		allocatePath(prd.dataline(), path);
+		allocatePath(prd.defline(), path);
 	}
 
 	//  One vector of payoffs per thread

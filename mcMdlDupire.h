@@ -56,8 +56,8 @@ class Dupire : public Model<T>
     //  false (0) if it is an additional simulation step
     vector<bool>            myCommonSteps;
 
-    //  The pruduct's dataline byref
-    const vector<SimulDef>*    myDataline;
+    //  The pruduct's defline byref
+    const vector<SampleDef>*    myDefline;
 
     //  Pre-calculated on initialization
 
@@ -164,7 +164,7 @@ public:
     }
 
     //  Initialize timeline
-    void allocate(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
+    void allocate(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
     {
         //  Fill from product timeline
         
@@ -183,15 +183,15 @@ public:
             return binary_search(productTimeline.begin(), productTimeline.end(), t);
         });
 
-        //  Take a reference on the product's dataline
-        myDataline = &dataline;
+        //  Take a reference on the product's defline
+        myDefline = &defline;
 
         //  Allocate the local volatilities
         //      pre-interpolated in time over simulation timeline
         myInterpVols.resize(myTimeline.size() - 1, mySpots.size());
     }
 
-    void init(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
+    void init(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
     {
         //  Compute the local volatilities
         //      pre-interpolated in time and multiplied by sqrt(dt)
