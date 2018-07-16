@@ -238,19 +238,19 @@ public:
         T alive(1.0);
 
         //  Go through path, update alive status
-        for (const auto& scen: path)
+        for (const auto& sample: path)
         {
             //  Breached
-            if (scen.forwards[0] > barSmooth)
+            if (sample.forwards[0] > barSmooth)
             {
                 alive = T(0.0);
                 break;
             }
 
             //  Semi-breached: apply smoothing
-            if (scen.forwards[0] > myBarrier - smooth)
+            if (sample.forwards[0] > myBarrier - smooth)
             {
-                alive *= (barSmooth - scen.forwards[0]) / twoSmooth;
+                alive *= (barSmooth - sample.forwards[0]) / twoSmooth;
             }
         }
 

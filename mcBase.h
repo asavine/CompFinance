@@ -78,6 +78,7 @@ struct Sample
     void initialize()
     {
         numeraire = T(1.0);
+		fill(forwards.begin(), forwards.end(), T(100.0));
         fill(discounts.begin(), discounts.end(), T(1.0));
         fill(libors.begin(), libors.end(), T(0.0));
     }
