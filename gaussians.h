@@ -42,7 +42,6 @@ inline double normalCdf(const double x)
 
 //	Inverse CDF (for generation of Gaussians out of Uniforms)
 //  Beasley-Springer-Moro algorithm
-//  Moro, The Full Monte, Risk 1995
 //  See Glasserman, Monte Carlo Methods in Financial Engineering, p 68
 inline double invNormalCdf(const double p)
 {

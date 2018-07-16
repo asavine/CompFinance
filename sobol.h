@@ -58,7 +58,10 @@ class Sobol : public RNG
     matrix<unsigned long>	    myDirectionIntegers;
 
     //	Cached Uniforms
-    vector<unsigned long>	    myIntegerSequence;  //  The current numbers, as integers
+	//  The current numbers, as integers
+    vector<unsigned long>	    myIntegerSequence;  
+	//	The uniforms
+	vector<double>				myUniforms;
 
     //  The current point number
     unsigned long				mySimCount;
@@ -157,9 +160,13 @@ public:
 
         //	Resize
         myIntegerSequence.resize(myDim);
+<<<<<<< HEAD
 
         //  Set initial state
         reset();
+=======
+		myUniforms.resize(myDim);
+>>>>>>> parent of 8640852... Merge branch 'master' of https://github.com/asavine/CompFinance
     }
 
     void reset()
@@ -205,9 +212,34 @@ public:
 
 	void nextG(vector<double>& gaussVec) override
     {
+<<<<<<< HEAD
 		next();
 		transform(myIntegerSequence.begin(), myIntegerSequence.end(), gaussVec.begin(),
 			[](const unsigned long i) {return invNormalCdf(ONEOVER2POW32 * i); });
+=======
+        //	For the n'th draw use the gray code
+        unsigned long n = mySimCount;
+        unsigned int  j = 0;
+        while (n & 1)
+        {
+            n >>= 1;
+            ++j;
+        }
+
+        //	XOR the appropriate direction number into each component of the integer sequence
+        for (int i = 0; i<myDim; ++i)
+        {
+            myIntegerSequence[i] ^= myDirectionIntegers[i][j];
+        }
+        if (!gaussVec.empty())
+        {
+			transform(myIntegerSequence.begin(), myIntegerSequence.end(), myUniforms.begin(), [](const auto& i) {return ONEOVER2POW32 * i; });
+			transform(myUniforms.begin(), myUniforms.end(), gaussVec.begin(), invNormalCdf);
+        }
+
+        //	Update count
+        ++mySimCount;
+>>>>>>> parent of 8640852... Merge branch 'master' of https://github.com/asavine/CompFinance
     }
 
     //  Access dimension

@@ -22,8 +22,8 @@ As long as this comment is preserved at the top of the file
 
 using namespace std;
 
-using Task = packaged_task<bool(void)>;
-using TaskHandle = future<bool>;
+typedef packaged_task<bool(void)> Task;
+typedef future<bool> TaskHandle;
 
 class ThreadPool 
 {

@@ -38,6 +38,8 @@ class Dupire : public Model<T>
     T                       mySpot;
     //  Local volatility structure
     const vector<double>    mySpots;
+    //  We keep log spots to interpolate in log space
+    vector<double>          myLogSpots;
     const vector<Time>      myTimes;
     //  Local vols
     //  Spot major: sigma(spot i, time j) = myVols[i][j]
@@ -55,7 +57,7 @@ class Dupire : public Model<T>
     vector<bool>            myCommonSteps;
 
     //  The pruduct's dataline byref
-    const vector<simulData>*    myDataline;
+    const vector<SimulDef>*    myDataline;
 
     //  Pre-calculated on initialization
 
@@ -81,12 +83,17 @@ public:
         const Time maxDt = 0.25)
         : mySpot(spot),
         mySpots(spots),
+        myLogSpots(mySpots.size()),
         myTimes(times),
         myVols(vols),
         myMaxDt(maxDt),
         myParameters(myVols.rows() * myVols.cols() + 1),
         myParameterLabels(myVols.rows() * myVols.cols() + 1)
     {
+        //  Compute log spots
+        transform(mySpots.begin(), mySpots.end(), myLogSpots.begin(), 
+            [](const double s) {return log(s); });
+
         //  Set parameter labels once 
         myParameterLabels[0] = "spot";
 
@@ -157,7 +164,7 @@ public:
     }
 
     //  Initialize timeline
-    void allocate(const vector<Time>& productTimeline, const vector<simulData>& dataline) override
+    void allocate(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
     {
         //  Fill from product timeline
         
@@ -184,7 +191,7 @@ public:
         myInterpVols.resize(myTimeline.size() - 1, mySpots.size());
     }
 
-    void init(const vector<Time>& productTimeline, const vector<simulData>& dataline) override
+    void init(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
     {
         //  Compute the local volatilities
         //      pre-interpolated in time and multiplied by sqrt(dt)
@@ -192,10 +199,10 @@ public:
         for (size_t i = 0; i < n; ++i)
         {
             const double sqrtdt = sqrt(myTimeline[i + 1] - myTimeline[i]);
-            const size_t m = mySpots.size();
+            const size_t m = myLogSpots.size();
             for (size_t j = 0; j < m; ++j)
             {
-                myInterpVols[i][j] = sqrtdt * interp(
+                myInterpVols[i][j] = sqrtdt * interp<false>(
                     myTimes.begin(),
                     myTimes.end(),
                     myVols[j],
@@ -213,8 +220,8 @@ public:
 
 private:
 
-    //  Helper function, fills a scenario given the spot
-    inline static void fillScen(const T& spot, scenario<T>& scen)
+    //  Helper function, fills a sample given the spot
+    inline static void fillScen(const T& spot, Sample<T>& scen)
     {
         fill(scen.forwards.begin(), scen.forwards.end(), spot);
     }
@@ -224,42 +231,42 @@ public:
     //  Generate one path, consume Gaussian vector
     //  path must be pre-allocated 
     //  with the same size as the product timeline
-    void generatePath(const vector<double>& gaussVec, vector<scenario<T>>& path) const override
+    void generatePath(const vector<double>& gaussVec, Scenario<T>& path) const override
     {
         //  The starting spot
         //  We know that today is on the timeline
-        T spot = mySpot;
+        T logspot = log(mySpot);
         Time current = systemTime;
         //  Next index to fill on the product timeline
         size_t idx = 0;
         //  Is today on the product timeline?
         if (myCommonSteps[idx])
         {
-            fillScen(spot, path[idx]);
+            fillScen(exp(logspot), path[idx]);
             ++idx;
         }
 
         //  Iterate through timeline
         const size_t n = myTimeline.size() - 1;
-        const size_t m = mySpots.size();
+        const size_t m = myLogSpots.size();
         for (size_t i = 0; i < n; ++i)
         {
             //  Interpolate volatility in spot
-            T vol = interp(
-                mySpots.begin(),
-                mySpots.end(),
+            T vol = interp<false>(
+                myLogSpots.begin(),
+                myLogSpots.end(),
                 myInterpVols[i],
                 myInterpVols[i] + m,
-                spot);
+                logspot);
             //  vol comes out * sqrt(dt)
 
             //  Apply Euler's scheme
-            spot += vol * gaussVec[i];
+            logspot += vol * (- 0.5 * vol + gaussVec[i]);
 
             //  Store on the path?
             if (myCommonSteps[i + 1])
             {
-                fillScen(spot, path[idx]);
+                fillScen(exp(logspot), path[idx]);
                 ++idx;
             }
         }

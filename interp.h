@@ -22,7 +22,7 @@ using namespace std;
 //  Utility for interpolation
 //  Interpolates the vector y against knots x in value x0 
 //  Interpolation is linear or smooth, extrapolation is flat
-template <class ITX, class ITY, class T>
+template <bool smoothStep, class ITX, class ITY, class T>
 inline auto interp(
     //	sorted on xs 
     ITX                         xBegin,
@@ -31,9 +31,7 @@ inline auto interp(
     ITY                         yBegin,
     ITY                         yEnd,
     //	interpolate for point x0
-    const T&					x0,
-    //  smooth?
-    const bool                  smoothStep = false)
+    const T&					x0)
     ->remove_reference_t<decltype(*yBegin)>
 {
     //	STL binary search, returns iterator on 1st no less than x0
@@ -53,7 +51,7 @@ inline auto interp(
 
     auto t = (x0 - x1) / (x2 - x1);
 
-    if (smoothStep)
+    if constexpr (smoothStep)
     {
         return y1 + (y2 - y1) * t * t * (3.0 - 2 * t);
     }
@@ -64,7 +62,7 @@ inline auto interp(
 }
 
 //  2D
-template <class T, class U, class V, class W, class X>
+template <bool smoothStep, class T, class U, class V, class W, class X>
 inline V interp2D(
     //	sorted on xs 
     const vector<T>&            x,
@@ -74,9 +72,7 @@ inline V interp2D(
     const matrix<V>&            z,
     //	interpolate for point (x0,y0)
     const W&					x0,
-    const X&					y0,
-    //  smooth?
-    const bool                  smoothStep = false)
+    const X&					y0)
 {
     const size_t n = x.size();
     const size_t m = y.size();
@@ -88,20 +84,20 @@ inline V interp2D(
 
     //  Extrapolation in x?
     if (n2 == n)
-        return interp(y.begin(), y.end(), z[n2 - 1], z[n2 - 1] + m, y0, smoothStep);
+        return interp<smoothStep>(y.begin(), y.end(), z[n2 - 1], z[n2 - 1] + m, y0);
     if (n2 == 0)
-        return interp(y.begin(), y.end(), z[0], z[0] + m, y0, smoothStep);
+        return interp<smoothStep>(y.begin(), y.end(), z[0], z[0] + m, y0);
 
     //  Interpolation in x
     const size_t n1 = n2 - 1;
     auto x1 = x[n1];
     auto x2 = x[n2];
-    auto z1 = interp(y.begin(), y.end(), z[n1], z[n1] + m, y0, smoothStep);
-    auto z2 = interp(y.begin(), y.end(), z[n2], z[n2] + m, y0, smoothStep);
+    auto z1 = interp<smoothStep>(y.begin(), y.end(), z[n1], z[n1] + m, y0);
+    auto z2 = interp<smoothStep>(y.begin(), y.end(), z[n2], z[n2] + m, y0);
 
     //  Smooth step
     auto t = (x0 - x1) / (x2 - x1);
-    if (smoothStep)
+    if constexpr (smoothStep)
     {
         return z1 + (z2 - z1) * t * t * (3.0 - 2 * t);
     }

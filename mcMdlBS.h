@@ -15,15 +15,15 @@ class BlackScholes : public Model<T>
     T                   myRate;
     T                   myDiv;
 
-    //  Normal specification = Bachelier
-    //      or Lognormal = Black-Scholes
-    const bool          myNormal;
+    //  false = risk neutral measure
+    //  true = spot measure
+    const bool          mySpotMeasure;
 
     //  Similuation timeline = today + product timeline
     vector<Time>        myTimeline;
     bool                myTodayOnTimeline;  //  Is today on product timeline?
     //  The pruduct's dataline byref
-    const vector<simulData>*    myDataline;
+    const vector<SimulDef>*    myDataline;
 
     //  Pre-calculated on initialization
 
@@ -53,14 +53,14 @@ public:
     BlackScholes(
         const U             spot,
         const U             vol,
-        const bool          normal,
+        const bool          spotMeasure = false,
         const U             rate = U(0.0),
         const U             div = U(0.0)) : 
             mySpot(spot),
             myVol(vol),
             myRate(rate),
             myDiv(div),
-            myNormal(normal),
+            mySpotMeasure(spotMeasure),
             myParameters(4),
             myParameterLabels(4) 
     {
@@ -127,7 +127,7 @@ public:
     }
 
     //  Initialize timeline
-    void allocate(const vector<Time>& productTimeline, const vector<simulData>& dataline) override
+    void allocate(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
     {
         //  Simulation timeline = today + product timeline
         myTimeline.clear();
@@ -170,36 +170,30 @@ public:
         }
     }
 
-    void init(const vector<Time>& productTimeline, const vector<simulData>& dataline) override
+    void init(const vector<Time>& productTimeline, const vector<SimulDef>& dataline) override
     {
         //  Pre-compute the standard devs and drifts over simulation timeline        
         const T mu = myRate - myDiv;
         const size_t n = myTimeline.size() - 1;
-        if (myNormal)
-        {
-            for (size_t i = 0; i < n; ++i)
-            {
-                const double dt = myTimeline[i + 1] - myTimeline[i];
 
-                //  normal model
-                //  Var[ST2 / ST1] = vol^2 * ( exp ( 2 * (r - d) * dt ) - 1) / ( 2 * (r - d) ) 
-                //  E[ST2 / ST1] = ST1 * exp ( (r - d) * dt )
-                myStds[i] = fabs(mu) > EPS
-                    ? T(myVol * sqrt((exp(2 * mu*dt) - 1) / (2 * mu)))
-                    : T(myVol * sqrt(dt));
-                myDrifts[i] = exp((myRate - myDiv)*dt);
-            }
-        }
-        else
-        {
             for (size_t i = 0; i < n; ++i)
             {
                 const double dt = myTimeline[i + 1] - myTimeline[i];
 
                 //  lognormal model
                 //  Var[logST2 / ST1] = vol^2 * dt
+            //  under risk neutral measure 
                 //  E[logST2 / ST1] = logST1 + ( (r - d) - 0.5 * vol ^ 2 ) * dt
+            //  under spot measure 
+            //      E[logST2 / ST1] = logST1 + ( (r - d) + 0.5 * vol ^ 2 ) * dt
                 myStds[i] = myVol * sqrt(dt);
+            if (mySpotMeasure)
+            {
+                myDrifts[i] = (mu + 0.5*myVol*myVol)*dt;
+
+            }
+            else
+            {
                 myDrifts[i] = (mu - 0.5*myVol*myVol)*dt;
             }
         }
@@ -210,7 +204,21 @@ public:
         for (size_t i = 0; i < m; ++i)
         {
             //  Numeraire
+            if (dataline[i].numeraire)
+            {
+                //  Under the spot measure, the numeraire is the spot with reinvested dividend
+                //      num(t) = spot(t) / spot(0) * exp(div * t)
+                //      we precalculate exp(div * t) / spot(0)
+                if (mySpotMeasure)
+                {
+                    myNumeraires[i] = exp(myDiv * productTimeline[i]) / mySpot;
+                }
+                //  Under the risk neutral measure, numeraires are deterministic in Black-Scholes
+                else
+                {
             myNumeraires[i] = exp(myRate * productTimeline[i]);
+        }
+            }
         }
 
         for (size_t i = 0; i < m; ++i)
@@ -253,14 +261,18 @@ public:
 
 private:
 
-    //  Helper function, fills a scenario given the spot
+    //  Helper function, fills a Sample given the spot
     inline void fillScen(
         const size_t idx,   //  index on product timeline
         const T& spot,      //  spot
-        scenario<T>& scen   //  scenario to fill
+        Sample<T>&      scen   //  Sample to fill
     ) const
     {
+        if ((*myDataline)[idx].numeraire)
+        {
         scen.numeraire = myNumeraires[idx];
+            if (mySpotMeasure) scen.numeraire *= spot;
+        }
         
         transform(myForwardFactors[idx].begin(), myForwardFactors[idx].end(), 
             scen.forwards.begin(), 
@@ -282,7 +294,7 @@ public:
     //  Generate one path, consume Gaussian vector
     //  path must be pre-allocated 
     //  with the same size as the product timeline
-    void generatePath(const vector<double>& gaussVec, vector<scenario<T>>& path) const override
+    void generatePath(const vector<double>& gaussVec, Scenario<T>& path) const override
     {
         //  The starting spot
         //  We know that today is on the timeline
@@ -297,22 +309,6 @@ public:
         }
 
         const size_t n = myTimeline.size() - 1;
-        if (myNormal)
-        {
-            //  Iterate through timeline
-            for (size_t i = 0; i < n; ++i)
-            {
-                //  Apply known conditional distributions 
-                    //  Bachelier
-                spot = spot * myDrifts[i]
-                    + myStds[i] * gaussVec[i];
-                //  Store on the path
-                fillScen(idx, spot, path[idx]);
-                ++idx;
-            }
-        }
-        else
-        {
             //  Iterate through timeline
             for (size_t i = 0; i < n; ++i)
             {
@@ -323,7 +319,6 @@ public:
                 //  Store on the path
                 fillScen(idx, spot, path[idx]);
                 ++idx;
-            }
         }
     }
 };

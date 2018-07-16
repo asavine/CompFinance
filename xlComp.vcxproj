@@ -162,15 +162,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="AAD.h" />
     <ClInclude Include="AADExpr.h" />
     <ClInclude Include="AADNode.h" />
     <ClInclude Include="AADNumber.h" />
     <ClInclude Include="AADTape.h" />
     <ClInclude Include="analytics.h" />
+    <ClInclude Include="blocklist.h" />
     <ClInclude Include="ConcurrentQueue.h" />
     <ClInclude Include="initializers.h" />
     <ClInclude Include="interp.h" />

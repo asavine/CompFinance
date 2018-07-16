@@ -70,16 +70,10 @@ public:
     //  n : numbers already processed
     template <size_t N, size_t n>
     void pushAdjoint(
-        
-//  Node for the complete expression being processed
-#if AADETNV
-        Node&           exprNode,
-#else
-        MultiNode<N>&   exprNode,     
-#endif   
-        
+        //  Node for the complete expression being processed
+        Node&		exprNode,
         //  Adjoint cumulated for this binary node
-        const double adjoint)       
+        const double	adjoint)       
         const
     {
         //  Push on the left, if numbers there
@@ -333,15 +327,9 @@ public:
     //  Push adjoint down the expression DAG
     template <size_t N, size_t n>
     void pushAdjoint(
-
-//  Node for the complete expression being processed
-#if AADETNV
-        Node&           exprNode,
-#else
-        MultiNode<N>&   exprNode,
-#endif   
-
-        const double adjoint)       //  Adjoint cumulated on the node
+        //  Node for the complete expression being processed
+        Node&		exprNode,
+        const double	adjoint)       //  Adjoint cumulated on the node
         const
     {
         //  Push to argument, if numbers there
@@ -850,33 +838,16 @@ Expression<RHS> operator+
 class Number : public Expression<Number>
 {
     //  The value and node for this number, as normal
-    double myValue;
-    Node* myNode;
+    double		myValue;
+    Node*	myNode;
 
     //  Node creation on tape, as normal
 
-#if AADETNV
-    
     template <size_t N>
     Node* createMultiNode()
     {
-        static const size_t size = sizeof(Node) + N * (sizeof(double) + sizeof(double*));
-
-        //  Placement syntax to allocate in place on tape
-        return new (tape->allocate<size>()) Node(N);
+        return tape->recordNode<N>();
     }
-
-#else
-
-    template <size_t N>
-    MultiNode<N>* createMultiNode()
-    {
-        //  Placement syntax to allocate in place on tape
-        return new (tape->allocate<sizeof(MultiNode<N>)>()) MultiNode<N>;
-    }
-
-#endif   
-
 
     //  This is where, on assignment or construction from an expression,
     //      that derivatives are pushed through the expression's DAG 
@@ -903,31 +874,15 @@ public:
     //  This is where the derivatives and pointers are set on the node
     //  Push adjoint down the expression DAG
 
-#if AADETNV
-
     template <size_t N, size_t n>
     void pushAdjoint(
-        Node& exprNode,             //  Node for the complete expression
-        const double adjoint)       //  Adjoint cumulated on the node
+        Node&		exprNode,	//  Node for the complete expression
+        const double	adjoint)	//  Adjoint cumulated on the node
         const
     {
-        exprNode.argAdjoints[n] = & myNode->adjoint;
-        exprNode.derivatives[n] = adjoint;
+        exprNode.pAdjPtrs[n] = Tape::multi? myNode->pAdjoints : &myNode->mAdjoint;
+		exprNode.pDerivatives[n] = adjoint;
     }
-
-#else
-
-    template <size_t N, size_t n>
-    void pushAdjoint(
-        MultiNode<N>& exprNode,     //  Node for the complete expression
-        const double adjoint)       //  Adjoint cumulated on the node
-        const
-    {
-        exprNode.arguments[n] = myNode;
-        exprNode.derivatives[n] = adjoint;
-    }
-
-#endif
 
     //  Static access to tape, as normal
     static thread_local Tape* tape;
@@ -970,6 +925,10 @@ public:
         return *this;
     }
 
+    //  Explicit coversion to double
+    explicit operator double& () { return myValue; }
+    explicit operator double () const { return myValue; }
+
     //  All the normal accessors and propagators, as in normal AAD code
     
     //  Put on tape
@@ -990,33 +949,43 @@ public:
     }
     double& adjoint()
     {
-        return myNode->adjoint;
+        return myNode->adjoint();
     }
     double adjoint() const
     {
-        return myNode->adjoint;
+        return myNode->adjoint();
     }
+    double& adjoint(const size_t n)
+    {
+        return myNode->adjoint(n);
+    }
+    double adjoint(const size_t n) const
+    {
+        return myNode->adjoint(n);
+    }
+
+	//  Reset all adjoints on the tape
+	//		note we don't use this method
+	void resetAdjoints()
+	{
+		tape->resetAdjoints();
+	}
 
     //  Propagation
 
-    //  Reset all adjoints on the tape
-    static void resetAdjoints()
-    {
-        for (Node& node : *tape) node.adjoint = 0.0;
-    }
     //  Propagate adjoints
     //      from and to both INCLUSIVE
     static void propagateAdjoints(
-        Tape::iterator propagateFrom,
-        Tape::iterator propagateTo)
+		Tape::iterator propagateFrom,
+		Tape::iterator propagateTo)
     {
         auto it = propagateFrom;
         while (it != propagateTo)
         {
-            it->propagate();
+            it->propagateOne();
             --it;
         }
-        it->propagate();
+        it->propagateOne();
     }
 
     //  Convenient overloads
@@ -1025,12 +994,8 @@ public:
     //  Then propagate from the node
     void propagateAdjoints(
         //  We start on this number's node
-        Tape::iterator propagateTo,
-        //  reset adjoints first?
-        const bool reset = false)
+		Tape::iterator propagateTo)
     {
-        //  Reset
-        if (reset) resetAdjoints();
         //  Set this adjoint to 1
         adjoint() = 1.0;
         //  Find node on tape
@@ -1038,29 +1003,44 @@ public:
         //  Reverse and propagate until we hit the stop
         while (it != propagateTo)
         {
-            it->propagate();
+            it->propagateOne();
             --it;
         }
-        it->propagate();
+        it->propagateOne();
     }
 
     //  These 2 set the adjoint to 1 on this node
-    void propagateToStart(
-        const bool reset = false)
+    void propagateToStart()
     {
-        propagateAdjoints(tape->begin(), reset);
+        propagateAdjoints(tape->begin());
     }
-    void propagateToMark(
-        const bool reset = false)
+    void propagateToMark()
     {
-        propagateAdjoints(tape->markIt(), reset);
+        propagateAdjoints(tape->markIt());
     }
 
     //  This one only propagates
     //  Note: propagation starts at mark - 1
     static void propagateMarkToStart()
     {
-        propagateAdjoints(--tape->markIt(), tape->begin());
+        propagateAdjoints(prev(tape->markIt()), tape->begin());
+    }
+
+    //  Multi-adjoint propagation
+
+    //  Propagate adjoints
+    //      from and to both INCLUSIVE
+    static void propagateAdjointsMulti(
+		Tape::iterator propagateFrom,
+		Tape::iterator propagateTo)
+    {
+        auto it = propagateFrom;
+        while (it != propagateTo)
+        {
+            it->propagateAll();
+            --it;
+        }
+        it->propagateAll();
     }
 
     //  Unary operators

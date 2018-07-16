@@ -300,6 +300,8 @@ LPXLOPER12 xValue(
 
     //  Numerical params
     const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+    //  Make sure we have a numPath
+    if (!num.numPath) return TempErr12(xlerrNA);
 
     //  Call and return;
     try 
@@ -337,6 +339,8 @@ LPXLOPER12 xAADrisk(
 
     //  Numerical params
     const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+    //  Make sure we have a numPath
+    if (!num.numPath) return TempErr12(xlerrNA);
 
     //  Risk payoff
     const string riskPayoff = getString(xRiskPayoff);
@@ -344,20 +348,18 @@ LPXLOPER12 xAADrisk(
     try
     {
         auto results = AADriskOne(mid, pid, num, riskPayoff);
-        const size_t n = results.risks.size(), N = n + 2;
+		const size_t n = results.risks.size(), N = n + 1;
 
         LPXLOPER12 oper = TempXLOPER12();
         resize(oper, N, 2);
 
         setString(oper, "value", 0, 0);
         setNum(oper, results.riskPayoffValue, 0, 1);
-        setString(oper, "params", 1, 0);
-        setString(oper, "risks", 1, 1);
 
         for (size_t i = 0; i < n; ++i)
         {
-            setString(oper, results.paramIds[i], i + 2, 0);
-            setNum(oper, results.risks[i], i + 2, 1);
+            setString(oper, results.paramIds[i], i + 1, 0);
+            setNum(oper, results.risks[i], i + 1, 1);
         }
 
         return oper;
@@ -393,6 +395,8 @@ LPXLOPER12 xAADriskAggregate(
 
     //  Numerical params
     const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+    //  Make sure we have a numPath
+    if (!num.numPath) return TempErr12(xlerrNA);
 
     //  Payoffs and notionals, removing blanks
     map<string, double> notionals;
@@ -419,20 +423,18 @@ LPXLOPER12 xAADriskAggregate(
     try
     {
         auto results = AADriskAggregate(mid, pid, notionals, num);
-        const size_t n = results.risks.size(), N = n + 2;
+        const size_t n = results.risks.size(), N = n + 1;
 
         LPXLOPER12 oper = TempXLOPER12();
         resize(oper, N, 2);
 
         setString(oper, "value", 0, 0);
         setNum(oper, results.riskPayoffValue, 0, 1);
-        setString(oper, "params", 1, 0);
-        setString(oper, "risks", 1, 1);
 
         for (size_t i = 0; i < n; ++i)
         {
-            setString(oper, results.paramIds[i], i + 2, 0);
-            setNum(oper, results.risks[i], i + 2, 1);
+            setString(oper, results.paramIds[i], i + 1, 0);
+            setNum(oper, results.risks[i], i + 1, 1);
         }
 
         return oper;
@@ -443,6 +445,8 @@ LPXLOPER12 xAADriskAggregate(
     }
 }
 
+unordered_map<string, RiskReports> riskStore;
+
 extern "C" __declspec(dllexport)
 LPXLOPER12 xBumprisk(
     LPXLOPER12          modelid,
@@ -452,7 +456,10 @@ LPXLOPER12 xBumprisk(
     double              seed1,
     double              seed2,
     double              numPath,
-    double              parallel)
+    double              parallel,
+    //  display now or put in memory?
+    double              displayNow,
+    LPXLOPER12          storeid)
 {
     FreeAllTempMemory();
 
@@ -466,11 +473,23 @@ LPXLOPER12 xBumprisk(
 
     //  Numerical params
     const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+    //  Make sure we have a numPath
+    if (!num.numPath) return TempErr12(xlerrNA);
 
     try
     {
         auto results = bumpRisk(mid, pid, num);
-        return from_labelledMatrix(results.params, results.payoffs, results.risks);
+        if (displayNow > 0.5)
+        {
+            return from_labelledMatrix(results.params, results.payoffs, results.risks, "value", results.values);
+        }
+        else
+        {
+            const string riskId = getString(storeid);
+            if (riskId == "") return TempErr12(xlerrNA);
+            riskStore[riskId] = results;
+            return storeid;
+        }
     }
     catch (const exception&)
     {
@@ -479,9 +498,100 @@ LPXLOPER12 xBumprisk(
 }
 
 extern "C" __declspec(dllexport)
+LPXLOPER12 xAADriskMulti(
+    LPXLOPER12          modelid,
+    LPXLOPER12          productid,
+    //  numerical parameters
+    double              useSobol,
+    double              seed1,
+    double              seed2,
+    double              numPath,
+    double              parallel,
+    //  display now or put in memory?
+    double              displayNow,
+    LPXLOPER12          storeid)
+{
+    FreeAllTempMemory();
+
+    const string pid = getString(productid);
+    //  Make sure we have an id
+    if (pid.empty()) return TempErr12(xlerrNA);
+
+    const string mid = getString(modelid);
+    //  Make sure we have an id
+    if (mid.empty()) return TempErr12(xlerrNA);
+
+    //  Numerical params
+    const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+    //  Make sure we have a numPath
+    if (!num.numPath) return TempErr12(xlerrNA);
+
+    try
+    {
+        auto results = AADriskMulti(mid, pid, num);
+        if (displayNow > 0.5)
+        {
+            return from_labelledMatrix(results.params, results.payoffs, results.risks, "value", results.values);
+        }
+        else
+        {
+            const string riskId = getString(storeid);
+            if (riskId == "") return TempErr12(xlerrNA);
+            riskStore[riskId] = results;
+            return storeid;
+        }
+    }
+    catch (const exception&)
+    {
+        return TempErr12(xlerrNA);
+    }
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xDisplayRisk(
+    LPXLOPER12          riskid,
+    LPXLOPER12          displayid)
+{
+    FreeAllTempMemory();
+
+    RiskReports* results;
+    const string riskId = getString(riskid);
+    auto& it = riskStore.find(riskId);
+    if (it == riskStore.end()) return TempErr12(xlerrNA);
+    else results = &it->second;
+
+    const vector<string> riskIds = to_strVector(displayid);
+    
+    vector<size_t> riskCols;
+    
+    for (const auto& id : riskIds)
+    {
+        auto it2 = find(results->payoffs.begin(), results->payoffs.end(), id);
+        if (it2 == results->payoffs.end()) return TempErr12(xlerrNA);
+        riskCols.push_back(distance(results->payoffs.begin(), it2));
+    }
+    if (riskCols.empty()) return TempErr12(xlerrNA);
+
+    const size_t nParam = results->risks.rows();
+    const size_t nPayoffs = riskCols.size();
+
+    vector<double> showVals(nPayoffs);
+    matrix<double> showRisks(nParam, nPayoffs);
+    for (size_t j = 0; j < nPayoffs; ++j)
+    {
+        for (size_t i = 0; i < nParam; ++i)
+        {
+            showRisks[i][j] = results->risks[i][riskCols[j]];
+        }
+        showVals[j] = results->values[riskCols[j]];
+    }
+
+    return from_labelledMatrix(results->params, riskIds, showRisks, "value", showVals);
+}
+
+extern "C" __declspec(dllexport)
  LPXLOPER12 xDupireCalib(
-    //  model parameters
-    const double ivsType, //  0: Bach, 1: BS, 2: Merton
+    //  Merton market parameters
     const double spot,
     const double vol,
     const double jmpIntens,
@@ -520,7 +630,6 @@ extern "C" __declspec(dllexport)
     }
 
     auto results = dupireCalib(vspots, maxDs, vtimes, maxDt,
-        ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
         spot, vol, jmpIntens, jmpAverage, jmpStd);
 
     //  Return
@@ -529,8 +638,7 @@ extern "C" __declspec(dllexport)
 
 extern "C" __declspec(dllexport)
  LPXLOPER12 xDupireSuperbucket(
-    //  model parameters
-    const double ivsType, //  0: Bach, 1: BS, 2: Merton
+    //  Merton market parameters
     const double spot,
     const double vol,
     const double jmpIntens,
@@ -578,6 +686,8 @@ extern "C" __declspec(dllexport)
 
     //  Numerical params
     const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+    //  Make sure we have a numPath
+    if (!num.numPath) return TempErr12(xlerrNA);
 
     //  Payoffs and notionals, removing blanks
     map<string, double> notionals;
@@ -615,7 +725,6 @@ extern "C" __declspec(dllexport)
                 maxDtVol,
                 vstrikes,
                 vmats,
-                ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
                 vol,
                 jmpIntens,
                 jmpAverage,
@@ -632,7 +741,6 @@ extern "C" __declspec(dllexport)
                 maxDtVol,
                 vstrikes,
                 vmats,
-                ivsType < 0.5 ? 'B' : ivsType < 1.5 ? 'S' : 'M',
                 vol,
                 jmpIntens,
                 jmpAverage,
@@ -673,6 +781,12 @@ extern "C" __declspec(dllexport)
 double xMerton(double spot, double vol, double mat, double strike, double intens, double meanJmp, double stdJmp)
 {
     return merton(spot, strike, vol, mat, intens, meanJmp, stdJmp);
+}
+
+extern "C" __declspec(dllexport)
+double xBarrierBlackScholes(double spot, double rate, double div, double vol, double mat, double strike, double barrier)
+{
+    return BlackScholesKO(spot, rate, div, strike, barrier, mat, vol);
 }
 
 //	Registers
@@ -829,9 +943,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xBumprisk"),
-        (LPXLOPER12)TempStr12(L"QQQBBBBB"),
+        (LPXLOPER12)TempStr12(L"QQQBBBBBBQ"),
         (LPXLOPER12)TempStr12(L"xBumprisk"),
-        (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel]"),
+        (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel], [display?], [storeId]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -840,10 +954,34 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xAADriskMulti"),
+        (LPXLOPER12)TempStr12(L"QQQBBBBBBQ"),
+        (LPXLOPER12)TempStr12(L"xAADriskMulti"),
+        (LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel], [display?], [storeId]"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"AAD risk report for multiple payoffs"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xDisplayRisk"),
+        (LPXLOPER12)TempStr12(L"QQQ"),
+        (LPXLOPER12)TempStr12(L"xDisplayRisk"),
+        (LPXLOPER12)TempStr12(L"reportId, payoffId"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Display risk from stored report"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"QBBBBBBK%K%K%BK%BBQQK%BBBBBB"),
+        (LPXLOPER12)TempStr12(L"QBBBBBK%K%K%BK%BBQQK%BBBBBB"),
         (LPXLOPER12)TempStr12(L"xDupireSuperbucket"),
-        (LPXLOPER12)TempStr12(L"ivsType, spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, productId, payoffs, notionals, sobol, s1, s2, numPth, parallel, [bump?]"),
+        (LPXLOPER12)TempStr12(L"spot, vol, jmpIt, jmpAve, jmpStd, RiskStrikes, riskMats, volSpots, maxDs, volTimes, maxDtVol, maxDtSimul, productId, payoffs, notionals, sobol, s1, s2, numPth, parallel, [bump?]"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -853,9 +991,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xDupireCalib"),
-        (LPXLOPER12)TempStr12(L"QBBBBBBK%BK%B"),
+        (LPXLOPER12)TempStr12(L"QBBBBBK%BK%B"),
         (LPXLOPER12)TempStr12(L"xDupireCalib"),
-        (LPXLOPER12)TempStr12(L"type, spot, vol, jumpIntensity, jumpAverage, jumpStd, spots, maxds, times, mxdt"),
+        (LPXLOPER12)TempStr12(L"spot, vol, jumpIntensity, jumpAverage, jumpStd, spots, maxds, times, mxdt"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -875,11 +1013,23 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"Merton"),
         (LPXLOPER12)TempStr12(L""));
 
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xBarrierBlackScholes"),
+        (LPXLOPER12)TempStr12(L"BBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"xBarrierBlackScholes"),
+        (LPXLOPER12)TempStr12(L"spot, rate, div, vol, mat, strike, barrier"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Merton"),
+        (LPXLOPER12)TempStr12(L""));
+    
 	/* Free the XLL filename */
 	Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);
 
     /*  Start the thread pool   */
-    ThreadPool::getInstance()->start(4 * thread::hardware_concurrency() - 1);
+    ThreadPool::getInstance()->start(thread::hardware_concurrency() - 1);
 
 	return 1;
 }
