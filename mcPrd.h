@@ -496,10 +496,6 @@ public:
         const double smooth = convert<double>(path[0].forwards[0] * mySmooth),
             twoSmooth = 2 * smooth;
 
-        //  We start alive
-        T alive(1.0);
-
-        //  Go through path, update alive status
         //  Period by period
         const size_t n = path.size() - 1;
         payoffs[0] = 0;
