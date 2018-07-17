@@ -98,7 +98,7 @@ extern "C" __declspec(dllexport)
 LPXLOPER12 xPutBlackScholes(
     double              spot,
     double              vol,
-    double              normal,
+    double              qSpot,
     double              rate,
     double              div,
     LPXLOPER12          xid)
@@ -111,7 +111,7 @@ LPXLOPER12 xPutBlackScholes(
     if (id.empty()) return TempErr12(xlerrNA);
 
     //  Call and return
-    putBlackScholes(spot, vol, normal > 0, rate, div, id);
+    putBlackScholes(spot, vol, qSpot > 0, rate, div, id);
 
     return TempStr12(id);
 }
@@ -813,7 +813,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"xPutBlackScholes"),
         (LPXLOPER12)TempStr12(L"QBBBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutBlackScholes"),
-        (LPXLOPER12)TempStr12(L"spot, vol, normal, rate, div, id"),
+        (LPXLOPER12)TempStr12(L"spot, vol, qSpot, rate, div, id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

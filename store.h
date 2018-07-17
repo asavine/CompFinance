@@ -18,16 +18,16 @@ ProductStore productStore;
 void putBlackScholes(
     const double            spot,
     const double            vol,
-    const bool              normal,
+    const bool              qSpot,
     const double            rate,
     const double            div,
     const string&           store)
 {
     //  We create 2 models, one for valuation and one for risk
     unique_ptr<Model<double>> mdl = make_unique<BlackScholes<double>>(
-        spot, vol, normal, rate, div);
+        spot, vol, qSpot, rate, div);
     unique_ptr<Model<Number>> riskMdl = make_unique<BlackScholes<Number>>(
-        spot, vol, normal, rate, div);
+        spot, vol, qSpot, rate, div);
 
     //  And move them into the map
     modelStore[store] = make_pair(move(mdl), move(riskMdl));
