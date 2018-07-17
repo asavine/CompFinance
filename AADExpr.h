@@ -24,6 +24,7 @@ template <class E>
 struct Expression
 {
     double value() const { return static_cast<const E*>(this)->value(); }
+	explicit operator double() const { return value(); }
 };
 
 //  Note that Number is a leaf expression

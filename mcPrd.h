@@ -230,7 +230,7 @@ public:
         //  Or Andreasen and Savine's publication on scripting
 
         //  We apply a smoothing factor of x% of the spot both ways, untemplated
-        const double smooth = convert<double>(path[0].forwards[0] * mySmooth),
+        const double smooth = double(path[0].forwards[0] * mySmooth),
             twoSmooth = 2 * smooth,
             barSmooth = myBarrier + smooth;
 
@@ -263,109 +263,112 @@ public:
 template <class T>
 class Europeans : public Product<T>
 {
-    vector<Time>            myMaturities;   //  = timeline
-    vector<vector<double>>  myStrikes;      //  a vector of strikes per maturity
-    vector<SampleDef>       myDefline;
+	//	Timeline
+	vector<Time>            myMaturities;
+	//  One vector of strikes per maturity
+	vector<vector<double>>  myStrikes;
+	vector<SampleDef>       myDefline;
 
-    vector<string>          myLabels;
+	vector<string>          myLabels;
 
 public:
 
-    //  Constructor: store data and build timeline
-    Europeans(const map<Time, vector<double>>& options) 
-    {
-        const size_t n = options.size();
+	//  Constructor: store data and build timeline
+	Europeans(const map<Time, vector<double>>& options)
+	{
+		const size_t n = options.size();
 
-        //  Timeline = one step per maturity
-        for (const pair<Time, vector<double>>& p : options)
-        {
-            myMaturities.push_back(p.first);
-            myStrikes.push_back(p.second);
-        }
+		//  Timeline = each maturity is an event date
+		for (const pair<Time, vector<double>>& p : options)
+		{
+			myMaturities.push_back(p.first);
+			myStrikes.push_back(p.second);
+		}
 
-        //  Defline = num and spot(t) = forward(t,t) on every step
-        myDefline.resize(n);
-        for (size_t i = 0; i < n; ++i)
-        {
-            myDefline[i].numeraire = true;
-            myDefline[i].forwardMats.push_back(myMaturities[i]);
-        }
+		//  Defline = num and spot(t) = forward(t,t) on every step
+		myDefline.resize(n);
+		for (size_t i = 0; i < n; ++i)
+		{
+			myDefline[i].numeraire = true;
+			myDefline[i].forwardMats.push_back(myMaturities[i]);
+		}
 
-        //  Identify the payoffs
-        for (const auto& option : options)
-        {
-            for (const auto& strike : option.second)
-            {
-                ostringstream ost;
-                ost.precision(2);
-                ost << fixed;
-                ost << "call " << option.first << " " << strike;
-                myLabels.push_back(ost.str());
-            }
-        }
-    }
+		//  Identify the payoffs
+		for (const auto& option : options)
+		{
+			for (const auto& strike : option.second)
+			{
+				ostringstream ost;
+				ost.precision(2);
+				ost << fixed;
+				ost << "call " << option.first << " " << strike;
+				myLabels.push_back(ost.str());
+			}
+		}
+	}
 
-    //  access to maturities and strikes
-    const vector<Time>& maturities() const
-    {
-        return myMaturities;
-    }
+	//  access to maturities and strikes
+	const vector<Time>& maturities() const
+	{
+		return myMaturities;
+	}
 
-    const vector<vector<double>>& strikes() const
-    {
-        return myStrikes;
-    }
+	const vector<vector<double>>& strikes() const
+	{
+		return myStrikes;
+	}
 
-    //  Virtual copy constructor
-    unique_ptr<Product<T>> clone() const override
-    {
-        return unique_ptr<Product<T>>(new Europeans<T>(*this));
-    }
+	//  Virtual copy constructor
+	unique_ptr<Product<T>> clone() const override
+	{
+		return unique_ptr<Product<T>>(new Europeans<T>(*this));
+	}
 
-    //  Timeline
-    const vector<Time>& timeline() const override
-    {
-        return myMaturities;
-    }
+	//  Timeline
+	const vector<Time>& timeline() const override
+	{
+		return myMaturities;
+	}
 
-    //  Defline
-    const vector<SampleDef>& defline() const override
-    {
-        return myDefline;
-    }
+	//  Defline
+	const vector<SampleDef>& defline() const override
+	{
+		return myDefline;
+	}
 
-    //  Labels
-    const vector<string>& payoffLabels() const override
-    {
-        return myLabels;
-    }
+	//  Labels
+	const vector<string>& payoffLabels() const override
+	{
+		return myLabels;
+	}
 
-    //  Payoffs, maturity major
-    void payoffs(
-        //  path, one entry per time step (on the product timeline)
-        const Scenario<T>&          path,
-        //  pre-allocated space for resulting payoffs
-        vector<T>&                  payoffs)
-        const override
-    {
-        const size_t numT = myMaturities.size(), numK = myStrikes.size();
+	//  Payoffs, maturity major
+	void payoffs(
+		//  path, one entry per time step (on the product timeline)
+		const Scenario<T>&          path,
+		//  pre-allocated space for resulting payoffs
+		vector<T>&                  payoffs)
+		const override
+	{
+		const size_t numT = myMaturities.size(), numK = myStrikes.size();
 
-        auto payoffIt = payoffs.begin();
-        for (size_t i = 0; i < numT; ++i)
-        {
-            transform(
-                    myStrikes[i].begin(),
-                    myStrikes[i].end(),
-                    payoffIt,
-                    [spot = path[i].forwards[0], num = path[i].numeraire] (const double& k) 
-                    {
-                        return max(spot - k, 0.0) / num; 
-                    }
-            );
+		auto payoffIt = payoffs.begin();
+		for (size_t i = 0; i < numT; ++i)
+		{
+			transform(
+				myStrikes[i].begin(),
+				myStrikes[i].end(),
+				payoffIt,
+				[spot = path[i].forwards[0], num = path[i].numeraire]
+				(const double& k)
+				{
+					return max(spot - k, 0.0) / num;
+				}
+			);
 
-            payoffIt += myStrikes[i].size();
-        }
-    }
+			payoffIt += myStrikes[i].size();
+		}
+	}
 };
 
 //  Payoff = sum { (libor(Ti, Ti+1) + cpn) * coverage(Ti, Ti+1) only if Si+1 >= Si }
