@@ -18,13 +18,8 @@ As long as this comment is preserved at the top of the file
 #pragma warning(disable : 4018)
 
 #include "matrix.h"
-#include "mcBase.h"
 #include "interp.h"
 #include "utility.h"
-
-#include <string>
-#include <iterator>
-using namespace std;
 
 #define HALF_DAY 0.00136986301369863
 
