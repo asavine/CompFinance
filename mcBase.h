@@ -312,7 +312,6 @@ inline vector<vector<double>> mcParallelSimul(
             random->skipTo(firstPath);
 
             //  And conduct the simulations, exactly same as sequential
-            bool antiPath = false;
             for (size_t i = 0; i < pathsInTask; i++)
             {
                 //  Next Gaussian vector, dimension D
