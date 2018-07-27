@@ -22,7 +22,7 @@ using namespace std;
 //  Utility for interpolation
 //  Interpolates the vector y against knots x in value x0 
 //  Interpolation is linear or smooth, extrapolation is flat
-template <bool smoothStep, class ITX, class ITY, class T>
+template <bool smoothStep=false, class ITX, class ITY, class T>
 inline auto interp(
     //	sorted on xs 
     ITX                         xBegin,
@@ -62,7 +62,7 @@ inline auto interp(
 }
 
 //  2D
-template <bool smoothStep, class T, class U, class V, class W, class X>
+template <bool smoothStep=false, class T, class U, class V, class W, class X>
 inline V interp2D(
     //	sorted on xs 
     const vector<T>&            x,

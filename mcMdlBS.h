@@ -8,7 +8,6 @@ class BlackScholes : public Model<T>
     //  Today's spot
     //  That would be today's linear market in a production system
     T                   mySpot;
-    //  Normal : in units of spot, Lognormal : in %
     T                   myVol;
 
     //  Constant rate and dividend yield
@@ -21,7 +20,8 @@ class BlackScholes : public Model<T>
 
     //  Similuation timeline = today + product timeline
     vector<Time>        myTimeline;
-    bool                myTodayOnTimeline;  //  Is today on product timeline?
+    //  Is today on product timeline?
+    bool                myTodayOnTimeline;  
     //  The pruduct's defline byref
     const vector<SampleDef>*    myDefline;
 
@@ -127,7 +127,10 @@ public:
     }
 
     //  Initialize timeline
-    void allocate(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
+    void allocate(
+        const vector<Time>&         productTimeline, 
+        const vector<SampleDef>&    defline) 
+            override
     {
         //  Simulation timeline = today + product timeline
         myTimeline.clear();
@@ -137,17 +140,19 @@ public:
             if (time > systemTime) myTimeline.push_back(time);
         }
 
-        //  Mark steps on timeline that are on the product timeline
+        //  Is today on the timeline?
         myTodayOnTimeline = (productTimeline[0] == systemTime);
 
         //  Take a reference on the product's defline
         myDefline = &defline;
 
-        //  Allocate the standard devs and drifts over simulation timeline
+        //  Allocate the standard devs and drifts 
+        //      over simulation timeline
         myStds.resize(myTimeline.size() - 1);
         myDrifts.resize(myTimeline.size() - 1);
 
-        //  Allocate the numeraires, discount and forward factors over product timeline
+        //  Allocate the numeraires, discount and forward factors 
+        //      over product timeline
         const size_t n = productTimeline.size();
         myNumeraires.resize(n);
         
@@ -170,7 +175,10 @@ public:
         }
     }
 
-    void init(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
+    void init(
+        const vector<Time>&         productTimeline, 
+        const vector<SampleDef>&    defline) 
+            override
     {
         //  Pre-compute the standard devs and drifts over simulation timeline        
         const T mu = myRate - myDiv;
@@ -198,7 +206,8 @@ public:
             }
         }
 
-        //  Pre-compute the numeraires, discount and forward factors over product timeline
+        //  Pre-compute the numeraires, discount and forward factors 
+        //      over product timeline
         const size_t m = productTimeline.size();
 
         for (size_t i = 0; i < m; ++i)
@@ -216,8 +225,8 @@ public:
                 //  Under the risk neutral measure, numeraires are deterministic in Black-Scholes
                 else
                 {
-            myNumeraires[i] = exp(myRate * productTimeline[i]);
-        }
+                    myNumeraires[i] = exp(myRate * productTimeline[i]);
+                }
             }
         }
 
@@ -227,7 +236,8 @@ public:
             const size_t p = defline[i].discountMats.size();
             for (size_t j = 0; j < p; ++j)
             {
-                myDiscounts[i][j] = exp(-myRate * (defline[i].discountMats[j] - productTimeline[i]));
+                myDiscounts[i][j] = 
+            exp(-myRate * (defline[i].discountMats[j] - productTimeline[i]));
             }
         }
 
@@ -237,7 +247,8 @@ public:
             const size_t p = defline[i].forwardMats.size();
             for (size_t j = 0; j < p; ++j)
             {
-                myForwardFactors[i][j] = exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
+                myForwardFactors[i][j] = 
+            exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
             }
         }
 
@@ -247,7 +258,8 @@ public:
             const size_t p = defline[i].liborDefs.size();
             for (size_t j = 0; j < p; ++j)
             {
-                const double dt = defline[i].liborDefs[j].end - defline[i].liborDefs[j].start;
+                const double dt 
+                    = defline[i].liborDefs[j].end - defline[i].liborDefs[j].start;
                 myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
             }
         }
@@ -263,12 +275,13 @@ private:
 
     //  Helper function, fills a Sample given the spot
     inline void fillScen(
-        const size_t idx,   //  index on product timeline
-        const T& spot,      //  spot
-        Sample<T>&      scen   //  Sample to fill
-    ) const
+        const size_t        idx,    //  index on product timeline
+        const T&            spot,   //  spot
+        Sample<T>&          scen,   //  Sample to fill
+        const SampleDef&    def)    //  and its definition
+            const
     {
-        if ((*myDefline)[idx].numeraire)
+        if (def.numeraire)
         {
         scen.numeraire = myNumeraires[idx];
             if (mySpotMeasure) scen.numeraire *= spot;
@@ -294,7 +307,10 @@ public:
     //  Generate one path, consume Gaussian vector
     //  path must be pre-allocated 
     //  with the same size as the product timeline
-    void generatePath(const vector<double>& gaussVec, Scenario<T>& path) const override
+    void generatePath(
+        const vector<double>&   gaussVec, 
+        Scenario<T>&            path) 
+            const override
     {
         //  The starting spot
         //  We know that today is on the timeline
@@ -304,21 +320,21 @@ public:
         //  Is today on the product timeline?
         if (myTodayOnTimeline)
         {
-            fillScen(idx, spot, path[idx]);
+            fillScen(idx, spot, path[idx], (*myDefline)[idx]);
             ++idx;
         }
 
+        //  Iterate through timeline, apply sampling scheme
         const size_t n = myTimeline.size() - 1;
-            //  Iterate through timeline
-            for (size_t i = 0; i < n; ++i)
-            {
-                //  Apply known conditional distributions 
-                    //  Black-Scholes
-                spot = spot * exp(myDrifts[i] 
-                    + myStds[i] * gaussVec[i]);
-                //  Store on the path
-                fillScen(idx, spot, path[idx]);
-                ++idx;
+        for (size_t i = 0; i < n; ++i)
+        {
+            //  Apply known conditional distributions 
+                //  Black-Scholes
+            spot = spot * exp(myDrifts[i] 
+                + myStds[i] * gaussVec[i]);
+            //  Store on the path
+            fillScen(idx, spot, path[idx], (*myDefline)[idx]);
+            ++idx;
         }
     }
 };

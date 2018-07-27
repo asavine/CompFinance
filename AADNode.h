@@ -26,12 +26,6 @@ class Node
 	friend auto setNumResultsForAAD(const bool, const size_t);
 	friend struct numResultsResetterForAAD;
 
-    //  Number of adjoints (results) to propagate, usually 1
-    static size_t   numAdj;
-
-    //  Number of childs (arguments)
-    const size_t n;
-
     //  The adjoint(s) 
 	//	in single case, self held
 	double			mAdjoint = 0;
@@ -46,6 +40,12 @@ class Node
     //  the n pointers to the adjoints of arguments
     double**        pAdjPtrs;
 
+    //  Number of adjoints (results) to propagate, usually 1
+    static size_t   numAdj;
+
+    //  Number of childs (arguments)
+    const size_t    n;
+
 public:
 
     Node(const size_t N = 0) : n(N) {}
@@ -53,7 +53,7 @@ public:
     //  Access to adjoint(s)
 	//	single
     double& adjoint() 
-{
+    {
 		return mAdjoint;
 	}
 	//	multi
@@ -68,9 +68,9 @@ public:
 		if (!n || !mAdjoint) return;
 
 		for (size_t i = 0; i < n; ++i)
-    {
+        {
 			*(pAdjPtrs[i]) += pDerivatives[i] * mAdjoint;
-    }
+        }
     }
 
     //  Multi case
@@ -82,14 +82,14 @@ public:
             return;
 
         for (size_t i = 0; i < n; ++i)
-    {
+        {
             double *adjPtrs = pAdjPtrs[i], ders = pDerivatives[i];
 
             //  Vectorized!
             for (size_t j = 0; j < numAdj; ++j)
-        {
+            {
                 adjPtrs[j] += ders * pAdjoints[j];
+            }
         }
-    }
     }
 };

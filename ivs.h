@@ -24,11 +24,11 @@ As long as this comment is preserved at the top of the file
 template <class T>
 class RiskView
 {
-    bool myEmpty;
+    bool            myEmpty;
 
-    vector<double> myStrikes;
-    vector<Time> myMats;
-    matrix<T> mySpreads;
+    vector<double>  myStrikes;
+    vector<Time>    myMats;
+    matrix<T>       mySpreads;
 
 public:
 
@@ -38,16 +38,19 @@ public:
     //  Intializes risk view AND put on tape
     //  Sets all spreads to 0
     RiskView(const vector<double>& strikes, const vector<Time>& mats) :
-        myEmpty(false), myStrikes(strikes), myMats(mats), mySpreads(strikes.size(), mats.size())
+        myEmpty(false), 
+        myStrikes(strikes), 
+        myMats(mats), 
+        mySpreads(strikes.size(), mats.size())
     {
-        for (auto& spr : mySpreads) spr = convert<T>(0.0);
+        for (auto& spr : mySpreads) spr = T(0.0);
     }
 
     //  Get spread
     T spread(const double strike, const Time mat) const
     {
         return myEmpty
-            ? convert<T>(0.0) 
+            ? T(0.0) 
             : interp2D<true>(myStrikes, myMats, mySpreads, strike, mat);
     }
 
@@ -76,7 +79,7 @@ public:
 
 class IVS
 {
-    //  To avoid refer a linear market
+    //  To avoid reference to a linear market
     double mySpot;
 
 public:
@@ -104,7 +107,7 @@ public:
             mySpot,
             strike,
             impliedVol(strike, mat) 
-                + (risk ? risk->spread(strike, mat) : convert<T>(0.0)),
+                + (risk ? risk->spread(strike, mat) : T(0.0)),
             mat);
     }
 

@@ -25,20 +25,20 @@ class Number
     Node* myNode;
 
     //  Create node
-
 	template <size_t N>
-	Node* createNode()
+	void createNode()
     {
-		return tape->recordNode<N>();
+		myNode = tape->recordNode<N>();
     }
 
 	//	Access node (friends only)
+    //  Note const incorectness
 	Node& node() const 
     {
 		return const_cast<Node&>(*myNode);
     }
 
-    //	Convenient access for friends
+    //	Convenient access to node data for friends
 
     double& derivative() { return myNode->pDerivatives[0]; }
     double& lDer() { return myNode->pDerivatives[0]; }
@@ -52,9 +52,10 @@ class Number
 	
 	//	Unary
 	Number(Node& arg, const double val) :
-		myValue(val),
-		myNode(createNode<1>())
+		myValue(val)
     {
+        createNode<1>();
+
 		myNode->pAdjPtrs[0] = Tape::multi
 			? arg.pAdjoints 
 			: &arg.mAdjoint;
@@ -62,10 +63,11 @@ class Number
 
 	//	Binary
 	Number(Node& lhs, Node& rhs, const double val) :
-		myValue(val),
-		myNode(createNode<2>())
+		myValue(val)
 	{
-		if (Tape::multi)
+        createNode<2>();
+        
+        if (Tape::multi)
 		{
 			myNode->pAdjPtrs[0] = lhs.pAdjoints;
 			myNode->pAdjPtrs[1] = rhs.pAdjoints;
@@ -87,16 +89,17 @@ public:
     Number() {}
 
     explicit Number(const double val) :
-		myValue(val),
-		myNode(createNode<0>())
-    {}
+		myValue(val)
+    {
+        createNode<0>();
+    }
 
     //  Assignments
 
     Number& operator=(const double val)
     {
         myValue = val;
-		myNode = createNode<0>();
+		createNode<0>();
 
         return *this;
     }
@@ -104,7 +107,7 @@ public:
     //  Put on tape
     void putOnTape()
     {
-		myNode = createNode<0>();
+		createNode<0>();
     }
 
     //  Explicit coversion to double
@@ -173,24 +176,16 @@ public:
         //  Set this adjoint to 1
         adjoint() = 1.0;
         //  Find node on tape
-        auto it = tape->find(myNode);
-        //  Reverse and propagate until we hit the stop
-        while (it != propagateTo)
-        {
-            it->propagateOne();
-            --it;
-        }
-        it->propagateOne();
+        auto propagateFrom = tape->find(myNode);
+        propagateAdjoints(propagateFrom, propagateTo);
     }
 
     //  These 2 set the adjoint to 1 on this node
-    void propagateToStart(
-        const bool reset = false)
+    void propagateToStart()
     {
         propagateAdjoints(tape->begin());
     }
-    void propagateToMark(
-        const bool reset = false)
+    void propagateToMark()
     {
         propagateAdjoints(tape->markIt());
     }

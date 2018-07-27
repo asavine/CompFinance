@@ -16,11 +16,11 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
-//  AAD with expression templates
-#define AADET   true        
-
 //  So we can instrument Gaussians like standard math functions
 #include "gaussians.h"
+
+//  AAD with expression templates
+#define AADET   true
 
 #if AADET
 
@@ -61,58 +61,10 @@ inline void putOnTape(IT begin, IT end)
 
 //	Converters
 
-template<class To, class From>
-struct Convert;
-
-template<>
-struct Convert<double, double>
-{
-    static inline double convert(const double from)
-    {
-        return from;
-    }
-};
-
-template<class T>
-struct Convert<T, T>
-{
-    static inline T convert(const T from)
-    {
-        return from;
-    }
-};
-
-template<>
-struct Convert<Number, double>
-{
-    static inline Number convert(const double from)
-    {
-        return Number(from);
-    }
-};
-
-template<class T>
-struct Convert<double, T>
-{
-    static inline double convert(const T from)
-    {
-        return from.value();
-    }
-};
-
-template<class To, class From>
-inline To convert(const From from)
-{
-    return Convert<To, From>::convert(from);
-}
-
 template<class It1, class It2>
 inline void convertCollection(It1 srcBegin, It1 srcEnd, It2 destBegin)
 {
     using destType = remove_reference_t<decltype(*destBegin)>;
-
-    while (srcBegin != srcEnd)
-    {
-        *destBegin++ = convert<destType>(*srcBegin++);
-    }
+    transform(srcBegin, srcEnd, destBegin, 
+        [](const auto& source) { return destType(source); });
 }

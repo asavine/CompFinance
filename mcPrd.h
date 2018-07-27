@@ -38,9 +38,9 @@ class European : public Product<T>
 public:
 
     //  Constructor: store data and build timeline
-    European(const double strike, 
-        const Time exerciseDate,
-        const Time settlementDate) :
+    European(const double   strike, 
+        const Time          exerciseDate,
+        const Time          settlementDate) :
         myStrike(strike),
         myExerciseDate(exerciseDate),
         mySettlementDate(settlementDate),
@@ -64,17 +64,20 @@ public:
         ost << fixed;
         if (settlementDate == exerciseDate)
         {
-            ost << "call " << myStrike << " " << exerciseDate;
+            ost << "call " << myStrike << " " 
+                << exerciseDate;
         }
         else
         {
-            ost << "call " << myStrike << " " << exerciseDate << " " << settlementDate;
+            ost << "call " << myStrike << " " 
+                << exerciseDate << " " << settlementDate;
         }
         myLabels[0] = ost.str();
     }
 
-    European(const double strike,
-        const Time exerciseDate) : European(strike, exerciseDate, exerciseDate)
+    European(const double   strike,
+        const Time          exerciseDate) : 
+        European(strike, exerciseDate, exerciseDate)
     {}
 
     //  Virtual copy constructor
@@ -145,7 +148,7 @@ public:
         mySmooth(smooth),
         myLabels(2)
     {
-        //  Produce timeline
+        //  Timeline
 
         //  Today
         myTimeline.push_back(systemTime);
@@ -227,9 +230,9 @@ public:
     {
         //  We apply the smooth barrier technique to stabilize risks
         //  See Savine's presentation on Fuzzy Logic, Global Derivatives 2016
-        //  Or Andreasen and Savine's publication on scripting
 
-        //  We apply a smoothing factor of x% of the spot both ways, untemplated
+        //  We apply a smoothing factor of x% of the spot both ways
+        //  untemplated
         const double smooth = double(path[0].forwards[0] * mySmooth),
             twoSmooth = 2 * smooth,
             barSmooth = myBarrier + smooth;
@@ -255,7 +258,8 @@ public:
         }
 
         //  Payoff
-        payoffs[1] = max(path.back().forwards[0] - myStrike, 0.0) / path.back().numeraire;
+        payoffs[1] = max(path.back().forwards[0] - myStrike, 0.0) 
+                        / path.back().numeraire;
         payoffs[0] = alive * payoffs[1];
     }
 };
@@ -371,7 +375,8 @@ public:
 	}
 };
 
-//  Payoff = sum { (libor(Ti, Ti+1) + cpn) * coverage(Ti, Ti+1) only if Si+1 >= Si }
+//  Payoff = sum { (libor(Ti, Ti+1) + cpn) 
+//      * coverage(Ti, Ti+1) only if Si+1 >= Si }
 template <class T>
 class ContingentBond : public Product<T>
 {
@@ -403,7 +408,7 @@ public:
         mySmooth(smooth),
         myLabels(1)
     {
-        //  Produce timeline
+        //  Timeline
 
         //  Today
         myTimeline.push_back(systemTime);
@@ -425,7 +430,8 @@ public:
 
         //  Defline
 
-        //  Payoff = sum { (libor(Ti, Ti+1) + cpn) * coverage(Ti, Ti+1) only if Si+1 >= Si }
+        //  Payoff = sum { (libor(Ti, Ti+1) + cpn) 
+        //      * coverage(Ti, Ti+1) only if Si+1 >= Si }
         //  We need spot ( = forward (Ti, Ti) ) on every step,
         //  and libor (Ti, Ti+1) on on every step but the last
         //  (coverage is assumed act/365)
@@ -437,7 +443,8 @@ public:
             //  spot(Ti) = forward (Ti, Ti) needed on every step
             myDefline[i].forwardMats.push_back(myTimeline[i]);
 
-            //  libor(Ti, Ti+1) and discount (Ti, Ti+1) needed on every step but last
+            //  libor(Ti, Ti+1) and discount (Ti, Ti+1) needed 
+            //      on every step but last
             if (i < n - 1)
             {
                 myDefline[i].liborDefs.push_back(
@@ -490,10 +497,10 @@ public:
     {
         //  We apply the smooth digital technique to stabilize risks
         //  See Savine's presentation on Fuzzy Logic, Global Derivatives 2016
-        //  Or Andreasen and Savine's publication on scripting
 
-        //  We apply a smoothing factor of x% of the spot both ways, untemplated
-        const double smooth = convert<double>(path[0].forwards[0] * mySmooth),
+        //  We apply a smoothing factor of x% of the spot both ways
+        //  untemplated
+        const double smooth = double(path[0].forwards[0] * mySmooth),
             twoSmooth = 2 * smooth;
 
         //  Period by period

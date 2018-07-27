@@ -208,12 +208,6 @@ public:
 			[](const unsigned long i) {return invNormalCdf(ONEOVER2POW32 * i); });
     }
 
-    //  Access dimension
-    size_t simDim() const override
-    {
-        return myDim;
-    }
-
     //  Skip ahead (from 0 to b)
     void skipTo(const long b) override
     {
@@ -250,6 +244,3 @@ public:
         mySimCount = unsigned long(b);
     }
 };
-
-
-

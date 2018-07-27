@@ -403,7 +403,7 @@ inline auto dupireAADRisk(
     //  Vegas
 
     results.vega.resize(dupire->spots().size(), dupire->times().size());
-    copy(++simulResults.risks.begin(), simulResults.risks.end(), results.vega.begin());
+    copy(next(simulResults.risks.begin()), simulResults.risks.end(), results.vega.begin());
 
     return results;
 }
@@ -524,7 +524,13 @@ inline auto
     RiskView<Number> riskView(strikes, mats);
 
     //  Calibrate again, in AAD mode, make tape
-    auto nParams = dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
+    auto nParams = dupireCalib(
+        ivs, 
+        inclSpots, 
+        maxDs, 
+        inclTimes, 
+        maxDtVol, 
+        riskView);
     matrix<Number>& nLvols = nParams.lVols;
 
     //  Seed local vol adjoints on tape with microbucket results
@@ -660,7 +666,7 @@ inline auto
     for (size_t i = 0; i < n; ++i) for (size_t j = 0; j < m; ++j)
     {
         //  Bump
-        riskView.bump(i, j, 1.0e-04);
+        riskView.bump(i, j, 1.0e-05);
         //  Recalibrate
         auto bumpedCalib = dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDtVol, riskView);
         //  Recreate model
@@ -670,9 +676,9 @@ inline auto
         //  Pick results and differentiate
         results.vega[i][j] = (
             inner_product(vnots.begin(), vnots.end(), bumpedVals.values.begin(), 0.0)
-            - results.value) * 1.0e+04;
+            - results.value) * 1.0e+05;
         //  Unbump
-        riskView.bump(i, j, -1.0e-04);
+        riskView.bump(i, j, -1.0e-05);
     }
 
     //  Copy results and strikes

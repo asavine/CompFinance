@@ -71,11 +71,11 @@ public:
     //  Constructor: store data
     
     template <class U>
-    Dupire(const U spot,
-        const vector<double> spots,
-        const vector<Time> times,
-        const matrix<U> vols,
-        const Time maxDt = 0.25)
+    Dupire(const U              spot,
+        const vector<double>    spots,
+        const vector<Time>      times,
+        const matrix<U>         vols,
+        const Time maxDt =      0.25)
         : mySpot(spot),
         mySpots(spots),
         myLogSpots(mySpots.size()),
@@ -114,7 +114,8 @@ private:
     void setParamPointers()
     {
         myParameters[0] = &mySpot;
-        transform(myVols.begin(), myVols.end(), ++myParameters.begin(), [](auto& vol) {return &vol; });
+        transform(myVols.begin(), myVols.end(), next(myParameters.begin()), 
+            [](auto& vol) {return &vol; });
     }
 
 public:
@@ -159,7 +160,10 @@ public:
     }
 
     //  Initialize timeline
-    void allocate(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
+    void allocate(
+        const vector<Time>&         productTimeline, 
+        const vector<SampleDef>&    defline) 
+            override
     {
         //  Fill from product timeline
         
@@ -168,7 +172,7 @@ public:
             productTimeline, // Original (product) timeline
             myMaxDt, // Maximum space allowed
             HALF_DAY, // Minimum distance = half day
-            &systemTime, &systemTime + 1);  //  Dirty hack to include system time
+            &systemTime, &systemTime + 1);  //  Hack to include system time
         
         //  Mark steps on timeline that are on the product timeline
         myCommonSteps.resize(myTimeline.size());
@@ -186,7 +190,10 @@ public:
         myInterpVols.resize(myTimeline.size() - 1, mySpots.size());
     }
 
-    void init(const vector<Time>& productTimeline, const vector<SampleDef>& defline) override
+    void init(
+        const vector<Time>&         productTimeline, 
+        const vector<SampleDef>&    defline) 
+            override
     {
         //  Compute the local volatilities
         //      pre-interpolated in time and multiplied by sqrt(dt)
@@ -197,7 +204,7 @@ public:
             const size_t m = myLogSpots.size();
             for (size_t j = 0; j < m; ++j)
             {
-                myInterpVols[i][j] = sqrtdt * interp<false>(
+                myInterpVols[i][j] = sqrtdt * interp(
                     myTimes.begin(),
                     myTimes.end(),
                     myVols[j],
@@ -226,7 +233,10 @@ public:
     //  Generate one path, consume Gaussian vector
     //  path must be pre-allocated 
     //  with the same size as the product timeline
-    void generatePath(const vector<double>& gaussVec, Scenario<T>& path) const override
+    void generatePath(
+        const vector<double>& gaussVec, 
+        Scenario<T>& path) 
+            const override
     {
         //  The starting spot
         //  We know that today is on the timeline
@@ -247,7 +257,7 @@ public:
         for (size_t i = 0; i < n; ++i)
         {
             //  Interpolate volatility in spot
-            T vol = interp<false>(
+            T vol = interp(
                 myLogSpots.begin(),
                 myLogSpots.end(),
                 myInterpVols[i],
@@ -294,7 +304,7 @@ inline void dupireCalibMaturity(
     const size_t nSpots = distance(spotsBegin, spotsEnd);
 
     //  Estimate ATM so we cut the grid 2 stdevs away to avoid instabilities
-    const double atmCall = convert<double>(ivs.call(ivs.spot(), maturity));
+    const double atmCall = double(ivs.call(ivs.spot(), maturity));
     //  Standard deviation, approx. atm call * sqrt(2pi)
     const double std = atmCall * 2.506628274631;
 

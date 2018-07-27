@@ -13,14 +13,14 @@ class mrg32k3a : public RNG
     unsigned long long          myXn, myXn1, myXn2, myYn, myYn1, myYn2;
 
     //  Constants
-    static const unsigned long long m1 = 4294967087;
-    static const unsigned long long m2 = 4294944443;
-    static const unsigned long long a12 = 1403580;
-    static const unsigned long long a13 = 810728;
-    static const unsigned long long a21 = 527612;
-    static const unsigned long long a23 = 1370589;
-    static const unsigned long long m1Minusa13 = 4294156359;
-    static const unsigned long long m2Minusa23 = 4293573854;
+    static constexpr  unsigned long long m1 = 4294967087;
+	static constexpr  unsigned long long m2 = 4294944443;
+	static constexpr  unsigned long long a12 = 1403580;
+	static constexpr  unsigned long long a13 = 810728;
+	static constexpr  unsigned long long a21 = 527612;
+	static constexpr  unsigned long long a23 = 1370589;
+	static constexpr  unsigned long long m1Minusa13 = 4294156359;
+	static constexpr  unsigned long long m2Minusa23 = 4293573854;
 
     //  Produce next number and update state
     double nextNumber()
@@ -37,7 +37,6 @@ class mrg32k3a : public RNG
 
         //  Compute uniform
         const double u = x > y ? double((x - y) % m1) / m1 : double((x + m1 - y) % m1) / m1;
-        //  Return Gaussian
         return u;
     }
 
@@ -76,12 +75,6 @@ public:
     void nextG(vector<double>& gaussVec) override
     {
         for (size_t i = 0; i < myDim; ++i) gaussVec[i] = invNormalCdf(nextNumber());
-    }
-
-    //  Access dimension
-    size_t simDim() const override
-    {
-        return myDim;
     }
 
     //  Matrix product with modulus
