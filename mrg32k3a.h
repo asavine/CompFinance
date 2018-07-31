@@ -58,7 +58,7 @@ public:
     //  Virtual copy constructor
     unique_ptr<RNG> clone() const override
     {
-        return unique_ptr<RNG>(new mrg32k3a(*this));
+        return make_unique<mrg32k3a>(*this);
     }
 
     //  Initializer 

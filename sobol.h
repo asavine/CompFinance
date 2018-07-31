@@ -69,7 +69,7 @@ public:
     //  Virtual copy constructor
     unique_ptr<RNG> clone() const override
     {
-        return unique_ptr<RNG>(new Sobol(*this));
+        return make_unique<Sobol>(*this);
     }
 
     //  Initializer 

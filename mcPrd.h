@@ -83,7 +83,7 @@ public:
     //  Virtual copy constructor
     unique_ptr<Product<T>> clone() const override
     {
-        return unique_ptr<Product<T>>(new European<T>(*this));
+        return make_unique<European<T>>(*this);
     }
 
     //  Timeline
@@ -106,7 +106,7 @@ public:
 
     //  Payoffs, maturity major
     void payoffs(
-        //  path, one entry per time step (on the product timeline)
+        //  path, one entry per time step
         const Scenario<T>&          path,
         //  pre-allocated space for resulting payoffs
         vector<T>&                  payoffs)
@@ -199,7 +199,7 @@ public:
     //  Virtual copy constructor
     unique_ptr<Product<T>> clone() const override
     {
-        return unique_ptr<Product<T>>(new UOC<T>(*this));
+        return make_unique<UOC<T>>(*this);
     }
 
     //  Timeline
@@ -222,7 +222,7 @@ public:
 
     //  Payoff
     void payoffs(
-        //  path, one entry per time step (on the product timeline)
+        //  path, one entry per time step 
         const Scenario<T>&          path,
         //  pre-allocated space for resulting payoffs
         vector<T>&                  payoffs)
@@ -325,7 +325,7 @@ public:
 	//  Virtual copy constructor
 	unique_ptr<Product<T>> clone() const override
 	{
-		return unique_ptr<Product<T>>(new Europeans<T>(*this));
+		return make_unique<Europeans<T>>(*this);
 	}
 
 	//  Timeline
@@ -348,13 +348,13 @@ public:
 
 	//  Payoffs, maturity major
 	void payoffs(
-		//  path, one entry per time step (on the product timeline)
+		//  path, one entry per time step 
 		const Scenario<T>&          path,
 		//  pre-allocated space for resulting payoffs
 		vector<T>&                  payoffs)
 		const override
 	{
-		const size_t numT = myMaturities.size(), numK = myStrikes.size();
+		const size_t numT = myMaturities.size();
 
 		auto payoffIt = payoffs.begin();
 		for (size_t i = 0; i < numT; ++i)
@@ -466,7 +466,7 @@ public:
     //  Virtual copy constructor
     unique_ptr<Product<T>> clone() const override
     {
-        return unique_ptr<Product<T>>(new ContingentBond<T>(*this));
+        return make_unique<ContingentBond<T>>(*this);
     }
 
     //  Timeline
@@ -489,7 +489,7 @@ public:
 
     //  Payoff
     void payoffs(
-        //  path, one entry per time step (on the product timeline)
+        //  path, one entry per time step 
         const Scenario<T>&          path,
         //  pre-allocated space for resulting payoffs
         vector<T>&                  payoffs)

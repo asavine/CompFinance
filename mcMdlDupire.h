@@ -86,7 +86,7 @@ public:
         myParameterLabels(myVols.rows() * myVols.cols() + 1)
     {
         //  Compute log spots
-        transform(mySpots.begin(), mySpots.end(), myLogSpots.begin(), 
+		transform(mySpots.begin(), mySpots.end(), myLogSpots.begin(), 
             [](const double s) {return log(s); });
 
         //  Set parameter labels once 
@@ -154,9 +154,9 @@ public:
     //  Virtual copy constructor
     unique_ptr<Model<T>> clone() const override
     {
-        auto clone = new Dupire<T>(*this);
+        auto clone = make_unique<Dupire<T>>(*this);
         clone->setParamPointers();
-        return unique_ptr<Model<T>>(clone);
+        return clone;
     }
 
     //  Initialize timeline

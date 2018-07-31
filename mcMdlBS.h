@@ -121,9 +121,9 @@ public:
     //  Virtual copy constructor
     unique_ptr<Model<T>> clone() const override
     {
-        auto clone = new BlackScholes<T>(*this);
+        auto clone = make_unique<BlackScholes<T>>(*this);
         clone->setParamPointers();
-        return unique_ptr<Model<T>>(clone);
+        return clone;
     }
 
     //  Initialize timeline
@@ -210,60 +210,53 @@ public:
         //      over product timeline
         const size_t m = productTimeline.size();
 
-        for (size_t i = 0; i < m; ++i)
-        {
-            //  Numeraire
-            if (defline[i].numeraire)
-            {
-                //  Under the spot measure, the numeraire is the spot with reinvested dividend
-                //      num(t) = spot(t) / spot(0) * exp(div * t)
-                //      we precalculate exp(div * t) / spot(0)
-                if (mySpotMeasure)
-                {
-                    myNumeraires[i] = exp(myDiv * productTimeline[i]) / mySpot;
-                }
-                //  Under the risk neutral measure, numeraires are deterministic in Black-Scholes
-                else
-                {
-                    myNumeraires[i] = exp(myRate * productTimeline[i]);
-                }
-            }
-        }
+		for (size_t i = 0; i < m; ++i)
+		{
+			//  Numeraire
+			if (defline[i].numeraire)
+			{
+				//  Under the spot measure, 
+				//      the numeraire is the spot with reinvested dividend
+				//      num(t) = spot(t) / spot(0) * exp(div * t)
+				//      we precalculate exp(div * t) / spot(0)
+				if (mySpotMeasure)
+				{
+					myNumeraires[i] = exp(myDiv * productTimeline[i]) / mySpot;
+				}
+				//  Under the risk neutral measure, 
+				//      numeraire is deterministic in Black-Scholes = exp(rate * t)
+				else
+				{
+					myNumeraires[i] = exp(myRate * productTimeline[i]);
+				}
+			}
 
-        for (size_t i = 0; i < m; ++i)
-        {
-            //  Discount factors
-            const size_t p = defline[i].discountMats.size();
-            for (size_t j = 0; j < p; ++j)
-            {
-                myDiscounts[i][j] = 
-            exp(-myRate * (defline[i].discountMats[j] - productTimeline[i]));
-            }
-        }
+			//  Discount factors
+			const size_t pDF = defline[i].discountMats.size();
+			for (size_t j = 0; j < pDF; ++j)
+			{
+				myDiscounts[i][j] =
+					exp(-myRate * (defline[i].discountMats[j] - productTimeline[i]));
+			}
 
-        for (size_t i = 0; i < m; ++i)
-        {
-            //  Forward factors
-            const size_t p = defline[i].forwardMats.size();
-            for (size_t j = 0; j < p; ++j)
-            {
-                myForwardFactors[i][j] = 
-            exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
-            }
-        }
+			//  Forward factors
+			const size_t pFF = defline[i].forwardMats.size();
+			for (size_t j = 0; j < pFF; ++j)
+			{
+				myForwardFactors[i][j] =
+					exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
+			}
 
-        for (size_t i = 0; i < m; ++i)
-        {
-            //  Libors
-            const size_t p = defline[i].liborDefs.size();
-            for (size_t j = 0; j < p; ++j)
-            {
-                const double dt 
-                    = defline[i].liborDefs[j].end - defline[i].liborDefs[j].start;
-                myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
-            }
-        }
-    }
+			//  Libors
+			const size_t pL = defline[i].liborDefs.size();
+			for (size_t j = 0; j < pL; ++j)
+			{
+				const double dt
+					= defline[i].liborDefs[j].end - defline[i].liborDefs[j].start;
+				myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
+			}
+		}   //  loop on event dates
+	}
 
     //  MC Dimension
     size_t simDim() const override
