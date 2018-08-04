@@ -35,6 +35,20 @@ class Number
     //  Note const incorectness
 	Node& node() const 
     {
+
+#ifdef _DEBUG
+
+		//	Find node on tape
+		auto it = tape->find(myNode);
+
+		//	Not found
+		if (it == tape->end())
+		{
+			throw runtime_error("Put a breakpoint here");
+		}
+
+#endif
+
 		return const_cast<Node&>(*myNode);
     }
 

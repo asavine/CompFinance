@@ -84,13 +84,22 @@ public:
     //  Rewind
     void rewind()
     {
-        if (multi)
-        {
-            myAdjointsMulti.rewind();
-        }
+
+#ifdef _DEBUG
+
+		clear();
+
+#else
+		if (multi)
+		{
+			myAdjointsMulti.rewind();
+		}
 		myDers.rewind();
 		myArgPtrs.rewind();
 		myNodes.rewind();
+
+#endif
+
     }
 
     //  Set mark

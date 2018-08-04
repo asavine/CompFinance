@@ -81,7 +81,7 @@ private:
         myParameters[0] = &mySpot;
         myParameters[1] = &myVol;
         myParameters[2] = &myRate;
-        myParameters[3] = &myDiv;
+		myParameters[3] = &myDiv;
     }
 
 public:
