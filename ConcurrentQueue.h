@@ -16,6 +16,9 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+//  Concurrent queue of chapter 3, 
+//  Used in the thread pool
+
 #include <queue>
 #include <mutex>
 using namespace std;
@@ -42,7 +45,7 @@ public:
 		return myQueue.empty();
 	}	//	Unlock
 
-		//	Pop into argument
+    //	Pop into argument
 	bool tryPop(T& t)
 	{
 		//	Lock
@@ -56,7 +59,7 @@ public:
 		return true;
 	}	//	Unlock
 
-		//	Pass t byVal or move with push( move( t))
+    //	Pass t byVal or move with push( move( t))
 	void push(T t)
 	{
 		{
@@ -66,7 +69,7 @@ public:
 			myQueue.push(move(t));
 		}	//	Unlock before notification
 
-			//	Unlock before notification 
+        //	Unlock before notification 
 		myCV.notify_one();
 	}
 

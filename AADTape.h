@@ -1,5 +1,12 @@
 #pragma once
 
+//  AAD implementation of chapter 10
+//  (With multi-dimensional additions of chapter 14)
+
+//  Implementation of the Tape 
+
+//  Unchanged for AADET of chapter 15
+
 #include "blocklist.h"
 #include "AADNode.h"
 
@@ -12,7 +19,7 @@ class Tape
 	//	Working with multiple results / adjoints?
 	static bool							multi;
 
-	//  Storage for adjoints
+	//  Storage for adjoints in multi-dimensional case (chapter 14)
     blocklist<double, ADJSIZE>			myAdjointsMulti;
     
 	//  Storage for derivatives and child adjoint pointers
@@ -57,6 +64,7 @@ public:
         return node;
     }
 
+    //  Reset all adjoints to 0
 	void resetAdjoints()
 	{
 		if (multi)
@@ -87,9 +95,14 @@ public:
 
 #ifdef _DEBUG
 
+        //  In debug mode, always wipe
+        //      makes it easier to identify errors
+
 		clear();
 
 #else
+        //  In release mode, rewind and reuse
+
 		if (multi)
 		{
 			myAdjointsMulti.rewind();

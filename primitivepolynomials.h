@@ -1,12 +1,12 @@
 
-// this file is a slightly edited version of
+// This file is a slightly edited version of
 // PrimitivePolynomialsModuloTwoUpToDegree27.h
 // © 2002 "Monte Carlo Methods in Finance"
 // as provided ready for compilation in the directory
 // "PrimitivePolynomialsModuloTwo" on the CD accompanying the book
 // "Monte Carlo Methods in Finance" by Peter Jaeckel.
 //
-// the original copyright is:
+// The original copyright is:
 // ===========================================================================
 // Copyright (C) 2002 "Monte Carlo Methods in Finance". All rights reserved.
 //

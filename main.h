@@ -14,6 +14,8 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
+//  Entry points to the library
+
 #pragma once
 
 #include "mcBase.h"
@@ -36,6 +38,7 @@ struct NumericalParam
     int               seed2 = 1234;
 };
 
+//  Price product in model
 inline auto value(
     const Model<double>&    model,
     const Product<double>&  product,
@@ -72,7 +75,7 @@ inline auto value(
     return results;
 }
 
-//  Generic valuation
+//  Overload that picks product and model by name in the store
 inline auto value(
     const string&           modelId,
     const string&           productId,
@@ -91,7 +94,7 @@ inline auto value(
     return value(*model, *product, num);
 }
 
-//  Generic risk
+//  AAD risk, one payoff
 inline auto AADriskOne(
     const string&           modelId,
     const string&           productId,
@@ -168,6 +171,7 @@ inline auto AADriskOne(
     return results;
 }
 
+//  AAD risk, aggregate portfolio
 inline auto AADriskAggregate(
     const string&           modelId,
     const string&           productId,
@@ -260,6 +264,7 @@ struct RiskReports
     matrix<double> risks;
 };
 
+//  Itemized AAD risk, one per payoff
 inline RiskReports AADriskMulti(
     const string&           modelId,
     const string&           productId,
@@ -305,12 +310,8 @@ inline RiskReports AADriskMulti(
     return results;
 }
 
-//  Returns a vector of values and a matrix of risks 
-//      with payoffs in columns and parameters in rows
-//      along with ids of payoffs and parameters
-
-//  Same format as AADriskMulti
-
+//  Bump risk, itemized
+//  Same result format as AADriskMulti()
 inline RiskReports bumpRisk(
     const string&           modelId,
     const string&           productId,
@@ -434,6 +435,8 @@ dupireCalib(
     //  Go
     return dupireCalib(ivs, inclSpots, maxDs, inclTimes, maxDt);
 }
+
+//  Superbucket
 
 struct SuperbucketResults
 {
@@ -563,6 +566,8 @@ inline auto
     //  Return results
     return results;
 }
+
+//  Superbucket with bumps
 
 //  Returns value, delta, strikes, maturities 
 //      and vega = derivatives to implied vols = superbucket

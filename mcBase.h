@@ -16,6 +16,10 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+//  Main file in the simulation library
+//  All the base classes and template algorithms
+//  See chapters 6, 7, 12 and 14
+
 #include "AAD.h"
 
 #include <vector>
@@ -32,6 +36,9 @@ using namespace std;
 
 using Time = double;
 extern Time systemTime;
+
+//  Scenarios
+//  =========
 
 //  SampleDef = definition 
 //      of what data must be simulated
@@ -103,6 +110,9 @@ inline void initializePath(Scenario<T>& path)
     for (auto& scen : path) scen.initialize();
 }
 
+//  Products
+//  ========
+
 template <class T>
 class Product
 {
@@ -128,6 +138,9 @@ public:
 
     virtual ~Product() {}
 };
+
+//  Models
+//  ======
 
 template <class T>
 class Model
@@ -191,6 +204,9 @@ private:
     }
 };
 
+//  Random number generators
+//  ========================
+
 class RNG
 {
 public:
@@ -210,6 +226,11 @@ public:
     //  Skip ahead
     virtual void skipTo(const long b) = 0;
 };
+
+//  Template algorithms
+//  ===================
+
+//  Serial valuation, chapter 6
 
 //	MC simulator: free function that conducts simulations 
 //      and returns a matrix (as vector of vectors) of payoffs 
@@ -254,6 +275,8 @@ inline vector<vector<double>> mcSimul(
 
     return results;	//	C++11: move
 }
+
+//  Parallel valuation, chapter 7
 
 #define BATCHSIZE 64
 //	Parallel equivalent of mcSimul()
@@ -343,7 +366,7 @@ inline vector<vector<double>> mcParallelSimul(
     return results;	//	C++11: move
 }
 
-//  AAD instrumentation of mcSimul()
+//  AAD instrumentation of mcSimul(), chapter 12
 
 //  returns the following results:
 struct AADSimulResults
@@ -472,6 +495,8 @@ mcSimulAAD(
 
     return results;
 }
+
+//  Parallel AAD, chapter 12
 
 //  Init model and out on tape
 inline void initModel4ParallelAAD(
@@ -688,6 +713,7 @@ mcParallelSimulAAD(
     return results;
 }
 
+//  Multi-dimensional AAD, chapter 14
 //	Rewrite code for the risk reports of multiple payoffs for clarity
 
 struct AADMultiSimulResults
@@ -704,6 +730,8 @@ struct AADMultiSimulResults
 	//		of all payoffs, averaged over paths
 	matrix<double>          risks;
 };
+
+//  Serial
 
 inline AADMultiSimulResults
 mcSimulAADMulti(
@@ -783,6 +811,8 @@ mcSimulAADMulti(
 
 	return results;
 }
+
+//  Parallel
 
 inline AADMultiSimulResults
 mcParallelSimulAADMulti(

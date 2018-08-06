@@ -19,7 +19,8 @@ As long as this comment is preserved at the top of the file
 #include <algorithm>
 using namespace std;
 
-//  Utility for interpolation
+//  Interpolation utility 
+
 //  Interpolates the vector y against knots x in value x0 
 //  Interpolation is linear or smooth, extrapolation is flat
 template <bool smoothStep=false, class ITX, class ITY, class T>

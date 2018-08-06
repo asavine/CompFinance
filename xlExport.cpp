@@ -14,6 +14,8 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
+//  Excel export wrappers to functions in main.h
+
 #pragma warning(disable:4996)
 
 #include "ThreadPool.h"

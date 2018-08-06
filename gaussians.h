@@ -7,7 +7,7 @@ using namespace std;
 
 #define EPS 1.0e-08
 
-//  Classic Gaussian functions
+//  Gaussian functions
 
 //  Normal density
 inline double normalDens(const double x)
@@ -43,6 +43,7 @@ inline double normalCdf(const double x)
 //	Inverse CDF (for generation of Gaussians out of Uniforms)
 //  Beasley-Springer-Moro algorithm
 //  See Glasserman, Monte Carlo Methods in Financial Engineering, p 68
+//  And Moro, The full Monte, Risk, 1995
 inline double invNormalCdf(const double p)
 {
     const bool sup = p > 0.5;

@@ -19,7 +19,8 @@ As long as this comment is preserved at the top of the file
 #include <vector>
 using namespace std;
 
-//  Simple matrix class that wraps a vector
+//  Simple matrix class that wraps a vector,
+//  See chapters 1 and 2
 
 template <class T>
 class matrix

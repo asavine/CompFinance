@@ -1,5 +1,8 @@
 #pragma once
 
+//  Implementation of the mrg32k3a RNG,
+//  See chapters 5 and 6
+
 #include "mcBase.h"
 #include "gaussians.h"
 

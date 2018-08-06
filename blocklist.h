@@ -14,8 +14,10 @@ As long as this comment is preserved at the top of the file
 */
 
 #pragma once
-
 #pragma warning(disable : 4018)
+
+//  Blocklist data structure for AAD memory management
+//  See chapter 10, unchanged with expression templates of chapter 15
 
 #include <array>
 #include <list>

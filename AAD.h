@@ -19,7 +19,8 @@ As long as this comment is preserved at the top of the file
 //  So we can instrument Gaussians like standard math functions
 #include "gaussians.h"
 
-//  AAD with expression templates
+//  Use traditional AAD of chapter 10 (false)
+//      or expression templated (AADET) of chapter 15 (true)
 #define AADET   true
 
 #if AADET
@@ -32,9 +33,10 @@ As long as this comment is preserved at the top of the file
 
 #endif
 
-//	Globally set number of results (adjoints) on node and tape
-//	Get an object that resets to 1 on destruction
+//  Routines for multi-dimensional AAD (chapter 14)
+//  Set static context for multi-dimensional AAD
 
+//	RAII: reset dimension 1 on destruction
 struct numResultsResetterForAAD
 {
 	~numResultsResetterForAAD()
@@ -44,6 +46,7 @@ struct numResultsResetterForAAD
 	}
 };
 
+//  Routine: set dimension and get RAII resetter
 inline auto setNumResultsForAAD(const bool multi = false, const size_t numResults = 1)
 {
 	Tape::multi = multi;
@@ -51,16 +54,16 @@ inline auto setNumResultsForAAD(const bool multi = false, const size_t numResult
 	return make_unique<numResultsResetterForAAD>();
 }
 
-//	Put collection on tape
+//  Other utilities
 
+//	Put collection on tape
 template <class IT>
 inline void putOnTape(IT begin, IT end)
 {
     for_each(begin, end, [](Number& n) {n.putOnTape(); });
 }
 
-//	Converters
-
+//	Convert collection between double and Number or reverse
 template<class It1, class It2>
 inline void convertCollection(It1 srcBegin, It1 srcEnd, It2 destBegin)
 {

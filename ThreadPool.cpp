@@ -15,6 +15,6 @@ As long as this comment is preserved at the top of the file
 
 #include "ThreadPool.h"
 
+//  Statics
 ThreadPool ThreadPool::myInstance;
-
 thread_local size_t ThreadPool::myTLSNum = 0;

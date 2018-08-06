@@ -1,10 +1,10 @@
-// this file is an edited version of
+// This file is an edited version of
 // the file provided with
 // © 2002 "Monte Carlo Methods in Finance"
 // on the CD accompanying the book
 // "Monte Carlo Methods in Finance" by Peter Jaeckel.
 //
-// the original copyright is:
+// The original copyright is:
 // ===========================================================================
 // Copyright (C) 2002 "Monte Carlo Methods in Finance". All rights reserved.
 //
@@ -13,6 +13,7 @@
 // ===========================================================================
 
 //  Edited by Antoine Savine in 2018: essentially added a skip ahead (skipTo)
+//      and implemented RNG interface
 
 #pragma once
 #pragma warning(disable : 4018)
@@ -23,7 +24,7 @@
 #include "primitivepolynomials.h"
 #include "initializers.h"
 
-//	content:	generates sobol sequences up to dimension 1110
+//	content:	Generates sobol sequences up to dimension 1110
 //	
 //				Joe and Kou directional numbers guarantee Sobol property A to be satisfied
 //

@@ -16,6 +16,13 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+//  AAD implementation of chapter 10
+//  (With multi-dimensional additions of chapter 14)
+
+//  Implementation of Node = record on tape
+
+//  Unchanged for AADET of chapter 15
+
 #include <exception>
 using namespace std;
 
@@ -27,9 +34,9 @@ class Node
 	friend struct numResultsResetterForAAD;
 
     //  The adjoint(s) 
-	//	in single case, self held
+	//	in single case, self held (chapter 10)
 	double			mAdjoint = 0;
-	//	in multi case, held separately and accessed by pointer
+	//	in multi case, held separately and accessed by pointer (chapter 14)
     double*         pAdjoints;  
 
 	//  Data lives in separate memory
@@ -41,6 +48,7 @@ class Node
     double**        pAdjPtrs;
 
     //  Number of adjoints (results) to propagate, usually 1
+    //  See chapter 14
     static size_t   numAdj;
 
     //  Number of childs (arguments)
@@ -61,7 +69,7 @@ public:
     
     //  Back-propagate adjoints to arguments adjoints
 
-    //  Single case
+    //  Single case, chapter 10
     void propagateOne() 
 {
 		//  Nothing to propagate
@@ -73,7 +81,7 @@ public:
         }
     }
 
-    //  Multi case
+    //  Multi case, chapter 14
     void propagateAll()
 {
         //  No adjoint to propagate

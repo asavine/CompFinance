@@ -16,6 +16,8 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+//  Thread pool of chapter 3
+
 #include <future>
 #include <thread>
 #include "ConcurrentQueue.h"

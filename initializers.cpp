@@ -1,4 +1,4 @@
-//  joe and kuo direction numbers
+//  Joe and Kuo direction numbers
 // Coefficients of the free direction integers as given by
 // Stephen Joe and Frances Y. Kuo, ACM Transaction on Mathematical Software, 2003
     const unsigned long jkdim02initializers[] = { 1UL, 0UL };

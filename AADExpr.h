@@ -16,18 +16,26 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+//  Implementation of AAD with expression templates 
+//  (AADET, chapter 15)
+
+//  Defines expressions and the Number type
+
 #include <algorithm>
 #include "AADTape.h"
 
-//  Base CRTP class so operators catch expressions
+//  Base CRTP expression class 
+//      Note: overloaded operators catch all expressions and nothing else
 template <class E>
 struct Expression
 {
+    //  CRTP "virtualization"
     double value() const 
     { 
         return static_cast<const E*>(this)->value(); 
     }
 	
+    //  Just another interface
     explicit operator double() const 
     { 
         return value(); 
@@ -40,7 +48,7 @@ struct Expression
 //  Binary expression
 //  LHS : the expression on the left
 //  RHS : the expression on the right
-//  OP : the binary function 
+//  OP : the binary operator
 template <class LHS, class RHS, class OP>
 class BinaryExpression 
     //  CRTP
@@ -54,7 +62,7 @@ class BinaryExpression
 public:
 
     //  Constructor out of 2 expressions
-    //  Note : eager evaluation on construction
+    //  Note: eager evaluation on construction
     explicit BinaryExpression(
         const Expression<LHS>& l,
         const Expression<RHS>& r)
@@ -69,22 +77,21 @@ public:
     //	Expression template magic
     //  Expressions know
     //  AT COMPILE TIME
-    //  the number of numbers in their sub-DAG
+    //  the number of active inputs in their sub-expressions
     enum { numNumbers = LHS::numNumbers + RHS::numNumbers };
 
-    //  Push adjoint down the DAG
-    //  And write information into the node for the expression
-    //  N : total number of numbers in the expression
-    //  n : numbers already processed
+    //  Push adjoint down the expression
+    //  N : total number of active inputs in the expression
+    //  n : number of active inputs already processed
     template <size_t N, size_t n>
     void pushAdjoint(
         //  Node for the complete expression being processed
         Node&		exprNode,
-        //  Adjoint cumulated for this binary node
+        //  Adjoint cumulated for this binary node, or 1 if top
         const double	adjoint)       
         const
     {
-        //  Push on the left, if numbers there
+        //  Push on the left
         if (LHS::numNumbers > 0)
         {
             lhs.pushAdjoint<N, n>(
@@ -246,8 +253,7 @@ struct OPMin
 };
 
 //  Operator overloading for binary expressions
-//  So DAG is built on the stack at compile time
-//  And traversed at run time for evaluation and propagation
+//      build the corresponding expressions
 
 template <class LHS, class RHS>
  BinaryExpression<LHS, RHS, OPMult> operator*(
@@ -309,7 +315,9 @@ class UnaryExpression
     const double myValue;
 
     const ARG arg;
+
     //  For binary operators with a double on one side
+    //      we store the double
     const double dArg = 0.0;   
 
 public:
@@ -320,7 +328,7 @@ public:
         const Expression<ARG>& a)
         : myValue(OP::eval(a.value(), 0.0)), arg(static_cast<const ARG&>(a)) {}
 
-    //  Constructor for binary expressions with a double on one side
+    //  Special constructor for binary expressions with a double on one side
     explicit UnaryExpression(
         const Expression<ARG>& a,
         const double b)
@@ -332,15 +340,16 @@ public:
     //	Expression template magic
     enum { numNumbers = ARG::numNumbers };
 
-    //  Push adjoint down the expression DAG
+    //  Push adjoint down the expression 
     template <size_t N, size_t n>
     void pushAdjoint(
         //  Node for the complete expression being processed
         Node&		exprNode,
-        const double	adjoint)       //  Adjoint cumulated on the node
+        //  Adjoint cumulated on the node, 1 if top
+        const double	adjoint)       
         const
     {
-        //  Push to argument, if numbers there
+        //  Push into argument
         if (ARG::numNumbers > 0)
         {
             arg.pushAdjoint<N, n>(
@@ -626,7 +635,8 @@ UnaryExpression<ARG, OPNormalCdf> normalCdf(const Expression<ARG>& arg)
     return UnaryExpression<ARG, OPNormalCdf>(arg);
 }
 
-//  Binary operators with a double on one side 
+//  Overloading continued,
+//      binary operators with a double on one side 
 
 template <class ARG>
  UnaryExpression<ARG, OPMultD> operator*(
@@ -727,7 +737,7 @@ UnaryExpression<ARG, OPMinD> min(
     return UnaryExpression<ARG, OPMinD>(lhs, d);
 }
 
-//  Comparison, as normal
+//  Comparison, same as traditional
 
 template<class E, class F>
  bool operator==(const Expression<E>& lhs, const Expression<F>& rhs)
@@ -845,11 +855,11 @@ Expression<RHS> operator+
 
 class Number : public Expression<Number>
 {
-    //  The value and node for this number, as normal
+    //  The value and node for this number, same as traditional
     double		myValue;
-    Node*	myNode;
+    Node*	    myNode;
 
-    //  Node creation on tape, as normal
+    //  Node creation on tape
 
     template <size_t N>
     Node* createMultiNode()
@@ -857,16 +867,18 @@ class Number : public Expression<Number>
         return tape->recordNode<N>();
     }
 
-    //  This is where, on assignment or construction from an expression,
+    //  Flattening:
+    //      This is where, on assignment or construction from an expression,
     //      that derivatives are pushed through the expression's DAG 
-    //      into the node
     template<class E>
-    void fromExpr(const Expression<E>& e)
+    void fromExpr(
+        //  RHS expression, will be flattened into this Number
+        const Expression<E>& e)
     {
-        //  Build node
+        //  Build expression node on tape
         auto* node = createMultiNode<E::numNumbers>();
         
-        //  Push adjoints through expression DAG from 1 on top
+        //  Push adjoints through expression with adjoint = 1 on top
         static_cast<const E&>(e).pushAdjoint<E::numNumbers, 0>(*node, 1.0);
 
         //  Set my node
@@ -879,20 +891,28 @@ public:
     enum { numNumbers = 1 };
 
     //  Push adjoint
-    //  This is where the derivatives and pointers are set on the node
-    //  Push adjoint down the expression DAG
-
+    //  Numbers are expression leaves, 
+    //      pushAdjoint() receives their adjoint in the expression
+    //  Numbers don't "push" anything, they register their derivatives on tape
     template <size_t N, size_t n>
     void pushAdjoint(
-        Node&		exprNode,	//  Node for the complete expression
-        const double	adjoint)	//  Adjoint cumulated on the node
+        //  Node for the complete expression
+        Node&		    exprNode,	
+        //  Adjoint accumulated for this number, in the expression
+        const double	adjoint)	
         const
     {
+        //  adjoint = d (expression) / d (thisNumber) : register on tape
+        //  note n: index of this number on the node on tape
+
+        //  Register adjoint
         exprNode.pAdjPtrs[n] = Tape::multi? myNode->pAdjoints : &myNode->mAdjoint;
-		exprNode.pDerivatives[n] = adjoint;
+		
+        //  Register derivative
+        exprNode.pDerivatives[n] = adjoint;
     }
 
-    //  Static access to tape, as normal
+    //  Static access to tape, same as traditional
     static thread_local Tape* tape;
 
     //  Constructors
@@ -908,19 +928,21 @@ public:
     Number& operator=(const double val)
     {
         myValue = val;
+        //  Create leaf
         myNode = createMultiNode<0>();
         return *this;
     }
 
     //  No need for copy and assignment
     //  Default ones do the right thing:
-    //      copy value and pointer to node
+    //      copy value and pointer to node on tape
 
     //  Construct or assign from expression
     
     template <class E>
     Number(const Expression<E>& e) : myValue(e.value())
     {
+        //  Flatten RHS expression
         fromExpr<E>(static_cast<const E&>(e));
     }
 
@@ -929,6 +951,7 @@ public:
         (const Expression<E>& e) 
     {
         myValue = e.value();
+        //  Flatten RHS expression
         fromExpr<E>(static_cast<const E&>(e));
         return *this;
     }
@@ -937,7 +960,7 @@ public:
     explicit operator double& () { return myValue; }
     explicit operator double () const { return myValue; }
 
-    //  All the normal accessors and propagators, as in normal AAD code
+    //  All the normal accessors and propagators, same as traditional 
     
     //  Put on tape
     void putOnTape()
@@ -955,6 +978,8 @@ public:
     {
         return myValue;
     }
+    
+    //  Single dimensional
     double& adjoint()
     {
         return myNode->adjoint();
@@ -963,6 +988,8 @@ public:
     {
         return myNode->adjoint();
     }
+
+    //  Multi dimensional
     double& adjoint(const size_t n)
     {
         return myNode->adjoint(n);
@@ -1036,8 +1063,8 @@ public:
 
     //  Multi-adjoint propagation
 
-    //  Propagate adjoints
-    //      from and to both INCLUSIVE
+    //  Multi dimensional case:
+    //  Propagate adjoints from and to both INCLUSIVE
     static void propagateAdjointsMulti(
 		Tape::iterator propagateFrom,
 		Tape::iterator propagateTo)

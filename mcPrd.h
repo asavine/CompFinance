@@ -14,6 +14,9 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
+//  Concrete products, chapter 6
+//  Note: demonstration products, not professional production code
+
 #pragma once
 
 #include <map>

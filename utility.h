@@ -1,5 +1,11 @@
 #pragma once
 
+//  Utility that fills a collection so distance between elements 
+//      don't exceed a given amount
+
+//  Applied to insert additional time steps in Euler's scheme,
+//      see chapters 5 and 6
+
 #define EPS 1.0e-08
 //  Utility for filling data
 template<class CONT, class T, class IT = T*>

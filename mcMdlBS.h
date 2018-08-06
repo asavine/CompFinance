@@ -1,5 +1,7 @@
 #pragma once
 
+//  Black and Scholes model, chapter 6
+
 template <class T>
 class BlackScholes : public Model<T>
 {
@@ -8,17 +10,18 @@ class BlackScholes : public Model<T>
     //  Today's spot
     //  That would be today's linear market in a production system
     T                   mySpot;
-    T                   myVol;
-
     //  Constant rate and dividend yield
     T                   myRate;
     T                   myDiv;
+    
+    //  Constant vol
+    T                   myVol;
 
     //  false = risk neutral measure
     //  true = spot measure
     const bool          mySpotMeasure;
 
-    //  Similuation timeline = today + product timeline
+    //  Similuation timeline = today + event dates
     vector<Time>        myTimeline;
     //  Is today on product timeline?
     bool                myTodayOnTimeline;  
@@ -184,30 +187,29 @@ public:
         const T mu = myRate - myDiv;
         const size_t n = myTimeline.size() - 1;
 
-            for (size_t i = 0; i < n; ++i)
-            {
-                const double dt = myTimeline[i + 1] - myTimeline[i];
+        for (size_t i = 0; i < n; ++i)
+        {
+            const double dt = myTimeline[i + 1] - myTimeline[i];
 
-                //  lognormal model
-                //  Var[logST2 / ST1] = vol^2 * dt
-            //  under risk neutral measure 
-                //  E[logST2 / ST1] = logST1 + ( (r - d) - 0.5 * vol ^ 2 ) * dt
-            //  under spot measure 
-            //      E[logST2 / ST1] = logST1 + ( (r - d) + 0.5 * vol ^ 2 ) * dt
-                myStds[i] = myVol * sqrt(dt);
+            //  Var[logST2 / ST1] = vol^2 * dt
+            myStds[i] = myVol * sqrt(dt);
+            
             if (mySpotMeasure)
             {
+                //  under spot measure 
+                //      E[logST2 / ST1] = logST1 + ( (r - d) + 0.5 * vol ^ 2 ) * dt
                 myDrifts[i] = (mu + 0.5*myVol*myVol)*dt;
-
             }
             else
             {
+                //  under risk neutral measure 
+                //  E[logST2 / ST1] = logST1 + ( (r - d) - 0.5 * vol ^ 2 ) * dt
                 myDrifts[i] = (mu - 0.5*myVol*myVol)*dt;
             }
         }
 
         //  Pre-compute the numeraires, discount and forward factors 
-        //      over product timeline
+        //      on event dates
         const size_t m = productTimeline.size();
 
 		for (size_t i = 0; i < m; ++i)
@@ -215,19 +217,19 @@ public:
 			//  Numeraire
 			if (defline[i].numeraire)
 			{
-				//  Under the spot measure, 
-				//      the numeraire is the spot with reinvested dividend
-				//      num(t) = spot(t) / spot(0) * exp(div * t)
-				//      we precalculate exp(div * t) / spot(0)
 				if (mySpotMeasure)
 				{
-					myNumeraires[i] = exp(myDiv * productTimeline[i]) / mySpot;
+                    //  Under the spot measure, 
+                    //      the numeraire is the spot with reinvested dividend
+                    //      num(t) = spot(t) / spot(0) * exp(div * t)
+                    //      we precalculate exp(div * t) / spot(0)
+                    myNumeraires[i] = exp(myDiv * productTimeline[i]) / mySpot;
 				}
-				//  Under the risk neutral measure, 
-				//      numeraire is deterministic in Black-Scholes = exp(rate * t)
 				else
 				{
-					myNumeraires[i] = exp(myRate * productTimeline[i]);
+                    //  Under the risk neutral measure, 
+                    //      numeraire is deterministic in Black-Scholes = exp(rate * t)
+                    myNumeraires[i] = exp(myRate * productTimeline[i]);
 				}
 			}
 

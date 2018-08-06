@@ -16,4 +16,5 @@ As long as this comment is preserved at the top of the file
 
 #include "mcBase.h"
 
+//  Static
 Time systemTime = 0.0;

@@ -14,6 +14,8 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
+//  Dupire's model, chapter 6
+
 #pragma once
 #pragma warning(disable : 4018)
 
@@ -47,7 +49,7 @@ class Dupire : public Model<T>
 
     //  Similuation timeline
     vector<Time>            myTimeline;
-    //  true (1) if the time step is on the product timeline
+    //  true (1) if the time step is an event date
     //  false (0) if it is an additional simulation step
     vector<bool>            myCommonSteps;
 

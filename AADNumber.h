@@ -16,15 +16,21 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+//  Traditional AAD implementation of chapter 10
+//  (With multi-dimensional additions of chapter 14)
+
+//  The custom number type
+
 #include <algorithm>
 #include "AADTape.h"
 
 class Number
 {
+    //  Value and node are the only data members
     double myValue;
     Node* myNode;
 
-    //  Create node
+    //  Create node on tape
 	template <size_t N>
 	void createNode()
     {
@@ -38,6 +44,8 @@ class Number
 
 #ifdef _DEBUG
 
+        //  Help identify errors when arguments are not on tape
+
 		//	Find node on tape
 		auto it = tape->find(myNode);
 
@@ -48,7 +56,7 @@ class Number
 		}
 
 #endif
-
+        //  Const incorrectness
 		return const_cast<Node&>(*myNode);
     }
 
@@ -102,14 +110,14 @@ public:
 
     Number() {}
 
+    //  Put on tape on construction
     explicit Number(const double val) :
 		myValue(val)
     {
         createNode<0>();
     }
 
-    //  Assignments
-
+    //  Put on tape on assignment
     Number& operator=(const double val)
     {
         myValue = val;
@@ -118,7 +126,7 @@ public:
         return *this;
     }
 
-    //  Put on tape
+    //  Explicitly put existing Number on tape
     void putOnTape()
     {
 		createNode<0>();
@@ -138,6 +146,7 @@ public:
     {
         return myValue;
     }
+    //  Single dimensional
     double& adjoint()
     {
         return myNode->adjoint();
@@ -146,6 +155,7 @@ public:
     {
         return myNode->adjoint();
     }
+    //  Multi dimensional
 	double& adjoint(const size_t n)
 	{
 		return myNode->adjoint(n);
@@ -211,8 +221,8 @@ public:
         propagateAdjoints(prev(tape->markIt()), tape->begin());
     }
 
-	//  Propagate adjoints
-	//      from and to both INCLUSIVE
+    //  Multi dimensional case:
+	//  Propagate adjoints from and to both INCLUSIVE
 	static void propagateAdjointsMulti(
 		Tape::iterator propagateFrom,
 		Tape::iterator propagateTo)
@@ -515,7 +525,8 @@ public:
         return *this;
     }
 
-    //  Unary functions
+    //  Overloading continued, unary functions
+
     inline friend Number exp(const Number& arg)
     {
         const double e = exp(arg.value());

@@ -1,5 +1,8 @@
 #pragma once
 
+//  Memory storage for models and products,
+//  See chapter 6
+
 #include "mcBase.h"
 #include "mcMdl.h"
 #include "mcPrd.h"

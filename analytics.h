@@ -2,34 +2,9 @@
 
 #include "gaussians.h"
 
-//  Bachelier's formula and implied volatility
-template<class T, class U, class V, class W>
-inline T bachelier(
-    const U spot,
-    const V strike,
-    const T vol,
-    const W mat)
-{
-    const auto std = vol * sqrt(mat);
-    if (std < EPS) return max(T(0.0), T(spot - strike));
-    const auto d = (spot - strike) / std;
-    return (spot - strike) * normalCdf(d) + std * normalDens(d);
-}
+//  Black and Scholes formula, templated
 
-//  Vega
-inline double bachelierVega(
-    const double spot,
-    const double strike,
-    const double vol,
-    const double mat)
-{
-    const double std = vol * sqrt(mat);
-    if (std < EPS) return 0.0;
-    const double d = (spot - strike) / std;
-    return sqrt(mat) * normalDens(d);
-}
-
-//  BS
+//  Price
 template<class T, class U, class V, class W>
 inline T blackScholes(
     const U spot,
@@ -80,20 +55,8 @@ inline double blackScholesIvol(
     return l + (prem - pl) / (pu - pl) * (u - l);
 }
 
-//  Vega
-inline double blackScholesVega(
-    const double spot,
-    const double strike,
-    const double vol,
-    const double mat)
-{
-    const double smat = sqrt(mat), std = vol * smat;
-    if (std < EPS) return 0.0;
-    const double d2 = log(spot / strike) / std - 0.5 * std;
-    return strike * smat * normalDens(d2);
-}
+//  Merton, templated
 
-//  Merton
 template<class T, class U, class V, class W, class X>
 inline T merton(
     const U spot,
@@ -127,7 +90,7 @@ inline T merton(
     return result;
 }
 
-//	Up and out call in Black-Scholes
+//	Up and out call in Black-Scholes, untemplated
 
 inline double BlackScholesKO(
     const double spot, 

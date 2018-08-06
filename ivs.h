@@ -20,6 +20,9 @@ As long as this comment is preserved at the top of the file
 #include "matrix.h"
 #include "analytics.h"
 
+//  Implied Volatility Surfaces and Risk Views,
+//  See chapter 13
+
 //  Risk view
 template <class T>
 class RiskView
@@ -77,6 +80,7 @@ public:
     }
 };
 
+//  Base IVS
 class IVS
 {
     //  To avoid reference to a linear market
@@ -139,6 +143,7 @@ public:
 
 //  Concrete IVS just override (raw) call prices
 
+//  Merton IVS
 class MertonIVS : public IVS
 {
     double myVol;
