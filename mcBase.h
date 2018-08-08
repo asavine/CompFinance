@@ -224,7 +224,7 @@ public:
     virtual ~RNG() {}
 
     //  Skip ahead
-    virtual void skipTo(const long b) = 0;
+    virtual void skipTo(const unsigned b) = 0;
 };
 
 //  Template algorithms

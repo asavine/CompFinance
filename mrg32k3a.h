@@ -8,38 +8,59 @@
 
 class mrg32k3a : public RNG
 {
-    //  Dimension
-    size_t                      myDim;
 
-    //  State
-    unsigned long long          myA, myB;
-    unsigned long long          myXn, myXn1, myXn2, myYn, myYn1, myYn2;
+	//	Seed
+	const double	myA, myB;
+	
+	//  Dimension
+    size_t			myDim;
+
+	//  State
+    double			myXn, myXn1, myXn2, myYn, myYn1, myYn2;
+
+	//	Antithetic
+	bool			myAnti;
+	//	false: generate new, true: negate cached
+	vector<double>	myCachedUniforms;
+	vector<double>	myCachedGaussians;
 
     //  Constants
-    static constexpr  unsigned long long m1 = 4294967087;
-	static constexpr  unsigned long long m2 = 4294944443;
-	static constexpr  unsigned long long a12 = 1403580;
-	static constexpr  unsigned long long a13 = 810728;
-	static constexpr  unsigned long long a21 = 527612;
-	static constexpr  unsigned long long a23 = 1370589;
-	static constexpr  unsigned long long m1Minusa13 = 4294156359;
-	static constexpr  unsigned long long m2Minusa23 = 4293573854;
+    static constexpr  double	m1 = 4294967087;
+	static constexpr  double	m2 = 4294944443;
+	static constexpr  double	a12 = 1403580;
+	static constexpr  double	a13 = 810728;
+	static constexpr  double	a21 = 527612;
+	static constexpr  double	a23 = 1370589;
+	//	We divide the final uniform 
+	//		by m1 + 1 so we never hit 1
+	static constexpr  double	m1p1 = 4294967088;
 
     //  Produce next number and update state
     double nextNumber()
     {
-        //  Update states
-        const unsigned long long x = (a12 * myXn1) % m1 + (m1Minusa13 * myXn2) % m1;
-        const unsigned long long y = (a21 * myYn) % m2 + (m2Minusa23 * myYn2) % m2;
-        myXn2 = myXn1;
-        myXn1 = myXn;
-        myXn = x > m1 ? x - m1 : x;
-        myYn2 = myYn1;
-        myYn1 = myYn;
-        myYn = y > m2 ? y - m2 : y;
+        //  Update X
+		//	Recursion
+		double x = a12 * myXn1 - a13 * myXn2;
+		//	Modulus
+		x -= long(x / m1) * m1;
+		if (x < 0) x += m1;
+		//	Update
+		myXn2 = myXn1;
+		myXn1 = myXn;
+		myXn = x;
 
-        //  Compute uniform
-        const double u = x > y ? double((x - y) % m1) / m1 : double((x + m1 - y) % m1) / m1;
+		//	Same for Y
+		double y = a21 * myYn - a23 * myYn2;
+		y -= long(y / m2) * m2;
+		if (y < 0) y += m2;
+		myYn2 = myYn1;
+		myYn1 = myYn;
+		myYn = y;
+
+        //  Uniform 
+        const double u = x > y 
+			? (x - y) / m1p1 
+			: (x - y + m1) / m1p1;
         return u;
     }
 
@@ -52,10 +73,15 @@ public:
         reset();
     }
 
+	//	Reset state to 0 (seed)
     void reset()
     {
+		//	Reset state
         myXn = myXn1 = myXn2 = myA;
         myYn = myYn1 = myYn2 = myB;
+		
+		//	Anti = false: generate next
+		myAnti = false;
     }
 
     //  Virtual copy constructor
@@ -68,39 +94,116 @@ public:
     void init(const size_t simDim) override      
     {
         myDim = simDim;
+		myCachedUniforms.resize(myDim);
+		myCachedGaussians.resize(myDim);
     }
 
 	void nextU(vector<double>& uVec) override
 	{
-		for (size_t i = 0; i < myDim; ++i) uVec[i] = nextNumber();
+		if (myAnti)
+		{
+			//	Do not generate, negate cached
+			transform(
+				myCachedUniforms.begin(),
+				myCachedUniforms.end(),
+				uVec.begin(),
+				[](const double d) { return 1.0 - d; });
+			
+			//	Generate next
+			myAnti = false;
+		}
+		else
+		{
+			//	Generate and cache
+			generate(
+				myCachedUniforms.begin(), 
+				myCachedUniforms.end(), 
+				[this]() { return nextNumber(); });
+			
+			//	Copy
+			copy(
+				myCachedUniforms.begin(),
+				myCachedUniforms.end(),
+				uVec.begin());
+			
+			//	Do not generate next
+			myAnti = true;
+		}
 	}
 
     void nextG(vector<double>& gaussVec) override
     {
-        for (size_t i = 0; i < myDim; ++i) gaussVec[i] = invNormalCdf(nextNumber());
-    }
+		if (myAnti)
+		{
+			//	Do not generate, negate cached
+			//	Note: we reuse the Gaussian numbers,
+			//		we save not only generation, but also
+			//		Gaussian transaformation
+			transform(
+				myCachedGaussians.begin(),
+				myCachedGaussians.end(),
+				gaussVec.begin(),
+				[](const double n) { return -n; });
+
+			//	Generate next
+			myAnti = false;
+		}
+		else
+		{
+			//	Generate and cache
+			generate(
+				myCachedGaussians.begin(),
+				myCachedGaussians.end(),
+				[this]() { return invNormalCdf(nextNumber()); });
+
+			//	Copy
+			copy(
+				myCachedGaussians.begin(),
+				myCachedGaussians.end(),
+				gaussVec.begin());
+
+			//	Do not generate next
+			myAnti = true;
+		}
+	}
+
+	//	Skip ahead logic
+	//	See chapter 7
+	//	To avoid overflow, we nest mods in innermost results
+	//		and use 64bit unsigned long long for storage
 
     //  Matrix product with modulus
-    static void mPrd(const unsigned long long lhs[3][3],
-        const unsigned long long rhs[3][3],
-        const unsigned long long mod,
-        unsigned long long result[3][3])
+    static void mPrd(
+		const unsigned long long	lhs[3][3],
+        const unsigned long long	rhs[3][3],
+        const unsigned long long	mod,
+		unsigned long long			result[3][3])
     {
-        unsigned long long temp[3][3];
+		//	Result go to temp, in case result points to lhs or rhs
+		unsigned long long temp[3][3];
 
         for (size_t j = 0; j<3; j++)
         {
             for (size_t k = 0; k<3; k++)
             {
-                unsigned long long s = 0;
+				unsigned long long s = 0;
                 for (size_t l = 0; l<3; l++)
                 {
-                    s = (s + lhs[j][l] * rhs[l][k]) % mod;
-                }
-                //  Temp in case result == lhs or rhs
+					//	Apply modulus to innermost product
+					unsigned long long tmpNum = lhs[j][l] * rhs[l][k];
+					//	Apply mod
+					tmpNum %= mod;
+					//	Result
+					s += tmpNum;
+					//	Reapply mod
+					s %= mod;
+				}
+                //  Store result in temp 
                 temp[j][k] = s;
             }
         }
+
+		//	Now product is done, copy temp to result
         for (int j = 0; j < 3; j++)
         {
             for (int k = 0; k < 3; k++)
@@ -110,32 +213,92 @@ public:
         }
     }
 
-    //  Matrix by vector
-    static void vPrd(const unsigned long long lhs[3][3],
-        const unsigned long long rhs[3],
-        const unsigned long long mod,
-        unsigned long long result[3])
+    //  Matrix by vector, exact same logic
+	//	Except we don't implement temp,
+	//		we never point result to lhs or rhs
+    static void vPrd(
+		const unsigned long long	lhs[3][3],
+        const unsigned long long	rhs[3],
+        const unsigned long long	mod,
+		unsigned long long			result[3])
     {
         for (size_t j = 0; j<3; j++)
         {
-            unsigned long long s = 0;
+			unsigned long long s = 0;
             for (size_t l = 0; l<3; l++)
             {
-                s = (s + lhs[j][l] * rhs[l]) % mod;
-            }
+				unsigned long long tmpNum = lhs[j][l] * rhs[l];
+				tmpNum %= mod;
+				s += tmpNum;
+				s %= mod;
+			}
             result[j] = s;
         }
     }
 
     //  Skip ahead
-    void skipTo(const long b) override
+
+	void skipTo(const unsigned b) override
+	{
+		//	First reset to 0
+		reset();
+
+		//	How many numbers to skip
+		unsigned skipnums = b * myDim;
+		bool odd = false;
+
+		//	Antithetic: skip only half
+		if (skipnums & 1)
+		{
+			//	Odd
+			odd = true;
+			skipnums = (skipnums - 1) / 2;
+		}
+		else
+		{
+			//	Even
+			skipnums /= 2;
+		}
+
+		//	Skip state
+		skipNumbers(skipnums);
+
+		//	If odd, pre-generate for antithetic
+		if (odd)
+		{
+			myAnti = true;
+			
+			//	Uniforms
+			generate(
+				myCachedUniforms.begin(),
+				myCachedUniforms.end(),
+				[this]() { return nextNumber(); });
+
+			//	Gaussians
+			generate(
+				myCachedGaussians.begin(),
+				myCachedGaussians.end(),
+				[this]() { return invNormalCdf(nextNumber()); });
+		}
+		else
+		{
+			myAnti = false;
+		}
+	}
+
+private:
+
+	void skipNumbers(const unsigned b) 
     {
-        reset();
-
         if ( b <= 0) return;
-        long skip = b * myDim;
+        unsigned skip = b;
 
-        unsigned long long Ab[3][3] = {
+		static constexpr unsigned long long
+			m1l = unsigned long long(m1);
+		static constexpr unsigned long long
+			m2l = unsigned long long(m2);
+
+		unsigned long long Ab[3][3] = {
             { 1, 0 ,0 },        
             { 0, 1, 0 },
             { 0, 0, 1 }
@@ -146,12 +309,25 @@ public:
                 { 0, 0, 1 }
         },
             Ai[3][3] = {        //  A0 = A
-                { 0, a12 , m1Minusa13 },
+                { 
+					0, 
+					unsigned long long (a12) , 
+					unsigned long long (m1 - a13) 
+					//	m1 - a13 instead of -a13
+					//	so results are always positive
+					//	and we can use unsigned long longs
+					//	after modulus, we get the same results
+				},
                 { 1, 0, 0 },
                 { 0, 1, 0 }
         },
             Bi[3][3] = {        //  B0 = B
-                { a21, 0 , m2Minusa23 },
+                { 
+					unsigned long long (a21), 
+					0 , 
+					unsigned long long (m2 - a23) 
+					//	same logic: m2 - a32
+				},
                 { 1, 0, 0 },
                 { 0, 1, 0 }
         };
@@ -161,41 +337,44 @@ public:
             if (skip & 1)   //  i.e. ai == 1
             {
                 //  accumulate Ab and Bb
-                mPrd(Ab, Ai, m1, Ab);
-                mPrd(Bb, Bi, m2, Bb);
+                mPrd(Ab, Ai, m1l, Ab);
+                mPrd(Bb, Bi, m2l, Bb);
             }
 
             //  Recursion on Ai and Bi 
-            mPrd(Ai, Ai, m1, Ai);
-            mPrd(Bi, Bi, m2, Bi);
+            mPrd(Ai, Ai, m1l, Ai);
+            mPrd(Bi, Bi, m2l, Bi);
 
             skip >>= 1;
         }
 
         //  Final result
-        unsigned long long X0[3] =
+		unsigned long long X0[3] =
         {
-            myXn,
-            myXn1,
-            myXn2
+			unsigned long long (myXn),
+			unsigned long long (myXn1),
+			unsigned long long (myXn2)
         },
             Y0[3] =
         {
-            myYn,
-            myYn1,
-            myYn2
+			unsigned long long (myYn),
+			unsigned long long (myYn1),
+			unsigned long long (myYn2)
         },
             temp[3];
         
-        vPrd(Ab, X0, m1, temp);
-        myXn = temp[0];
-        myXn1 = temp[1];
-        myXn2 = temp[2];
+		//	From initial to final state
+        vPrd(Ab, X0, m1l, temp);
+        
+		//	Convert back to doubles
+		myXn = double(temp[0]);
+        myXn1 = double(temp[1]);
+        myXn2 = double(temp[2]);
 
-        vPrd(Bb, Y0, m2, temp);
-        myYn = temp[0];
-        myYn1 = temp[1];
-        myYn2 = temp[2];
+		//	Same for Y
+        vPrd(Bb, Y0, m2l, temp);
+        myYn = double(temp[0]);
+        myYn1 = double(temp[1]);
+        myYn2 = double(temp[2]);
     }
-
 };

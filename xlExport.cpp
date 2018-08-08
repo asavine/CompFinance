@@ -41,9 +41,25 @@ NumericalParam xl2num(
 
     num.numPath = static_cast<int>(numPath + EPS);
     num.parallel = parallel > EPS;
-    num.seed1 = static_cast<int>(seed1 + EPS);
-    num.seed2 = static_cast<int>(seed2 + EPS);
-    num.useSobol = useSobol > EPS;
+	if (seed1 >= 1)
+	{
+		num.seed1 = static_cast<int>(seed1 + EPS);
+	}
+	else
+	{
+		num.seed1 = 1234;
+	}
+
+	if (seed2 >= 1)
+	{
+		num.seed2 = static_cast<int>(seed2 + EPS);
+	}
+	else
+	{
+		num.seed2 = num.seed1 + 1;
+	}
+
+	num.useSobol = useSobol > EPS;
 
     return num;
 }
@@ -315,6 +331,59 @@ LPXLOPER12 xValue(
     {
         return TempErr12(xlerrNA);
     }
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xValueTime(
+	LPXLOPER12          modelid,
+	LPXLOPER12          productid,
+	//  numerical parameters
+	double              useSobol,
+	double              seed1,
+	double              seed2,
+	double              numPath,
+	double              parallel)
+{
+	FreeAllTempMemory();
+
+	const string pid = getString(productid);
+	//  Make sure we have an id
+	if (pid.empty()) return TempErr12(xlerrNA);
+
+	const auto* prd = getProduct<double>(pid);
+	//  Make sure we have a product
+	if (!prd) return TempErr12(xlerrNA);
+
+	const string mid = getString(modelid);
+	//  Make sure we have an id
+	if (mid.empty()) return TempErr12(xlerrNA);
+
+	Model<double>* mdl = const_cast<Model<double>*>(getModel<double>(mid));
+	//  Make sure we have a model
+	if (!mdl) return TempErr12(xlerrNA);
+
+	//  Numerical params
+	const auto num = xl2num(useSobol, seed1, seed2, numPath, parallel);
+	//  Make sure we have a numPath
+	if (!num.numPath) return TempErr12(xlerrNA);
+
+	//  Call and return;
+	try
+	{
+		clock_t t0 = clock();
+		auto results = value(mid, pid, num);
+		clock_t t1 = clock();
+		LPXLOPER12 oper = TempXLOPER12();
+		resize(oper, results.values.size() + 1, 1);
+		for (int i = 0; i < results.values.size(); ++i) setNum(oper, results.values[i], i, 0);
+		setNum(oper, t1 - t0, results.values.size(), 0);
+
+		return oper;
+	}
+	catch (const exception&)
+	{
+		return TempErr12(xlerrNA);
+	}
 }
 
 extern "C" __declspec(dllexport)
@@ -919,7 +988,19 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"Monte-Carlo valuation"),
         (LPXLOPER12)TempStr12(L""));
 
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+		(LPXLOPER12)TempStr12(L"xValueTime"),
+		(LPXLOPER12)TempStr12(L"QQQBBBBB"),
+		(LPXLOPER12)TempStr12(L"xValueTime"),
+		(LPXLOPER12)TempStr12(L"modelId, productId, useSobol, [seed1], [seed2], N, [Parallel]"),
+		(LPXLOPER12)TempStr12(L"1"),
+		(LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+		(LPXLOPER12)TempStr12(L""),
+		(LPXLOPER12)TempStr12(L""),
+		(LPXLOPER12)TempStr12(L"Timed Monte-Carlo valuation"),
+		(LPXLOPER12)TempStr12(L""));
+	
+	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xAADrisk"),
         (LPXLOPER12)TempStr12(L"QQQQBBBBB"),
         (LPXLOPER12)TempStr12(L"xAADrisk"),

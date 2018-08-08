@@ -29,13 +29,7 @@
     <ClInclude Include="mcPrd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="primitivepolynomials.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="sobol.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="initializers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mrg32k3a.h">
@@ -115,12 +109,6 @@
     <ClCompile Include="mcBase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="primitivepolynomials.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="initializers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="AAD.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -128,6 +116,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="xlMemoryPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sobol.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -170,7 +170,6 @@
     <ClInclude Include="analytics.h" />
     <ClInclude Include="blocklist.h" />
     <ClInclude Include="ConcurrentQueue.h" />
-    <ClInclude Include="initializers.h" />
     <ClInclude Include="interp.h" />
     <ClInclude Include="ivs.h" />
     <ClInclude Include="main.h" />
@@ -181,7 +180,6 @@
     <ClInclude Include="mcMdlDupire.h" />
     <ClInclude Include="mcPrd.h" />
     <ClInclude Include="mrg32k3a.h" />
-    <ClInclude Include="primitivepolynomials.h" />
     <ClInclude Include="xlframework.h" />
     <ClInclude Include="gaussians.h" />
     <ClInclude Include="matrix.h" />
@@ -195,9 +193,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AAD.cpp" />
-    <ClCompile Include="initializers.cpp" />
+    <ClCompile Include="sobol.cpp" />
     <ClCompile Include="mcBase.cpp" />
-    <ClCompile Include="primitivepolynomials.cpp" />
     <ClCompile Include="xlMemoryManager.cpp" />
     <ClCompile Include="xlMemoryPool.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
