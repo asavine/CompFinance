@@ -172,72 +172,7 @@ public:
 	//	To avoid overflow, we nest mods in innermost results
 	//		and use 64bit unsigned long long for storage
 
-    //  Matrix product with modulus
-    static void mPrd(
-		const unsigned long long	lhs[3][3],
-        const unsigned long long	rhs[3][3],
-        const unsigned long long	mod,
-		unsigned long long			result[3][3])
-    {
-		//	Result go to temp, in case result points to lhs or rhs
-		unsigned long long temp[3][3];
-
-        for (size_t j = 0; j<3; j++)
-        {
-            for (size_t k = 0; k<3; k++)
-            {
-				unsigned long long s = 0;
-                for (size_t l = 0; l<3; l++)
-                {
-					//	Apply modulus to innermost product
-					unsigned long long tmpNum = lhs[j][l] * rhs[l][k];
-					//	Apply mod
-					tmpNum %= mod;
-					//	Result
-					s += tmpNum;
-					//	Reapply mod
-					s %= mod;
-				}
-                //  Store result in temp 
-                temp[j][k] = s;
-            }
-        }
-
-		//	Now product is done, copy temp to result
-        for (int j = 0; j < 3; j++)
-        {
-            for (int k = 0; k < 3; k++)
-            {
-                result[j][k] = temp[j][k];
-            }
-        }
-    }
-
-    //  Matrix by vector, exact same logic
-	//	Except we don't implement temp,
-	//		we never point result to lhs or rhs
-    static void vPrd(
-		const unsigned long long	lhs[3][3],
-        const unsigned long long	rhs[3],
-        const unsigned long long	mod,
-		unsigned long long			result[3])
-    {
-        for (size_t j = 0; j<3; j++)
-        {
-			unsigned long long s = 0;
-            for (size_t l = 0; l<3; l++)
-            {
-				unsigned long long tmpNum = lhs[j][l] * rhs[l];
-				tmpNum %= mod;
-				s += tmpNum;
-				s %= mod;
-			}
-            result[j] = s;
-        }
-    }
-
-    //  Skip ahead
-
+	//  Skip ahead
 	void skipTo(const unsigned b) override
 	{
 		//	First reset to 0
@@ -267,7 +202,7 @@ public:
 		if (odd)
 		{
 			myAnti = true;
-			
+
 			//	Uniforms
 			generate(
 				myCachedUniforms.begin(),
@@ -287,6 +222,70 @@ public:
 	}
 
 private:
+
+	//  Matrix product with modulus
+	static void mPrd(
+		const unsigned long long	lhs[3][3],
+		const unsigned long long	rhs[3][3],
+		const unsigned long long	mod,
+		unsigned long long			result[3][3])
+	{
+		//	Result go to temp, in case result points to lhs or rhs
+		unsigned long long temp[3][3];
+
+		for (size_t j = 0; j<3; j++)
+		{
+			for (size_t k = 0; k<3; k++)
+			{
+				unsigned long long s = 0;
+				for (size_t l = 0; l<3; l++)
+				{
+					//	Apply modulus to innermost product
+					unsigned long long tmpNum = lhs[j][l] * rhs[l][k];
+					//	Apply mod
+					tmpNum %= mod;
+					//	Result
+					s += tmpNum;
+					//	Reapply mod
+					s %= mod;
+				}
+				//  Store result in temp 
+				temp[j][k] = s;
+			}
+		}
+
+		//	Now product is done, copy temp to result
+		for (int j = 0; j < 3; j++)
+		{
+			for (int k = 0; k < 3; k++)
+			{
+				result[j][k] = temp[j][k];
+			}
+		}
+	}
+
+	//  Matrix by vector, exact same logic
+	//	Except we don't implement temp,
+	//		we never point result to lhs or rhs
+	static void vPrd(
+		const unsigned long long	lhs[3][3],
+		const unsigned long long	rhs[3],
+		const unsigned long long	mod,
+		unsigned long long			result[3])
+	{
+		for (size_t j = 0; j<3; j++)
+		{
+			unsigned long long s = 0;
+			for (size_t l = 0; l<3; l++)
+			{
+				unsigned long long tmpNum = lhs[j][l] * rhs[l];
+				tmpNum %= mod;
+				s += tmpNum;
+				s %= mod;
+			}
+			result[j] = s;
+		}
+	}
 
 	void skipNumbers(const unsigned b) 
     {
