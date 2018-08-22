@@ -579,7 +579,7 @@ mcParallelSimulAAD(
     vector<Tape> tapes(nThread);
 
     //  Model initialized?
-    vector<bool> mdlInit(nThread + 1, false);
+    vector<int> mdlInit(nThread + 1, false);
 
     //  Initialize main thread
     initModel4ParallelAAD(prd, *models[0], paths[0]);
