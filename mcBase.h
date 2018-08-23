@@ -579,6 +579,8 @@ mcParallelSimulAAD(
     vector<Tape> tapes(nThread);
 
     //  Model initialized?
+    //  Note we don't use vector<bool>
+    //      because vector<bool> is not thread safe
     vector<int> mdlInit(nThread + 1, false);
 
     //  Initialize main thread
