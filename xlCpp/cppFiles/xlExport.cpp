@@ -29,7 +29,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 		(LPXLOPER12)TempStr12(L""),
 		(LPXLOPER12)TempStr12(L""),
 		(LPXLOPER12)TempStr12(L"Multiplies 2 numbers"),
-		(LPXLOPER12)TempStr12(L"number 1, number 2"));
+		(LPXLOPER12)TempStr12(L""));
 	
 	/* Free the XLL filename */
 	Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);

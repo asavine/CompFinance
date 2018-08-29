@@ -1,3 +1,20 @@
+///***************************************************************************
+// File:        FRAMEWRK.H
+//
+// Purpose:     Header file for Framework library
+//
+// Platform:    Microsoft Windows
+//
+// Comments:
+//              Include this file in any source files
+//              that use the framework library.
+//
+// From the Microsoft Excel Developer's Kit, Version 12
+// Copyright (c) 1997 - 2007 Microsoft Corporation. All rights reserved.
+///***************************************************************************
+
+#pragma once
+
 #include <wchar.h>
 
 #include "memorymanager.h"
@@ -43,4 +60,38 @@ extern "C" LPXLOPER12 TempStr12(const XCHAR* lpstr)
 	lpx->val.str = lps;
 
 	return lpx;
+}
+
+extern "C" LPXLOPER12 TempErr12(int err)
+{
+    LPXLOPER12 lpx;
+
+    lpx = (LPXLOPER12)GetTempMemory(sizeof(XLOPER12));
+
+    if (!lpx)
+    {
+        return 0;
+    }
+
+    lpx->xltype = xltypeErr;
+    lpx->val.err = err;
+
+    return lpx;
+}
+
+LPXLOPER12 TempNum12(double d)
+{
+    LPXLOPER12 lpx;
+
+    lpx = (LPXLOPER12)GetTempMemory(sizeof(XLOPER12));
+
+    if (!lpx)
+    {
+        return 0;
+    }
+
+    lpx->xltype = xltypeNum;
+    lpx->val.num = d;
+
+    return lpx;
 }

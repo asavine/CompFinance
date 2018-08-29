@@ -10,13 +10,14 @@
 //
 ///***************************************************************************
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 //
 // Total amount of memory to allocate for all temporary XLOPERs
 //
 
-#define MEMORYSIZE 10240
+#define MEMORYSIZE  4194304
 
 class MemoryPool
 {
