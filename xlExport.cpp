@@ -20,6 +20,7 @@ As long as this comment is preserved at the top of the file
 
 #include "ThreadPool.h"
 #include "main.h"
+#include "toyCode.h"
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -860,6 +861,47 @@ double xBarrierBlackScholes(double spot, double rate, double div, double vol, do
     return BlackScholesKO(spot, rate, div, strike, barrier, mat, vol);
 }
 
+extern "C" __declspec(dllexport)
+double xToyDupireBarrierMc(
+    //  model parameters
+    double              spot,
+    FP12*               spots,
+    FP12*               times,
+    FP12*               vols,
+    double              mat,
+    double              strike,
+    double              barrier,
+    double              paths,
+    double              steps,
+    double              useSobol,
+    double              seed1,
+    double              seed2)
+{
+    FreeAllTempMemory();
+
+    //  Make sure we have paths and steps
+    if (paths <= 0.0 || steps <= 0.0) return -1;
+
+    //  Unpack
+
+    if (spots->rows * spots->columns * times->rows * times->columns != vols->rows * vols->columns)
+    {
+        return -1;
+    }
+
+    vector<double> vspots = to_vector(spots);
+    vector<double> vtimes = to_vector(times);
+    matrix<double> vvols = to_matrix(vols);
+
+    //  Random Number Generator
+    unique_ptr<RNG> rng;
+    if (useSobol > 0.5) rng = make_unique<Sobol>();
+    else rng = make_unique<mrg32k3a>(seed1 > 0.5 ? int(seed1): 12345, seed2 > 0.5? int(seed2): 123456);
+
+    //  Call and return
+    return toyDupireBarrierMc(spot, vspots, vtimes, vvols, mat, strike, barrier, int(paths), int(steps), *rng);
+}
+
 //	Registers
 
 extern "C" __declspec(dllexport) int xlAutoOpen(void)
@@ -1105,9 +1147,21 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Merton"),
+        (LPXLOPER12)TempStr12(L"Barrier analytic"),
         (LPXLOPER12)TempStr12(L""));
-    
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xToyDupireBarrierMc"),
+        (LPXLOPER12)TempStr12(L"BBK%K%K%BBBBBBBB"),
+        (LPXLOPER12)TempStr12(L"xToyDupireBarrierMc"),
+        (LPXLOPER12)TempStr12(L"spot, spots, times, vols, mat, strike, barrier, paths, steps, useSobol, [seed1], [seed2]"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Toy Dupire Barrier MC"),
+        (LPXLOPER12)TempStr12(L""));
+
 	/* Free the XLL filename */
 	Excel12f(xlFree, 0, 1, (LPXLOPER12)&xDLL);
 

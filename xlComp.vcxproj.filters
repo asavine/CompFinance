@@ -95,6 +95,9 @@
     <ClInclude Include="AADTape.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="toyCode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="xlcall.cpp">

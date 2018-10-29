@@ -180,6 +180,7 @@
     <ClInclude Include="mcMdlDupire.h" />
     <ClInclude Include="mcPrd.h" />
     <ClInclude Include="mrg32k3a.h" />
+    <ClInclude Include="toyCode.h" />
     <ClInclude Include="xlframework.h" />
     <ClInclude Include="gaussians.h" />
     <ClInclude Include="matrix.h" />
