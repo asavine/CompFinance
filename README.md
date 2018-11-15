@@ -1,7 +1,6 @@
 # CompFinance
 # Antoine Savine
-
-Companion code for "Modern Computational Finance: AAD and Parallel Simulations" (Antoine Savine, Wiley, 2018)
+# Companion code for "Modern Computational Finance: AAD and Parallel Simulations" (Antoine Savine, Wiley, 2018)
 
 This is the professional implementation in C++ of the book Modern Computational Finance: AAD and Parallel Simulations by Antoine Savine. The code is freely available to anyone. Any person who purchased a copy of the book is authorized to use, modify and distribute the code for any application, as long as the credits remain on the top of the files.
 
