@@ -283,12 +283,8 @@ template <class T> inline T blackScholes(
 /* output layer 5 */ return df * (fwd * p1 - strike * p2);
 }
 
-void blackScholesDiff()
+vector<double> calculateAdjoints(ToyNumber& result)
 {
-    ToyNumber spot = 100, rate = 0.02, yield = 0.05, vol = 0.2, strike = 110, mat = 2; // initializes and records inputs
-    auto result = blackScholes(spot, rate, yield, vol, strike, mat);                // evaluates and records operations
-    cout << "Value = " << result.value << endl;   //  5.03705
-
     //  initialization
     vector<double> adjoints(tape.size(), 0.0);  //  initialize all to 0
     int N = result.idx;                         //  find N
@@ -307,6 +303,18 @@ void blackScholesDiff()
             }
         }
     }
+
+    return adjoints;
+}
+
+void blackScholesDiff()
+{
+    ToyNumber spot = 100, rate = 0.02, yield = 0.05, vol = 0.2, strike = 110, mat = 2; // initializes and records inputs
+    auto result = blackScholes(spot, rate, yield, vol, strike, mat);                // evaluates and records operations
+    cout << "Value = " << result.value << endl;   //  5.03705
+
+    //  propagate adjoints
+    vector<double> adjoints = calculateAdjoints(result);
 
     //  show derivatives
     cout << "Derivative to spot (delta) = " << adjoints[spot.idx] << endl;          //  0.309
@@ -396,24 +404,8 @@ void dupireRisksMiniBatch(
 
 	//	3. Adjoint propagation
 
-	//  initialization
-	vector<double> adjoints(tape.size(), 0.0);  //  initialize all to 0
-	int N = nPrice.idx;                         //  find N
-	adjoints[N] = 1.0;                          //  seed aN = 1
-
-	//  backward propagation
-	for (int j = N; j > 0; --j)  //  iterate backwards over tape
-	{
-		if (tape[j].numArg > 0)
-		{
-			adjoints[tape[j].idx1] += adjoints[j] * tape[j].der1;       //  propagate first argument
-
-			if (tape[j].numArg > 1)
-			{
-				adjoints[tape[j].idx2] += adjoints[j] * tape[j].der2;   //  propagate second argument
-			}
-		}
-	}
+    //  propagate adjoints
+    vector<double> adjoints = calculateAdjoints(nPrice);
 
 	//	4. Pick results
 
