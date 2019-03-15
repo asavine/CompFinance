@@ -9,8 +9,6 @@
 #include <string>
 using namespace std;
 
-#include "matrix.h"
-
 //  Additional / alternative functions to the ones in framework.h
 
 LPXLOPER12 TempXLOPER12()
