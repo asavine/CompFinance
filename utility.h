@@ -13,7 +13,7 @@ template<class CONT, class T, class IT = T*>
 //      has all original points
 //      plus additional ones if requested
 //      plus additional ones so maxDx is not exceeded
-//  Original continer and addPOints must be sorted
+//  Original container and addPOints must be sorted
 //  Returned container is sorted
 inline CONT
 fillData(
