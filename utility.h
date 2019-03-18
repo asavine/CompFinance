@@ -32,7 +32,7 @@ fillData(
 
     //  Add points?
     CONT added;
-    const size_t addPoints = addBegin || addEnd ? distance(addBegin, addEnd) : 0;
+    const size_t addPoints = addBegin && addEnd ? distance(addBegin, addEnd) : 0;
 
     if (addPoints > 0)
     {
