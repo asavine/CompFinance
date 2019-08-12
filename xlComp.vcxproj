@@ -169,12 +169,14 @@
     <ClInclude Include="AADTape.h" />
     <ClInclude Include="analytics.h" />
     <ClInclude Include="blocklist.h" />
+    <ClInclude Include="choldc.h" />
     <ClInclude Include="ConcurrentQueue.h" />
     <ClInclude Include="interp.h" />
     <ClInclude Include="ivs.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="mcMdl.h" />
     <ClInclude Include="mcMdlBS.h" />
+    <ClInclude Include="mcMdlMultiDisplaced.h" />
     <ClInclude Include="sobol.h" />
     <ClInclude Include="mcBase.h" />
     <ClInclude Include="mcMdlDupire.h" />
