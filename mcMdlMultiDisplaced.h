@@ -1,5 +1,25 @@
 
 /*
+
+- finalize and recode a, b <-> ATM, skew, rem equations in comments, will ref text
+
+- check initialized model, a, b and choldc
+
+- upgrade engine to multiple, named, assets, update all models and products, check adequation of model and product in engine
+
+- reg tests
+
+- Autocalls
+
+- Test, test, test
+
+- Risks
+
+*/
+
+
+
+/*
 Written by Antoine Savine in 2019
 
 This code is the strict IP of Antoine Savine
