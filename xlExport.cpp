@@ -136,6 +136,108 @@ LPXLOPER12 xPutBlackScholes(
 }
 
 extern "C" __declspec(dllexport)
+ LPXLOPER12 xPutDLM(
+    //  model parameters
+	double				numAssets,
+    FP12*               spots,
+    FP12*               atms,
+    FP12*               skews,
+	double				rate,
+    FP12*               divDates,
+    FP12*               divs,
+    FP12*               correl,
+    double              lambda,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+	//	Check dimensions
+	const size_t vnumassets = size_t(numAssets + EPS);
+    if (	spots->rows * spots->columns != vnumassets
+		||	atms->rows * atms->columns != vnumassets
+		||	skews->rows * skews->columns != vnumassets
+		||	divs->rows != divDates->rows || divs->columns != vnumassets || divDates->columns != 1
+		||	correl->rows != vnumassets || correl->columns != vnumassets) 
+    {
+        return TempErr12(xlerrNA);
+    }
+
+    //  Unpack
+
+    vector<double> vspots = to_vector(spots);
+    vector<double> vatms = to_vector(atms);
+    vector<double> vskews = to_vector(skews);
+
+    vector<double> vdivtimes = to_vector(divDates);
+    matrix<double> vdivs = to_matrix(divs);
+
+    matrix<double> vcorrel = to_matrix(correl);
+
+    //  Call and return
+	putDisplaced(vnumassets, vspots, vatms, vskews, rate, vdivtimes, vdivs, vcorrel, lambda, id);
+
+	/* Disabled for checking
+    return TempStr12(id);
+	*/
+
+	try
+    {
+		Model<double>* mdl = const_cast<Model<double>*>(getModel<double>(id));
+		//  Make sure we have a model
+		if (!mdl) return TempErr12(xlerrNA);
+
+		MultiDisplaced<double>* dlm = dynamic_cast<MultiDisplaced<double>*>(mdl);
+		
+		vector<Time> timeline = { .1, .2, .6 };
+		vector<SampleDef> defline(3);
+		defline[0].forwardMats = { .1 };
+		defline[1].forwardMats = { .2 };
+		defline[2].forwardMats = { .6 };
+
+
+		dlm->allocate(timeline, defline);
+		dlm->init(timeline, defline);
+
+		const size_t n = dlm->myNumAssets * 3 + 7, m = dlm->myNumAssets;
+
+        LPXLOPER12 oper = TempXLOPER12();
+        resize(oper, n, m);
+
+        setNum(oper, dlm->myRate, 0, 0);
+        setNum(oper, dlm->myNumAssets, 1, 0);
+		
+		for (size_t i = 0; i < m; ++i)
+		{
+			setNum(oper, dlm->mySpots[i], 2, i);
+			setNum(oper, dlm->myAtms[i], 3, i);
+			setNum(oper, dlm->mySkews[i], 4, i);
+			setNum(oper, dlm->myAlphas[i], 5, i);
+			setNum(oper, dlm->myBetas[i], 6, i);
+
+			for (size_t j = 0; j < m; ++j)
+			{
+				setNum(oper, dlm->myCorrel[i][j], 7 + i, j);
+				setNum(oper, dlm->myUsedCorrel[i][j], 7 + i + m, j);
+				setNum(oper, dlm->myChol[i][j], 7 + i + 2 * m, j);
+			}
+		}
+
+        return oper;
+    }
+    catch (const exception&)
+    {
+        return TempErr12(xlerrNA);
+    }
+
+
+}
+
+extern "C" __declspec(dllexport)
  LPXLOPER12 xPutEuropean(
     double              strike,
     double              exerciseDate,
@@ -998,6 +1100,18 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutDLM"),
+        (LPXLOPER12)TempStr12(L"QBK%K%K%BK%K%K%BQ"),
+        (LPXLOPER12)TempStr12(L"xPutDLM"),
+        (LPXLOPER12)TempStr12(L"numAssets, spots, atms, skews, rate, divDates, divs, correl, lambda, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a Multi-DLM in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutDupire"),
         (LPXLOPER12)TempStr12(L"QBK%K%K%BQ"),
         (LPXLOPER12)TempStr12(L"xPutDupire"),
@@ -1009,7 +1123,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"Initializes a Dupire in memory"),
         (LPXLOPER12)TempStr12(L""));
 
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutEuropean"),
         (LPXLOPER12)TempStr12(L"QBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutEuropean"),

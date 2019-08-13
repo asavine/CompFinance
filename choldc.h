@@ -4,43 +4,45 @@
 
 #include "matrix.h"
 
-template <class T, class U>
-void choldc(const matrix<U>& in, matrix<T>& out)
+template <class T>
+void choldc(const matrix<T>& in, matrix<T>& out)
 {
 	int n = in.rows();
-	double sum;
+	T sum;
+
+	fill(out.begin(), out.end(), T(0.0));
 
 	for(int i=0; i<n; ++i)
 	{
 		auto* ai = in[i];
-		for(int j=i; j<n; ++j)
+		auto* pi = out[i];
+		for(int j=0; j<=i; ++j)
 		{
-			sum = ai[j];
 			auto* aj = in[j];
 			auto* pj = out[j];
-			for(int k=i-1; k>=0; --k)
+			sum = ai[j];
+			for(int k=0; k<j; ++k)
 			{
-				sum -= ai[k] * aj[k];
+				sum -= pi[k] * pj[k];
 			}
 			if(i == j)
 			{      
                 if(sum < - 1.0e-15)
                 {
-                    throw "choldc : matrix not positive definite";
-					return false;
+                    throw runtime_error("choldc : matrix not positive definite");
 				}
-                if(fabs(sum) <= 1.0e-15) sum = 0.0;
+                if(sum < 1.0e-15) sum = 0.0;
 				pi[i] = sqrt(sum);
 			}
 			else
 			{
-				if(pi == 0.0)
+				if(fabs(pj[j]) < 1.0e-15)
                 {
-                    pj[i] = 0.0;
+                    pi[j] = 0.0;
                 }
                 else
                 {
-                    pj[i] = sum/pi[i];
+                    pi[j] = sum/pj[j];
                 }
 			}
 		}
