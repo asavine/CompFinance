@@ -195,9 +195,9 @@ extern "C" __declspec(dllexport)
 		
 		vector<Time> timeline = { .1, .2, .6 };
 		vector<SampleDef> defline(3);
-		defline[0].forwardMats = { .1 };
-		defline[1].forwardMats = { .2 };
-		defline[2].forwardMats = { .6 };
+        defline[0].forwardMats = { { .1 } };
+        defline[1].forwardMats = { { .2 } };
+        defline[2].forwardMats = { { .6 } };
 
 
 		dlm->allocate(timeline, defline);

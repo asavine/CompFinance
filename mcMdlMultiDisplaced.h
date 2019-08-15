@@ -8,6 +8,7 @@ check
 check
 
 - upgrade engine to multiple, named, assets, update all models and products, check adequation of model and product in engine
+check
 
 - reg tests
 
@@ -58,6 +59,13 @@ class MultiDisplaced : public Model<T>
 public:
 	//	
 
+    enum Dynamics
+    {
+        Normal = 0,
+        Surnormal = 1,
+        Subnormal = 2
+    };
+
     //  Model parameters
 
 	//	Number of assets and reference prices
@@ -90,6 +98,7 @@ public:
 	//	Derived
 	vector<T>			myAlphas;
 	vector<T>			myBetas;
+    vector<Dynamics>    myDynamics;
 
 	//	Finally, correl
 	//	Lower diagonal matrix
@@ -100,9 +109,6 @@ public:
 	matrix<T>			myUsedCorrel;
 	//	Cholesky coefs, also lower diagonal
 	matrix<T>			myChol;
-
-	//	Temporary
-	vector<T>			myCorrelatedGaussians;
 
     //  Similuation timeline = today + div dates + event dates
     vector<Time>		myTimeline;
@@ -272,7 +278,7 @@ public:
 
     //  Read access to parameters
 
-	const size_t numAssets() const 
+	size_t numAssets() const override
 	{
 		return myNumAssets;
 	}
@@ -343,11 +349,10 @@ public:
     {
 		myAlphas.resize(myNumAssets);
 		myBetas.resize(myNumAssets);
+        myDynamics.resize(myNumAssets);
 
 		myUsedCorrel.resize(myNumAssets, myNumAssets);		
 		myChol.resize(myNumAssets, myNumAssets);
-
-		myCorrelatedGaussians.resize(myNumAssets);
 
         //  Simulation timeline = today + div dates + product timeline
 
@@ -423,11 +428,23 @@ public:
 		for (size_t asset=0; asset<myNumAssets; ++asset)
 		{
 			myBetas[asset] = myAtms[asset] + 2 * mySkews[asset];
-			if (fabs(myBetas[asset]) < 1.0e-08)
+			if (fabs(myBetas[asset]) < 1.0e-05)
 			{
-				myBetas[asset] = 1.0e-08;
+                myDynamics[asset] = Normal;
+			    myAlphas[asset] = - 2 * mySpots[asset] * mySkews[asset];	
+				myBetas[asset] = 0.0;
 			}
-			myAlphas[asset] = - 2 * mySpots[asset] / fabs(myBetas[asset]) * mySkews[asset];	
+            else if (myBetas[asset] > 0)
+            {
+                myDynamics[asset] = Surnormal;
+			    myAlphas[asset] = - 2 * mySpots[asset] / myBetas[asset] * mySkews[asset];	
+            }
+            else    //  neg beta
+            {
+                myDynamics[asset] = Subnormal;
+                myBetas[asset] *= -1.0;   //  pos now
+			    myAlphas[asset] = - 2 * mySpots[asset] / myBetas[asset] * mySkews[asset];	            
+            }
 		}
 
 		//	Apply lambda factor to correl
@@ -478,14 +495,6 @@ public:
 					exp(-myRate * (defline[i].discountMats[j] - productTimeline[i]));
 			}
 
-			//  Forward factors
-			const size_t pFF = defline[i].forwardMats.size();
-			for (size_t j = 0; j < pFF; ++j)
-			{
-				myForwardFactors[i][j] =
-					exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
-			}
-
 			//  Libors
 			const size_t pL = defline[i].liborDefs.size();
 			for (size_t j = 0; j < pL; ++j)
@@ -494,6 +503,18 @@ public:
 					= defline[i].liborDefs[j].end - defline[i].liborDefs[j].start;
 				myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
 			}
+
+			//  Forward factors
+			
+            /*
+            const size_t pFF = defline[i].forwardMats.size();
+			for (size_t j = 0; j < pFF; ++j)
+			{
+				myForwardFactors[i][j] =
+					exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
+			}
+            */
+
 		}   //  loop on event dates
 	}
 

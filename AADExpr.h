@@ -1107,5 +1107,29 @@ public:
         *this = *this / e;
         return *this;
     }
+
+    Number& operator+=(const double& e)
+    {
+        *this = *this + e;
+        return *this;
+    }
+
+    Number& operator*=(const double& e)
+    {
+        *this = *this * e;
+        return *this;
+    }
+
+    Number& operator-=(const double& e)
+    {
+        *this = *this - e;
+        return *this;
+    }
+
+    Number& operator/=(const double& e)
+    {
+        *this = *this / e;
+        return *this;
+    }
 };
 
