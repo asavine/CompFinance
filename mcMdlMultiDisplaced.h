@@ -132,10 +132,11 @@ public:
     vector<T>           myNumeraires;	//	[time]
     //  pre-calculated discounts exp(r * (T - t))
     vector<vector<T>>   myDiscounts;	//	[time]
-    //  forward factors exp((r - d) * (T - t))
-    vector<vector<T>>   myForwardFactors;	//	[time]
     //  and rates = (exp(r * (T2 - T1)) - 1) / (T2 - T1)
     vector<vector<T>>   myLibors;	//	[time]
+
+    //  forward factors 
+    matrix<vector<T>>   myForwardFactors;	//	[time][asset][mats]
 
     //  Exported parameters
     vector<T*>          myParameters;
@@ -405,16 +406,16 @@ public:
             myDiscounts[j].resize(defline[j].discountMats.size());
         }
 
-        myForwardFactors.resize(n);
-        for (size_t j = 0; j < n; ++j)
-        {
-            myForwardFactors[j].resize(defline[j].forwardMats.size());
-        }
-
         myLibors.resize(n);
         for (size_t j = 0; j < n; ++j)
         {
             myLibors[j].resize(defline[j].liborDefs.size());
+        }
+
+        myForwardFactors.resize(n, myNumAssets);
+        for (size_t j = 0; j < n; ++j) for (size_t k = 0; k < myNumAssets; ++k)
+        {
+            myForwardFactors[j][k].resize(defline[j].forwardMats[k].size());
         }
     }
 
@@ -504,7 +505,7 @@ public:
 				myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
 			}
 
-			//  Forward factors
+			//  Forward factors, beware the dividends
 			
             /*
             const size_t pFF = defline[i].forwardMats.size();
@@ -536,17 +537,19 @@ private:
     {
         if (def.numeraire)
         {
-        scen.numeraire = myNumeraires[idx];
+            scen.numeraire = myNumeraires[idx];
             if (mySpotMeasure) scen.numeraire *= spot;
         }
         
-        transform(myForwardFactors[idx].begin(), myForwardFactors[idx].end(), 
-            scen.forwards.begin(), 
-            [&spot](const T& ff)
-            {
-                return spot * ff;
-            }
-        );
+        for (size_t a = 0; a < myNumAssets; ++a)
+        {
+            transform(myForwardFactors[idx][a].begin(), myForwardFactors[idx][a].end(), 
+                scen.forwards[a].begin(), 
+                [&spot](const T& ff)
+                {
+                    return spot * ff;
+                });
+        }
 
         copy(myDiscounts[idx].begin(), myDiscounts[idx].end(), 
             scen.discounts.begin());
