@@ -138,7 +138,7 @@ LPXLOPER12 xPutBlackScholes(
 extern "C" __declspec(dllexport)
  LPXLOPER12 xPutDLM(
     //  model parameters
-	double				numAssets,
+	LPXLOPER12          assets,
     FP12*               spots,
     FP12*               atms,
     FP12*               skews,
@@ -156,8 +156,13 @@ extern "C" __declspec(dllexport)
     //  Make sure we have an id
     if (id.empty()) return TempErr12(xlerrNA);
 
+    //  Assets
+    vector<string> vassets = to_strVector(assets);
+    if (vassets.empty()) return TempErr12(xlerrNA);
+    for (const auto& asset : vassets) if (asset.empty()) return TempErr12(xlerrNA);
+	const size_t vnumassets = vassets.size();
+
 	//	Check dimensions
-	const size_t vnumassets = size_t(numAssets + EPS);
     if (	spots->rows * spots->columns != vnumassets
 		||	atms->rows * atms->columns != vnumassets
 		||	skews->rows * skews->columns != vnumassets
@@ -179,7 +184,7 @@ extern "C" __declspec(dllexport)
     matrix<double> vcorrel = to_matrix(correl);
 
     //  Call and return
-	putDisplaced(vnumassets, vspots, vatms, vskews, rate, vdivtimes, vdivs, vcorrel, lambda, id);
+	putDisplaced(vassets, vspots, vatms, vskews, rate, vdivtimes, vdivs, vcorrel, lambda, id);
 
 	/* Disabled for checking
     return TempStr12(id);
@@ -195,10 +200,9 @@ extern "C" __declspec(dllexport)
 		
 		vector<Time> timeline = { .1, .2, .6 };
 		vector<SampleDef> defline(3);
-        defline[0].forwardMats = { { .1 } };
-        defline[1].forwardMats = { { .2 } };
-        defline[2].forwardMats = { { .6 } };
-
+        defline[0].forwardMats = { { .1 }, {}, {} };
+        defline[1].forwardMats = { {}, { .2 }, {} };
+        defline[2].forwardMats = { {}, {}, { .6 } };
 
 		dlm->allocate(timeline, defline);
 		dlm->init(timeline, defline);
@@ -209,7 +213,7 @@ extern "C" __declspec(dllexport)
         resize(oper, n, m);
 
         setNum(oper, dlm->myRate, 0, 0);
-        setNum(oper, dlm->myNumAssets, 1, 0);
+        for (size_t i = 0; i < dlm->myNumAssets; ++i) setString(oper, dlm->assetNames()[i], 1, i);
 		
 		for (size_t i = 0; i < m; ++i)
 		{
@@ -1101,9 +1105,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutDLM"),
-        (LPXLOPER12)TempStr12(L"QBK%K%K%BK%K%K%BQ"),
+        (LPXLOPER12)TempStr12(L"QQK%K%K%BK%K%K%BQ"),
         (LPXLOPER12)TempStr12(L"xPutDLM"),
-        (LPXLOPER12)TempStr12(L"numAssets, spots, atms, skews, rate, divDates, divs, correl, lambda, id"),
+        (LPXLOPER12)TempStr12(L"assets, spots, atms, skews, rate, divDates, divs, correl, lambda, id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

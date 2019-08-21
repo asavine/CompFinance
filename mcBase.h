@@ -130,8 +130,8 @@ public:
     virtual const vector<SampleDef>& defline() const = 0;
 
     //  Number and names of underlying assets, default = 1 and "spot"
-    virtual size_t numAssets() const { return 1; }
-    virtual vector<string> assetNames() const { return { "spot" }; }
+    virtual const size_t numAssets() const { return 1; }
+    virtual const vector<string>& assetNames() const { return { "spot" }; }
 
     //  Labels of all payoffs in the product
     virtual const vector<string>& payoffLabels() const = 0;
@@ -158,8 +158,8 @@ class Model
 public:
 
     //  Number and names of underlying assets, default = 1 and "spot"
-    virtual size_t numAssets() const { return 1; }
-    virtual vector<string> assetNames() const { return { "spot" }; }
+    virtual const size_t numAssets() const { return 1; }
+    virtual const vector<string>& assetNames() const { return { "spot" }; }
 
     //  Initialize with product timeline
     virtual void allocate(

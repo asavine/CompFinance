@@ -72,7 +72,7 @@ void putDupire(
 }
 
 void putDisplaced(
-	const size_t			numAssets,
+	const vector<string>&   assets,
     const vector<double>&	spots,
     const vector<double>&   atms,
     const vector<double>&   skews,
@@ -85,9 +85,9 @@ void putDisplaced(
 {
     //  We create 2 models, one for valuation and one for risk
     unique_ptr<Model<double>> mdl = make_unique<MultiDisplaced<double>>(
-        numAssets, rate, spots, divDates, divs, atms, skews, correl, lambda);
+        assets, rate, spots, divDates, divs, atms, skews, correl, lambda);
     unique_ptr<Model<Number>> riskMdl = make_unique<MultiDisplaced<Number>>(
-        numAssets, rate, spots, divDates, divs, atms, skews, correl, lambda);
+        assets, rate, spots, divDates, divs, atms, skews, correl, lambda);
 
     //  And move them into the map
     modelStore[store] = make_pair(move(mdl), move(riskMdl));

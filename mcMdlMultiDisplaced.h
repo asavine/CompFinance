@@ -11,6 +11,10 @@ check
 check
 
 - reg tests
+check
+
+- Mdl, correl, skew
+==> Mdl: correct drifts, stds with rates
 
 - Autocalls
 
@@ -68,8 +72,9 @@ public:
 
     //  Model parameters
 
-	//	Number of assets and reference prices
+	//	Underlying assets 
 	size_t				myNumAssets;
+    vector<string>      myAssetNames;
 
     //  Today's market
     
@@ -148,22 +153,24 @@ public:
 
     template <class U>
     MultiDisplaced(
-		const size_t		numAssets,
-        const U             rate,
-        const vector<U>&    spots,
-		const vector<Time>&	divDates,
-		const matrix<U>&	divs,
-        const vector<U>&    atms,
-        const vector<U>&    skews,
-		const matrix<U>&	correl,
-		const U&			lambda) : 
-            myNumAssets(numAssets),
+		const vector<string>&   assets,
+        const U                 rate,
+        const vector<U>&        spots,
+		const vector<Time>&	    divDates,
+		const matrix<U>&	    divs,
+        const vector<U>&        atms,
+        const vector<U>&        skews,
+		const matrix<U>&	    correl,
+		const U&			    lambda) : 
+            myNumAssets(assets.size()),
+            myAssetNames(assets),
             myRate(rate),
 			myDivDates(divDates),
 			myDivs(divs),
 			myLambda(lambda)
     {
 		//	Copy data
+        size_t numAssets = assets.size();
 		mySpots.resize(numAssets);
 		copy(spots.begin(), spots.end(), mySpots.begin());
 		myAtms.resize(numAssets);
@@ -185,7 +192,7 @@ public:
 
 		for (size_t i = 0; i < numAssets; ++i)
 		{
-			myParameterLabels[paramNum] = string("spot ") + to_string(i + 1);
+			myParameterLabels[paramNum] = string("spot ") + myAssetNames[i];
 			++paramNum;
 		}
 		
@@ -195,7 +202,7 @@ public:
 			{
                 ostringstream ost;
                 ost << setprecision(2) << fixed;
-                ost << "div " << j << " " << myDivDates[i]; 
+                ost << "div " << myAssetNames[j] << " " << myDivDates[i]; 
                 myParameterLabels[paramNum] = ost.str();
 				++paramNum;
 			}		
@@ -203,13 +210,13 @@ public:
 
 		for (size_t i = 0; i < numAssets; ++i)
 		{
-			myParameterLabels[paramNum] = string("ATM ") + to_string(i + 1);
+			myParameterLabels[paramNum] = string("ATM ") + myAssetNames[i];
 			++paramNum;
 		}
 
 		for (size_t i = 0; i < numAssets; ++i)
 		{
-			myParameterLabels[paramNum] = string("skew ") + to_string(i + 1);
+			myParameterLabels[paramNum] = string("skew ") + myAssetNames[i];
 			++paramNum;
 		}
 
@@ -217,7 +224,7 @@ public:
 		{
 			for (size_t j = 0; j < i; ++j)
 			{
-                myParameterLabels[paramNum] = string("correl ") + to_string(i + 1) + to_string(j + 1);
+                myParameterLabels[paramNum] = string("correl ") + myAssetNames[i] + " " + myAssetNames[j];
 				++paramNum;
 			}		
 		}
@@ -279,10 +286,15 @@ public:
 
     //  Read access to parameters
 
-	size_t numAssets() const override
+	const size_t numAssets() const override
 	{
 		return myNumAssets;
 	}
+
+    const vector<string>& assetNames() const override
+    {
+        return myAssetNames;
+    }
 
     const T rate() const
     {
@@ -426,25 +438,25 @@ public:
     {
 		//	Find alphas and betas out of ATMs and skews, see https://www.researchgate.net/publication/335146739_Displaced_Lognormal_Models
  
-		for (size_t asset=0; asset<myNumAssets; ++asset)
+		for (size_t a=0; a<myNumAssets; ++a)
 		{
-			myBetas[asset] = myAtms[asset] + 2 * mySkews[asset];
-			if (fabs(myBetas[asset]) < 1.0e-05)
+			myBetas[a] = myAtms[a] + 2 * mySkews[a];
+			if (fabs(myBetas[a]) < 1.0e-05)
 			{
-                myDynamics[asset] = Normal;
-			    myAlphas[asset] = - 2 * mySpots[asset] * mySkews[asset];	
-				myBetas[asset] = 0.0;
+                myDynamics[a] = Normal;
+			    myAlphas[a] = - 2 * mySpots[a] * mySkews[a];	
+				myBetas[a] = 0.0;
 			}
-            else if (myBetas[asset] > 0)
+            else if (myBetas[a] > 0)
             {
-                myDynamics[asset] = Surnormal;
-			    myAlphas[asset] = - 2 * mySpots[asset] / myBetas[asset] * mySkews[asset];	
+                myDynamics[a] = Surnormal;
+			    myAlphas[a] = - 2 * mySpots[a] / myBetas[a] * mySkews[a];	
             }
             else    //  neg beta
             {
-                myDynamics[asset] = Subnormal;
-                myBetas[asset] *= -1.0;   //  pos now
-			    myAlphas[asset] = - 2 * mySpots[asset] / myBetas[asset] * mySkews[asset];	            
+                myDynamics[a] = Subnormal;
+                myBetas[a] *= -1.0;   //  pos now
+			    myAlphas[a] = - 2 * mySpots[a] / myBetas[a] * mySkews[a];	            
             }
 		}
 
@@ -461,16 +473,28 @@ public:
         //  Pre-compute the standard devs and drifts over simulation timeline        
         const T mu = myRate;
 
-		const size_t n1 = myTimeline.size() - 1;
-		const size_t n2 = myNumAssets;
-        for (size_t i = 0; i < n1; ++i)
+		const size_t nt = myTimeline.size() - 1;
+        for (size_t i = 0; i < nt; ++i)
         {
             const double dt = myTimeline[i + 1] - myTimeline[i];
 
-			for (size_t j = 0; j < n2; ++j)
+			for (size_t a = 0; a < myNumAssets; ++a)
 			{
-				myStds[i][j] = myBetas[j] * sqrt(dt);
-				myDrifts[i][j] = (mu - 0.5*myBetas[j]*myBetas[j])*dt;
+                if (myDynamics[a] == Normal)
+                {
+				    myStds[i][a] = myAlphas[a] * sqrt(dt);
+				    myDrifts[i][a] = mu * dt;                
+                }
+                else if (myDynamics[a] == Surnormal)
+                {
+				    myStds[i][a] = myBetas[a] * sqrt(dt);
+				    myDrifts[i][a] = (mu - 0.5 * myBetas[a] * myBetas[a]) * dt;                
+                }
+                else    //  Subnormal
+                {
+				    myStds[i][a] = - myBetas[a] * sqrt(dt);
+				    myDrifts[i][a] = (mu - 0.5 * myBetas[a] * myBetas[a]) * dt;                                    
+                }
 			}
         }
 
@@ -506,15 +530,29 @@ public:
 			}
 
 			//  Forward factors, beware the dividends
-			
-            /*
-            const size_t pFF = defline[i].forwardMats.size();
-			for (size_t j = 0; j < pFF; ++j)
-			{
-				myForwardFactors[i][j] =
-					exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
-			}
-            */
+			for (size_t a = 0; a < myNumAssets; ++a)
+            {
+                const auto& mats = defline[i].forwardMats[a];
+                auto& ffs = myForwardFactors[i][a];
+                const size_t pFF = mats.size();
+			    for (size_t j = 0; j < pFF; ++j)
+			    {
+                    auto& ff = ffs[j];
+				    ff = exp(mu * (mats[j] - productTimeline[i]));
+                    //  Accumulate dividends 
+                    //      from fixing date productTimeline[i] inclusive
+                    //      to forward date mats[j] exclusive
+                    auto firstDivIt = lower_bound(myDivDates.begin(), myDivDates.end(), productTimeline[i]);
+                    if (firstDivIt != myDivDates.end())
+                    {
+                        size_t divIdx = distance(myDivDates.begin(), firstDivIt);
+                        while (myDivDates[divIdx] < mats[j])
+                        {
+                            ff *= 1.0 - myDivs[divIdx][a];
+                        }
+                    }
+			    }            
+            }
 
 		}   //  loop on event dates
 	}
@@ -530,7 +568,7 @@ private:
     //  Helper function, fills a Sample given the spot
     inline void fillScen(
         const size_t        idx,    //  index on product timeline
-        const T&            spot,   //  spot
+        const vector<T>&    spots,  //  spots, by asset
         Sample<T>&          scen,   //  Sample to fill
         const SampleDef&    def)    //  and its definition
             const
@@ -538,14 +576,13 @@ private:
         if (def.numeraire)
         {
             scen.numeraire = myNumeraires[idx];
-            if (mySpotMeasure) scen.numeraire *= spot;
         }
         
         for (size_t a = 0; a < myNumAssets; ++a)
         {
             transform(myForwardFactors[idx][a].begin(), myForwardFactors[idx][a].end(), 
                 scen.forwards[a].begin(), 
-                [&spot](const T& ff)
+                [spot =spots[a]](const T& ff)
                 {
                     return spot * ff;
                 });
@@ -568,33 +605,86 @@ public:
         Scenario<T>&            path) 
             const override
     {
-		/*
-
-        //  The starting spot
-        //  We know that today is on the timeline
-        T spot = mySpot;
-        //  Next index to fill on the product timeline
-        size_t idx = 0;
-        //  Is today on the product timeline?
-        if (myTodayOnTimeline)
+        //  Temporaries
+        static thread_local vector<T> spots;
+        if (spots.size() < myNumAssets)
         {
-            fillScen(idx, spot, path[idx], (*myDefline)[idx]);
-            ++idx;
+            spots.resize(myNumAssets);
+        }
+
+        //  Today
+
+        //  We know that today is on the timeline
+        copy(mySpots.begin(), mySpots.end(), spots.begin());
+
+        //  Index on the product timeline
+        size_t prdIdx = 0;
+        //  If today is on the product timeline, fill sample
+        if (myCommonSteps[0])
+        {
+            fillScen(0, spots, path[0], (*myDefline)[0]);
+            ++prdIdx;
+        }
+
+        //  Index on the dividend curve
+        size_t divIdx = 0;
+        //  If today is a dividend date, pay the dividends
+        if (myDivSteps[0])
+        {
+            for (size_t a = 0; a < myNumAssets; ++a)
+            {
+                spots[a] *= 1.0 - myDivs[0][a];
+            }
+            ++divIdx;
         }
 
         //  Iterate through timeline, apply sampling scheme
         const size_t n = myTimeline.size() - 1;
         for (size_t i = 0; i < n; ++i)
         {
-            //  Apply known conditional distributions 
-                //  Black-Scholes
-            spot = spot * exp(myDrifts[i] 
-                + myStds[i] * gaussVec[i]);
-            //  Store on the path
-            fillScen(idx, spot, path[idx], (*myDefline)[idx]);
-            ++idx;
+            //  Brownian increments for this time step
+            const double* w = &gaussVec[i * myNumAssets];
+            //  Iterate on assets
+            for (size_t a = 0; a < myNumAssets; ++a)
+            {
+                //  First, build correlated Brownian
+                T cw(0.0);
+                for (size_t i = 0; i <= a; ++i)
+                {
+                    cw += myChol[a][i] * w[i];
+                }
+
+                //  Next, apply displaced lognormal scheme
+                if (myDynamics[a] == Normal)
+                {
+                    
+                }
+                else if (myDynamics[a] == Surnormal)
+                {
+                
+                }
+                else    //  Subnormal
+                {
+                
+                }
+
+                //  If on the product timeline, fill sample
+                if (myCommonSteps[i + 1])
+                {
+                    fillScen(prdIdx, spots, path[prdIdx], (*myDefline)[prdIdx]);
+                    ++prdIdx;
+                }
+
+                //  If on the dividend curve, pay dividends
+                if (myDivSteps[i + 1])
+                {
+                    for (size_t a = 0; a < myNumAssets; ++a)
+                    {
+                        spots[a] *= 1.0 - myDivs[divIdx][a];
+                    }
+                    ++divIdx;
+                }
+            }
         }
-	
-		*/
     }
 };
