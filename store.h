@@ -76,7 +76,8 @@ void putDisplaced(
     const vector<double>&	spots,
     const vector<double>&   atms,
     const vector<double>&   skews,
-    const double&           rate,
+    const double&           discRate,
+    const double&           repoRate,
     const vector<Time>&		divDates,
     const matrix<double>&   divs,
 	const matrix<double>&	correl,
@@ -85,9 +86,9 @@ void putDisplaced(
 {
     //  We create 2 models, one for valuation and one for risk
     unique_ptr<Model<double>> mdl = make_unique<MultiDisplaced<double>>(
-        assets, rate, spots, divDates, divs, atms, skews, correl, lambda);
+        assets, discRate, repoRate, spots, divDates, divs, atms, skews, correl, lambda);
     unique_ptr<Model<Number>> riskMdl = make_unique<MultiDisplaced<Number>>(
-        assets, rate, spots, divDates, divs, atms, skews, correl, lambda);
+        assets, discRate, repoRate, spots, divDates, divs, atms, skews, correl, lambda);
 
     //  And move them into the map
     modelStore[store] = make_pair(move(mdl), move(riskMdl));

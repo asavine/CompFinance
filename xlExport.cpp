@@ -142,7 +142,8 @@ extern "C" __declspec(dllexport)
     FP12*               spots,
     FP12*               atms,
     FP12*               skews,
-	double				rate,
+	double				discRate,
+    double              repoRate,
     FP12*               divDates,
     FP12*               divs,
     FP12*               correl,
@@ -184,7 +185,7 @@ extern "C" __declspec(dllexport)
     matrix<double> vcorrel = to_matrix(correl);
 
     //  Call and return
-	putDisplaced(vassets, vspots, vatms, vskews, rate, vdivtimes, vdivs, vcorrel, lambda, id);
+	putDisplaced(vassets, vspots, vatms, vskews, discRate, repoRate, vdivtimes, vdivs, vcorrel, lambda, id);
 
 	/* Disabled for checking
     return TempStr12(id);
@@ -207,12 +208,13 @@ extern "C" __declspec(dllexport)
 		dlm->allocate(timeline, defline);
 		dlm->init(timeline, defline);
 
-		const size_t n = dlm->myNumAssets * 3 + 7, m = dlm->myNumAssets;
+		const size_t n = dlm->myNumAssets * 3 + 7, m = max<size_t>(2, dlm->myNumAssets);
 
         LPXLOPER12 oper = TempXLOPER12();
         resize(oper, n, m);
 
-        setNum(oper, dlm->myRate, 0, 0);
+        setNum(oper, dlm->myDiscRate, 0, 0);
+        setNum(oper, dlm->myRepoRate, 0, 1);
         for (size_t i = 0; i < dlm->myNumAssets; ++i) setString(oper, dlm->assetNames()[i], 1, i);
 		
 		for (size_t i = 0; i < m; ++i)
@@ -1105,9 +1107,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutDLM"),
-        (LPXLOPER12)TempStr12(L"QQK%K%K%BK%K%K%BQ"),
+        (LPXLOPER12)TempStr12(L"QQK%K%K%BBK%K%K%BQ"),
         (LPXLOPER12)TempStr12(L"xPutDLM"),
-        (LPXLOPER12)TempStr12(L"assets, spots, atms, skews, rate, divDates, divs, correl, lambda, id"),
+        (LPXLOPER12)TempStr12(L"assets, spots, atms, skews, DiscRate, RepoRate, divDates, divs, correl, lambda, id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

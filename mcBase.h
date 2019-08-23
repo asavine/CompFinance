@@ -122,6 +122,8 @@ inline void initializePath(Scenario<T>& path)
 template <class T>
 class Product
 {
+    inline static const vector<string> defaultAssetNames = { "spot" };
+
 public:
 
     //  Access to the product timeline
@@ -131,7 +133,7 @@ public:
 
     //  Number and names of underlying assets, default = 1 and "spot"
     virtual const size_t numAssets() const { return 1; }
-    virtual const vector<string>& assetNames() const { return { "spot" }; }
+    virtual const vector<string>& assetNames() const { return defaultAssetNames; }
 
     //  Labels of all payoffs in the product
     virtual const vector<string>& payoffLabels() const = 0;
@@ -155,11 +157,13 @@ public:
 template <class T>
 class Model
 {
+    inline static const vector<string> defaultAssetNames = { "spot" };
+
 public:
 
     //  Number and names of underlying assets, default = 1 and "spot"
     virtual const size_t numAssets() const { return 1; }
-    virtual const vector<string>& assetNames() const { return { "spot" }; }
+    virtual const vector<string>& assetNames() const { return defaultAssetNames; }
 
     //  Initialize with product timeline
     virtual void allocate(

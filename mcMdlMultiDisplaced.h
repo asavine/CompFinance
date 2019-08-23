@@ -13,8 +13,7 @@ check
 - reg tests
 check
 
-- Mdl, correl, skew
-==> Mdl: correct drifts, stds with rates
+- Mdl, correl, skew, test product
 
 - Autocalls
 
@@ -65,9 +64,10 @@ public:
 
     enum Dynamics
     {
-        Normal = 0,
-        Surnormal = 1,
-        Subnormal = 2
+        Lognormal = 0,
+        Normal = 1,
+        Surnormal = 2,
+        Subnormal = 3
     };
 
     //  Model parameters
@@ -79,7 +79,8 @@ public:
     //  Today's market
     
 	//  Constant rate 
-    T                   myRate;
+    T                   myDiscRate;
+    T                   myRepoRate;
 
 	//	Spots
 	vector<T>			mySpots;
@@ -89,7 +90,7 @@ public:
 	//	Dates where at least one asset pays a dividend
 	vector<Time>		myDivDates;
 
-	//	Matrix (numDivDates, numAsets) of dividends by date and asset
+	//	Matrix (numDivDates, numAsets) of proportional dividends by date and asset
 	matrix<T>			myDivs;
     
 	//	Volatility, by asset
@@ -110,18 +111,15 @@ public:
 	matrix<T>			myCorrel;
 	T					myLambda;
 
-	//	Derived
+	//	Shifted
 	matrix<T>			myUsedCorrel;
 	//	Cholesky coefs, also lower diagonal
 	matrix<T>			myChol;
 
     //  Similuation timeline = today + div dates + event dates
     vector<Time>		myTimeline;
-    //  true (1) if the time step is an event date
-    //  false (0) if it is an additional simulation step
-    vector<bool>		myCommonSteps;
-	//	true (1) if and only if this is a dividend step
-	vector<bool>		myDivSteps;
+    //  Is today on product timeline?
+    bool                myTodayOnTimeline;  
 
     //  The pruduct's defline byref
     const vector<SampleDef>*    myDefline;
@@ -129,9 +127,11 @@ public:
     //  Pre-calculated on initialization
 
     //  pre-calculated stds
-    matrix<T>           myStds;		//	[time, asset]
+    matrix<T>           myStds;		        //	[time, asset]
     //  pre-calculated drifts 
-    matrix<T>           myDrifts;	//	[time, asset]
+    matrix<T>           myDrifts;	        //	[time, asset]
+    //  forward factors for the dynamics, not to be confused with ffs for reconstruction
+    matrix<T>           myDynFwdFacts;      //  [time, asset]
     
     //  pre-caluclated numeraires exp(-r * t)
     vector<T>           myNumeraires;	//	[time]
@@ -141,7 +141,7 @@ public:
     vector<vector<T>>   myLibors;	//	[time]
 
     //  forward factors 
-    matrix<vector<T>>   myForwardFactors;	//	[time][asset][mats]
+    matrix<vector<T>>   myForwardFactors;	//	[time, asset, mats]
 
     //  Exported parameters
     vector<T*>          myParameters;
@@ -154,7 +154,8 @@ public:
     template <class U>
     MultiDisplaced(
 		const vector<string>&   assets,
-        const U                 rate,
+        const U                 discRate,
+        const U                 repoRate,
         const vector<U>&        spots,
 		const vector<Time>&	    divDates,
 		const matrix<U>&	    divs,
@@ -164,7 +165,8 @@ public:
 		const U&			    lambda) : 
             myNumAssets(assets.size()),
             myAssetNames(assets),
-            myRate(rate),
+            myDiscRate(discRate),
+            myRepoRate(repoRate),
 			myDivDates(divDates),
 			myDivs(divs),
 			myLambda(lambda)
@@ -182,13 +184,14 @@ public:
 				
         //  Set parameter labels once 
 
-		size_t numParams = 1 + numAssets + numAssets * divDates.size() + numAssets + numAssets + numAssets * (numAssets - 1) / 2 + 1;
+		size_t numParams = 2 + numAssets + numAssets * divDates.size() + numAssets + numAssets + numAssets * (numAssets - 1) / 2 + 1;
 		myParameters.resize(numParams);
 		myParameterLabels.resize(numParams);
 
-        myParameterLabels[0] = "rate";
+        myParameterLabels[0] = "disc rate";
+        myParameterLabels[1] = "repo rate";
 
-		size_t paramNum = 1;
+		size_t paramNum = 2;
 
 		for (size_t i = 0; i < numAssets; ++i)
 		{
@@ -239,7 +242,8 @@ private:
     //  Must reset on copy
     void setParamPointers()
     {
-        myParameters[0] = &myRate;
+        myParameters[0] = &myDiscRate;
+        myParameters[1] = &myRepoRate;
 
 		size_t paramNum = 1;
 
@@ -367,37 +371,16 @@ public:
 		myUsedCorrel.resize(myNumAssets, myNumAssets);		
 		myChol.resize(myNumAssets, myNumAssets);
 
-        //  Simulation timeline = today + div dates + product timeline
-
-		set<Time> times;
-		times.insert(systemTime);
-        for (const auto& time : myDivDates)
+        //  Simulation timeline = today + product timeline
+        myTimeline.clear();
+        myTimeline.push_back(systemTime);
+        for (const auto& time : productTimeline)
         {
-            times.insert(time);
-        }
-		for (const auto& time : productTimeline)
-        {
-            times.insert(time);
+            if (time > systemTime) myTimeline.push_back(time);
         }
 
-        myTimeline.resize(times.size());
-		copy(times.begin(), times.end(), myTimeline.begin());
-
-        //  Mark steps on timeline that are on the product timeline
-        myCommonSteps.resize(myTimeline.size());
-        transform(myTimeline.begin(), myTimeline.end(), myCommonSteps.begin(), 
-            [&](const Time t)
-        {
-            return binary_search(productTimeline.begin(), productTimeline.end(), t);
-        });
-
-        //  Mark div dates
-        myDivSteps.resize(myTimeline.size());
-        transform(myTimeline.begin(), myTimeline.end(), myDivSteps.begin(), 
-            [&](const Time t)
-        {
-            return binary_search(myDivDates.begin(), myDivDates.end(), t);
-        });
+        //  Is today on the timeline?
+        myTodayOnTimeline = (productTimeline[0] == systemTime);
 
         //  Take a reference on the product's defline
         myDefline = &defline;
@@ -406,6 +389,7 @@ public:
         //      over simulation timeline
         myStds.resize(myTimeline.size() - 1, myNumAssets);
         myDrifts.resize(myTimeline.size() - 1, myNumAssets);
+        myDynFwdFacts.resize(myTimeline.size() - 1, myNumAssets);
 
         //  Allocate the numeraires, discount and forward factors 
         //      over product timeline
@@ -431,6 +415,62 @@ public:
         }
     }
 
+private:
+
+    //  Compute forward factor for one asset
+    T forwardFactor(
+        const Time                  T1,
+        const Time                  T2,
+        const size_t                asset)
+    {
+        const double dt = T2 - T1;
+
+        //  Accumulate dividends between T1 (incl.) and T2 (excl.)
+        T divProd = T(1.0);
+        auto divIt = lower_bound(myDivDates.begin(), myDivDates.end(), T1);
+        if (divIt != myDivDates.end())
+        {
+            auto divIdx = distance(myDivDates.begin(), divIt);
+            while (divIdx != myDivDates.size() && myDivDates[divIdx] < T2)
+            {
+                divProd *= 1.0 - myDivs[divIdx][asset];
+            }
+        }
+
+        //  Forward factor
+        return divProd * exp(myRepoRate * dt);
+    }
+
+    //  Compute forward factors for all assets
+    void forwardFactors(
+        const Time                  T1,
+        const Time                  T2,
+        T*                          fwdFacts)
+    {
+        const double dt = T2 - T1;
+
+        for (size_t a = 0; a < myNumAssets; ++a)
+        {
+            //  Accumulate dividends between T1 (incl.) and T2 (excl.)
+            T divProd = T(1.0);
+            auto divIt = lower_bound(myDivDates.begin(), myDivDates.end(), T1);
+            if (divIt != myDivDates.end())
+            {
+                auto divIdx = distance(myDivDates.begin(), divIt);
+                while (divIdx < myDivDates.size() && myDivDates[divIdx] < T2)
+                {
+                    divProd *= 1.0 - myDivs[divIdx][a];
+                    ++divIdx;
+                }
+            }
+
+            //  Forward factor
+            fwdFacts[a] = divProd * exp(myRepoRate * dt);
+        }
+    }
+
+public:    
+
     void init(
         const vector<Time>&         productTimeline, 
         const vector<SampleDef>&    defline) 
@@ -441,7 +481,12 @@ public:
 		for (size_t a=0; a<myNumAssets; ++a)
 		{
 			myBetas[a] = myAtms[a] + 2 * mySkews[a];
-			if (fabs(myBetas[a]) < 1.0e-05)
+            if (fabs(mySkews[a]) < 1.0e-05)
+            {
+                myDynamics[a] = Lognormal;
+                myAlphas[a] = 0.0;
+            }
+			else if (fabs(myBetas[a]) < 1.0e-05)
 			{
                 myDynamics[a] = Normal;
 			    myAlphas[a] = - 2 * mySpots[a] * mySkews[a];	
@@ -460,40 +505,44 @@ public:
             }
 		}
 
-		//	Apply lambda factor to correl
+		//	Apply lambda shift to correl
 		transform(myCorrel.begin(), myCorrel.end(), myUsedCorrel.begin(),
 			[&](const T& rawCorr) { return myLambda * (1.0 - rawCorr) + rawCorr; });
 
-		//	Apply Choleski decomposition (see e.g. Numerical Recipes) to correlation matrix
+		//	Apply Choleski decomposition (see Numerical Recipes) to correlation matrix
 		//	If Wi are independent standard Gaussians, then:
 		//	Bi = sum(CHOLij * Wj)
 		//	are correlated standard Gaussians with the correct correl
 		choldc(myUsedCorrel, myChol);
 
         //  Pre-compute the standard devs and drifts over simulation timeline        
-        const T mu = myRate;
-
 		const size_t nt = myTimeline.size() - 1;
         for (size_t i = 0; i < nt; ++i)
         {
             const double dt = myTimeline[i + 1] - myTimeline[i];
+            forwardFactors(myTimeline[i], myTimeline[i + 1], myDynFwdFacts[i]);
 
 			for (size_t a = 0; a < myNumAssets; ++a)
 			{
-                if (myDynamics[a] == Normal)
+                if (myDynamics[a] == Lognormal)
+                {
+				    myStds[i][a] = myBetas[a] * sqrt(dt);
+				    myDrifts[i][a] = - 0.5 * myStds[i][a] * myStds[i][a];                
+                }
+                else if (myDynamics[a] == Normal)
                 {
 				    myStds[i][a] = myAlphas[a] * sqrt(dt);
-				    myDrifts[i][a] = mu * dt;                
+				    myDrifts[i][a] = T(0.0);                
                 }
                 else if (myDynamics[a] == Surnormal)
                 {
 				    myStds[i][a] = myBetas[a] * sqrt(dt);
-				    myDrifts[i][a] = (mu - 0.5 * myBetas[a] * myBetas[a]) * dt;                
+				    myDrifts[i][a] = - 0.5 * myBetas[a] * myBetas[a] * dt;                
                 }
                 else    //  Subnormal
                 {
 				    myStds[i][a] = - myBetas[a] * sqrt(dt);
-				    myDrifts[i][a] = (mu - 0.5 * myBetas[a] * myBetas[a]) * dt;                                    
+				    myDrifts[i][a] = - 0.5 * myBetas[a] * myBetas[a] * dt;                                    
                 }
 			}
         }
@@ -509,7 +558,7 @@ public:
 			{
                 //  Under the risk neutral measure, 
                 //      numeraire is deterministic in Black-Scholes = exp(rate * t)
-                myNumeraires[i] = exp(myRate * productTimeline[i]);
+                myNumeraires[i] = exp(myDiscRate * productTimeline[i]);
 			}
 
 			//  Discount factors
@@ -517,7 +566,7 @@ public:
 			for (size_t j = 0; j < pDF; ++j)
 			{
 				myDiscounts[i][j] =
-					exp(-myRate * (defline[i].discountMats[j] - productTimeline[i]));
+					exp(-myDiscRate * (defline[i].discountMats[j] - productTimeline[i]));
 			}
 
 			//  Libors
@@ -526,7 +575,7 @@ public:
 			{
 				const double dt
 					= defline[i].liborDefs[j].end - defline[i].liborDefs[j].start;
-				myLibors[i][j] = (exp(myRate*dt) - 1.0) / dt;
+				myLibors[i][j] = (exp(myDiscRate*dt) - 1.0) / dt;
 			}
 
 			//  Forward factors, beware the dividends
@@ -537,21 +586,8 @@ public:
                 const size_t pFF = mats.size();
 			    for (size_t j = 0; j < pFF; ++j)
 			    {
-                    auto& ff = ffs[j];
-				    ff = exp(mu * (mats[j] - productTimeline[i]));
-                    //  Accumulate dividends 
-                    //      from fixing date productTimeline[i] inclusive
-                    //      to forward date mats[j] exclusive
-                    auto firstDivIt = lower_bound(myDivDates.begin(), myDivDates.end(), productTimeline[i]);
-                    if (firstDivIt != myDivDates.end())
-                    {
-                        size_t divIdx = distance(myDivDates.begin(), firstDivIt);
-                        while (myDivDates[divIdx] < mats[j])
-                        {
-                            ff *= 1.0 - myDivs[divIdx][a];
-                        }
-                    }
-			    }            
+                    ffs[j] = forwardFactor(productTimeline[i], mats[j], a);
+                }            
             }
 
 		}   //  loop on event dates
@@ -618,24 +654,12 @@ public:
         copy(mySpots.begin(), mySpots.end(), spots.begin());
 
         //  Index on the product timeline
-        size_t prdIdx = 0;
+        size_t idx = 0;
         //  If today is on the product timeline, fill sample
-        if (myCommonSteps[0])
+        if (myTodayOnTimeline)
         {
-            fillScen(0, spots, path[0], (*myDefline)[0]);
-            ++prdIdx;
-        }
-
-        //  Index on the dividend curve
-        size_t divIdx = 0;
-        //  If today is a dividend date, pay the dividends
-        if (myDivSteps[0])
-        {
-            for (size_t a = 0; a < myNumAssets; ++a)
-            {
-                spots[a] *= 1.0 - myDivs[0][a];
-            }
-            ++divIdx;
+            fillScen(idx, spots, path[idx], (*myDefline)[idx]);
+            ++idx;
         }
 
         //  Iterate through timeline, apply sampling scheme
@@ -647,44 +671,37 @@ public:
             //  Iterate on assets
             for (size_t a = 0; a < myNumAssets; ++a)
             {
-                //  First, build correlated Brownian
+                //  Build correlated Brownian
                 T cw(0.0);
                 for (size_t i = 0; i <= a; ++i)
                 {
                     cw += myChol[a][i] * w[i];
                 }
 
-                //  Next, apply displaced lognormal scheme
-                if (myDynamics[a] == Normal)
+                //  Forward
+                T fwd = spots[a] * myDynFwdFacts[i][a];
+
+                //  Apply appropriate scheme
+                if (myDynamics[a] == Lognormal)
                 {
-                    
+                    spots[a] = fwd * exp(myDrifts[i][a] + myStds[i][a] * cw);
+                }
+                else if (myDynamics[a] == Normal)
+                {
+                    spots[a] = fwd + myStds[i][a] * cw;
                 }
                 else if (myDynamics[a] == Surnormal)
                 {
-                
+                    spots[a] = (fwd + myAlphas[a]) * exp(myDrifts[i][a] + myStds[i][a] * cw) - myAlphas[a];
                 }
                 else    //  Subnormal
                 {
-                
-                }
-
-                //  If on the product timeline, fill sample
-                if (myCommonSteps[i + 1])
-                {
-                    fillScen(prdIdx, spots, path[prdIdx], (*myDefline)[prdIdx]);
-                    ++prdIdx;
-                }
-
-                //  If on the dividend curve, pay dividends
-                if (myDivSteps[i + 1])
-                {
-                    for (size_t a = 0; a < myNumAssets; ++a)
-                    {
-                        spots[a] *= 1.0 - myDivs[divIdx][a];
-                    }
-                    ++divIdx;
+                    spots[a] = (fwd - myAlphas[a]) * exp(myDrifts[i][a] - myStds[i][a] * cw) + myAlphas[a];
                 }
             }
+
+            fillScen(idx, spots, path[idx], (*myDefline)[idx]);
+            ++idx;
         }
     }
 };
