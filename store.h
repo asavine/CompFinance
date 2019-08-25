@@ -22,6 +22,7 @@ As long as this comment is preserved at the top of the file
 #include "mcBase.h"
 #include "mcMdl.h"
 #include "mcPrd.h"
+#include "mcPrdMulti.h"
 #include <unordered_map>
 #include <memory>
 using namespace std;

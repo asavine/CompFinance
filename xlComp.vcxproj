@@ -177,6 +177,7 @@
     <ClInclude Include="mcMdl.h" />
     <ClInclude Include="mcMdlBS.h" />
     <ClInclude Include="mcMdlMultiDisplaced.h" />
+    <ClInclude Include="mcPrdMulti.h" />
     <ClInclude Include="sobol.h" />
     <ClInclude Include="mcBase.h" />
     <ClInclude Include="mcMdlDupire.h" />

@@ -560,3 +560,4 @@ public:
         payoffs.front() += 1.0 / path.back().numeraire;  //  redemption at maturity
     }
 };
+
