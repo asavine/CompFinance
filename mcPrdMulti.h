@@ -21,65 +21,106 @@ class MultiStats : public Product<T>
 
 	//	Defline and labels
 	vector<SampleDef>       myDefline;
+
+    size_t                  myNumPayoffs;
 	vector<string>          myLabels;
 
 public:
 
 	//  Constructor: store data and build timeline
-	TestMulti(const vector<string>& assets, const Time T1, const Time T2, const double K0, const double )
+	MultiStats(const vector<string>& assets, const vector<Time>& fixDates, const vector<Time>& fwdDates) :
+        myNumAssets(assets.size()), myAssetNames(assets), myFixDates(fixDates), myFwdDates(fwdDates)
 	{
-		const size_t n = options.size();
-
-		//  Timeline = each maturity is an event date
-		for (const pair<Time, vector<double>>& p : options)
+		//  Defline = num and forward(Tfix, Tfwd) on every fix date, for all assets
+		const size_t nTimes = fixDates.size();
+		myDefline.resize(nTimes);
+		for (size_t i = 0; i < nTimes; ++i)
 		{
-			myMaturities.push_back(p.first);
-			myStrikes.push_back(p.second);
-		}
-
-		//  Defline = num and spot(t) = forward(t,t) on every step
-		myDefline.resize(n);
-		for (size_t i = 0; i < n; ++i)
-		{
-			myDefline[i].numeraire = true;
-            myDefline[i].forwardMats.push_back({ myMaturities[i] });
+			myDefline[i].numeraire = false;
+            myDefline[i].forwardMats.resize(myNumAssets);
+            fill(myDefline[i].forwardMats.begin(), myDefline[i].forwardMats.end(), vector<Time>(1, myFwdDates[i]));
 		}
 
 		//  Identify the payoffs
-		for (const auto& option : options)
-		{
-			for (const auto& strike : option.second)
-			{
-				ostringstream ost;
-				ost.precision(2);
-				ost << fixed;
-				ost << "call " << option.first << " " << strike;
-				myLabels.push_back(ost.str());
-			}
-		}
+        myNumPayoffs = (nTimes + (nTimes > 1 ? nTimes - 1: 0)) * (myNumAssets + myNumAssets * (myNumAssets + 1) / 2);
+        
+        //  First, fwd fixings on fix dates
+        for (size_t t = 0; t < nTimes; ++t)
+        {
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1)
+            {
+			    ostringstream ost;
+			    ost.precision(2);
+			    ost << fixed;
+			    ost << myAssetNames[a1] << " " << myFixDates[t] << " " << myFwdDates[t];
+			    myLabels.push_back(ost.str());            
+            }
+
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            {
+			    ostringstream ost;
+			    ost.precision(2);
+			    ost << fixed;
+			    ost << myAssetNames[a1] << " " << myAssetNames[a2] << myFixDates[t] << " " << myFwdDates[t];
+			    myLabels.push_back(ost.str());                        
+            }
+        }
+
+        //  Next, differences
+        for (size_t t2 = 1; t2 < nTimes; ++t2)
+        {
+            const size_t t1 = t2 - 1;
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1)
+            {
+			    ostringstream ost;
+			    ost.precision(2);
+			    ost << fixed;
+			    ost << myAssetNames[a1] << " " << myFixDates[t1] << " " << myFwdDates[t1] << " - " << myFixDates[t2] << " " << myFwdDates[t2];
+			    myLabels.push_back(ost.str());            
+            }
+
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            {
+			    ostringstream ost;
+			    ost.precision(2);
+			    ost << fixed;
+			    ost << myAssetNames[a1] << " " << myAssetNames[a2] << " " << myFixDates[t1] << " " << myFwdDates[t1] << " - " << myFixDates[t2] << " " << myFwdDates[t2];
+			    myLabels.push_back(ost.str());                        
+            }
+        }
 	}
 
-	//  access to maturities and strikes
-	const vector<Time>& maturities() const
+	//  Read access to parameters
+	const size_t numAssets() const override
 	{
-		return myMaturities;
+		return myNumAssets;
 	}
 
-	const vector<vector<double>>& strikes() const
-	{
-		return myStrikes;
-	}
+    const vector<string>& assetNames() const override
+    {
+        return myAssetNames;
+    }
+
+    const vector<Time>& fixDates() const 
+    {
+        return myFixDates;
+    }
+
+    const vector<Time>& fwdDates() const 
+    {
+        return myFwdDates;
+    }
 
 	//  Virtual copy constructor
 	unique_ptr<Product<T>> clone() const override
 	{
-		return make_unique<Europeans<T>>(*this);
+		return make_unique<MultiStats<T>>(*this);
 	}
 
 	//  Timeline
 	const vector<Time>& timeline() const override
 	{
-		return myMaturities;
+		return myFixDates;
 	}
 
 	//  Defline
@@ -94,7 +135,7 @@ public:
 		return myLabels;
 	}
 
-	//  Payoffs, maturity major
+	//  Evaluation on scenario
 	void payoffs(
 		//  path, one entry per time step 
 		const Scenario<T>&          path,
@@ -102,23 +143,37 @@ public:
 		vector<T>&                  payoffs)
 		const override
 	{
-		const size_t numT = myMaturities.size();
+        const size_t nTimes = myFixDates.size();
+        size_t payIdx = 0;
 
-		auto payoffIt = payoffs.begin();
-		for (size_t i = 0; i < numT; ++i)
-		{
-			transform(
-				myStrikes[i].begin(),
-				myStrikes[i].end(),
-				payoffIt,
-				[spot = path[i].forwards.front().front(), num = path[i].numeraire]
-				(const double& k)
-				{
-					return max(spot - k, 0.0) / num;
-				}
-			);
+        //  First, fwd fixings on fix dates
+        for (size_t t = 0; t < nTimes; ++t)
+        {
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1)
+            {
+                payoffs[payIdx++] = path[t].forwards[a1].front();
+            }
 
-			payoffIt += myStrikes[i].size();
-		}
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            {
+                payoffs[payIdx++] = path[t].forwards[a1].front() * path[t].forwards[a2].front();
+            }
+        }
+
+        //  Next, differences
+        for (size_t t2 = 1; t2 < nTimes; ++t2)
+        {
+            const size_t t1 = t2 - 1;
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1)
+            {
+                payoffs[payIdx++] = path[t2].forwards[a1].front() - path[t1].forwards[a1].front();
+            }
+
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            {
+                payoffs[payIdx++] = (path[t2].forwards[a1].front() - path[t1].forwards[a1].front())
+                                        * (path[t2].forwards[a2].front() - path[t1].forwards[a2].front());
+            }
+        }
 	}
 };

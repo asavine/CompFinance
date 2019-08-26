@@ -187,51 +187,63 @@ extern "C" __declspec(dllexport)
     //  Call and return
 	putDisplaced(vassets, vspots, vatms, vskews, discRate, repoRate, vdivtimes, vdivs, vcorrel, lambda, id);
 
-	/* Disabled for checking
     return TempStr12(id);
-	*/
+}
 
-	try
+extern "C" __declspec(dllexport)
+LPXLOPER12 xViewDLM(
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    try
     {
-		Model<double>* mdl = const_cast<Model<double>*>(getModel<double>(id));
-		//  Make sure we have a model
-		if (!mdl) return TempErr12(xlerrNA);
+        Model<double>* mdl = const_cast<Model<double>*>(getModel<double>(id));
+        //  Make sure we have a model
+        if (!mdl) return TempErr12(xlerrNA);
+        MultiDisplaced<double>* dlm = dynamic_cast<MultiDisplaced<double>*>(mdl);
+        //  Make sure it is a DLM
+        if (!dlm) return TempErr12(xlerrNA);
 
-		MultiDisplaced<double>* dlm = dynamic_cast<MultiDisplaced<double>*>(mdl);
-		
-		vector<Time> timeline = { .1, .2, .6 };
-		vector<SampleDef> defline(3);
-        defline[0].forwardMats = { { .1 }, {}, {} };
-        defline[1].forwardMats = { {}, { .2 }, {} };
-        defline[2].forwardMats = { {}, {}, { .6 } };
-
-		dlm->allocate(timeline, defline);
-		dlm->init(timeline, defline);
-
-		const size_t n = dlm->myNumAssets * 3 + 7, m = max<size_t>(2, dlm->myNumAssets);
+        const size_t n = dlm->numAssets() + 1, m = 4;
 
         LPXLOPER12 oper = TempXLOPER12();
         resize(oper, n, m);
 
-        setNum(oper, dlm->myDiscRate, 0, 0);
-        setNum(oper, dlm->myRepoRate, 0, 1);
-        for (size_t i = 0; i < dlm->myNumAssets; ++i) setString(oper, dlm->assetNames()[i], 1, i);
-		
-		for (size_t i = 0; i < m; ++i)
-		{
-			setNum(oper, dlm->mySpots[i], 2, i);
-			setNum(oper, dlm->myAtms[i], 3, i);
-			setNum(oper, dlm->mySkews[i], 4, i);
-			setNum(oper, dlm->myAlphas[i], 5, i);
-			setNum(oper, dlm->myBetas[i], 6, i);
+        setString(oper, "dynamics", 0, 1);
+        setString(oper, "alpha", 0, 2);
+        setString(oper, "beta", 0, 3);
 
-			for (size_t j = 0; j < m; ++j)
-			{
-				setNum(oper, dlm->myCorrel[i][j], 7 + i, j);
-				setNum(oper, dlm->myUsedCorrel[i][j], 7 + i + m, j);
-				setNum(oper, dlm->myChol[i][j], 7 + i + 2 * m, j);
-			}
-		}
+        for (size_t i = 0; i < dlm->numAssets(); ++i)
+        {
+            setString(oper, dlm->assetNames()[i], i + 1, 0);
+            
+            switch(dlm->dynamics()[i])
+            {
+            case 0:
+                setString(oper, "lognormal", i + 1, 1);
+                break;
+            case 1:
+                setString(oper, "normal", i + 1, 1);
+                break;
+            case 2:
+                setString(oper, "surnormal", i + 1, 1);
+                break;
+            case 3:
+                setString(oper, "subnormal", i + 1, 1);
+                break;
+            default:
+                setString(oper, "invalid", i + 1, 1);
+                break;
+            }
+            
+            setNum(oper, dlm->alphas()[i], i + 1, 2);
+            setNum(oper, dlm->betas()[i], i + 1, 3);
+        }
 
         return oper;
     }
@@ -239,8 +251,6 @@ extern "C" __declspec(dllexport)
     {
         return TempErr12(xlerrNA);
     }
-
-
 }
 
 extern "C" __declspec(dllexport)
@@ -351,6 +361,56 @@ LPXLOPER12 xPutEuropeans(
 
     //  Call and return
     putEuropeans(vmats, vstrikes, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xPutMultiStats(
+    LPXLOPER12          assets,
+    FP12*               fix,
+    FP12*               fwd,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    vector<string> vassets = to_strVector(assets);
+    //  Make sure we have assets
+    if (vassets.empty()) return TempErr12(xlerrNA);
+
+    //  Fixing and fwd dates, removing blanks and zeros (not today)
+    vector<Time> vfix;
+    vector<Time> vfwd;
+    {
+        size_t rows = fix->rows;
+        size_t cols = fix->columns;
+        
+        if (fwd->rows * fwd->columns != rows * cols) return TempErr12(xlerrNA);
+        
+        Time* fixs = fix->array;
+        Time* fwds = fwd->array;
+
+        for (size_t i = 0; i < cols * rows; ++i)
+        {
+            if (fixs[i] > EPS && fwds[i] > EPS)
+            {
+                //  Check
+                if (i > 0 && fixs[i] <= fixs[i-1]) return TempErr12(xlerrNA);
+                if (fixs[i] < fwds[i]) return TempErr12(xlerrNA);
+
+                //  Set
+                vfix.push_back(fixs[i]);
+                vfwd.push_back(fwds[i]);
+            }
+        }
+    }
+
+    //  Call and return
+    putMultiStats(vassets, vfix, vfwd, id);
 
     return TempStr12(id);
 }
@@ -1118,6 +1178,18 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xViewDLM"),
+        (LPXLOPER12)TempStr12(L"QQ"),
+        (LPXLOPER12)TempStr12(L"xViewDLM"),
+        (LPXLOPER12)TempStr12(L"id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Displays the assets dynamics, alpha and beta, for debug and info"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutDupire"),
         (LPXLOPER12)TempStr12(L"QBK%K%K%BQ"),
         (LPXLOPER12)TempStr12(L"xPutDupire"),
@@ -1174,7 +1246,19 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Initializes a collection of European call in memory"),
+        (LPXLOPER12)TempStr12(L"Initializes a collection of European calls in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutMultiStats"),
+        (LPXLOPER12)TempStr12(L"QQK%K%Q"),
+        (LPXLOPER12)TempStr12(L"xPutMultiStats"),
+        (LPXLOPER12)TempStr12(L"assets, fixingDates, fwdDates, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a ~product to compute expectations and covariances in memory"),
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,

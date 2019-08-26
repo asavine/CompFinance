@@ -58,10 +58,6 @@ template <class T>
 class MultiDisplaced : public Model<T>
 {
 
-	//	For debugging only, goes private after that
-public:
-	//	
-
     enum Dynamics
     {
         Lognormal = 0,
@@ -339,6 +335,21 @@ public:
 	{
 		return myLambda;
 	}
+
+    const vector<Dynamics>& dynamics() const
+    {
+        return myDynamics;
+    }
+
+    const vector<T>& alphas() const 
+    {
+        return myAlphas;
+    }
+
+    const vector<T>& betas() const 
+    {
+        return myBetas;
+    }
 
     //  Access to all the model parameters
     const vector<T*>& parameters() override

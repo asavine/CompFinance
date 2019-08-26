@@ -95,8 +95,6 @@ void putDisplaced(
     modelStore[store] = make_pair(move(mdl), move(riskMdl));
 }
 
-
-
 template<class T>
 const Model<T>* getModel(const string& store);
 
@@ -184,7 +182,7 @@ void putContingent(
 
 void putEuropeans(
     //  maturities must be given in increasing order
-    const vector<double>&   maturities,
+    const vector<Time>&     maturities,
     const vector<double>&   strikes,
     const string&           store)
 {
@@ -200,6 +198,23 @@ void putEuropeans(
         options);
     unique_ptr<Product<Number>> riskPrd = make_unique<Europeans<Number>>(
         options);
+
+    //  And move them into the map
+    productStore[store] = make_pair(move(prd), move(riskPrd));
+}
+
+void putMultiStats(
+    const vector<string>&   assets,
+    //  fix dates must be given in increasing order
+    const vector<Time>&     fixDates,
+    //  corresponding fwd dates must be on or after fixing
+    //  must have same number of fix and fwd dates
+    const vector<Time>&     fwdDates,
+    const string&           store)
+{
+    //  We create 2 products, one for valuation and one for risk
+    unique_ptr<Product<double>> prd = make_unique<MultiStats<double>>(assets, fixDates, fwdDates);
+    unique_ptr<Product<Number>> riskPrd = make_unique<MultiStats<Number>>(assets, fixDates, fwdDates);
 
     //  And move them into the map
     productStore[store] = make_pair(move(prd), move(riskPrd));
