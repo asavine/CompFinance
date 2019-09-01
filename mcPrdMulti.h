@@ -42,7 +42,7 @@ public:
 		}
 
 		//  Identify the payoffs
-        myNumPayoffs = (nTimes + (nTimes > 1 ? nTimes - 1: 0)) * (myNumAssets + myNumAssets * (myNumAssets + 1) / 2);
+        myNumPayoffs = (nTimes + (nTimes > 1 ? nTimes - 1: 0)) * (myNumAssets + myNumAssets * (myNumAssets + 3) / 2);
         
         //  First, fwd fixings on fix dates
         for (size_t t = 0; t < nTimes; ++t)
@@ -56,12 +56,12 @@ public:
 			    myLabels.push_back(ost.str());            
             }
 
-            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 <= a1; ++a2)
             {
 			    ostringstream ost;
 			    ost.precision(2);
 			    ost << fixed;
-			    ost << myAssetNames[a1] << " " << myAssetNames[a2] << myFixDates[t] << " " << myFwdDates[t];
+			    ost << myAssetNames[a1] << " " << myAssetNames[a2] << " " << myFixDates[t] << " " << myFwdDates[t];
 			    myLabels.push_back(ost.str());                        
             }
         }
@@ -79,7 +79,7 @@ public:
 			    myLabels.push_back(ost.str());            
             }
 
-            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 <= a1; ++a2)
             {
 			    ostringstream ost;
 			    ost.precision(2);
@@ -154,7 +154,7 @@ public:
                 payoffs[payIdx++] = path[t].forwards[a1].front();
             }
 
-            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 <= a1; ++a2)
             {
                 payoffs[payIdx++] = path[t].forwards[a1].front() * path[t].forwards[a2].front();
             }
@@ -169,7 +169,7 @@ public:
                 payoffs[payIdx++] = path[t2].forwards[a1].front() - path[t1].forwards[a1].front();
             }
 
-            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 < a1; ++a2)
+            for (size_t a1 = 0; a1 < myNumAssets; ++a1) for (size_t a2 = 0; a2 <= a1; ++a2)
             {
                 payoffs[payIdx++] = (path[t2].forwards[a1].front() - path[t1].forwards[a1].front())
                                         * (path[t2].forwards[a2].front() - path[t1].forwards[a2].front());

@@ -209,6 +209,17 @@ LPXLOPER12 xViewDLM(
         //  Make sure it is a DLM
         if (!dlm) return TempErr12(xlerrNA);
 
+		//	Initialize it
+		vector<Time> timeline = { 1.0 };
+		vector<SampleDef> defline(1);
+		defline[0].numeraire = false;
+		defline[0].discountMats = {};
+		defline[0].liborDefs = {};
+		defline[0].forwardMats = vector<vector<Time>>(dlm->numAssets(), { 1.0 });
+
+		dlm->allocate(timeline, defline);
+		dlm->init(timeline, defline);
+
         const size_t n = dlm->numAssets() + 1, m = 4;
 
         LPXLOPER12 oper = TempXLOPER12();

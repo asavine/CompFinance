@@ -613,9 +613,10 @@ public:
 private:
 
     //  Helper function, fills a Sample given the spot
+	template <class CONT>
     inline void fillScen(
         const size_t        idx,    //  index on product timeline
-        const vector<T>&    spots,  //  spots, by asset
+        const CONT&			spots,  //  spots, by asset
         Sample<T>&          scen,   //  Sample to fill
         const SampleDef&    def)    //  and its definition
             const
@@ -625,11 +626,12 @@ private:
             scen.numeraire = myNumeraires[idx];
         }
         
+		auto* fwdFacts = myForwardFactors[idx];
         for (size_t a = 0; a < myNumAssets; ++a)
         {
-            transform(myForwardFactors[idx][a].begin(), myForwardFactors[idx][a].end(), 
+            transform(fwdFacts[a].begin(), fwdFacts[a].end(), 
                 scen.forwards[a].begin(), 
-                [spot =spots[a]](const T& ff)
+                [spot = spots[a]](const T& ff)
                 {
                     return spot * ff;
                 });
@@ -678,7 +680,7 @@ public:
         for (size_t i = 0; i < n; ++i)
         {
             //  Brownian increments for this time step
-            const double* w = &gaussVec[i * myNumAssets];
+            const double* w = gaussVec.data() + i * myNumAssets;
             //  Iterate on assets
             for (size_t a = 0; a < myNumAssets; ++a)
             {
@@ -693,22 +695,22 @@ public:
                 T fwd = spots[a] * myDynFwdFacts[i][a];
 
                 //  Apply appropriate scheme
-                if (myDynamics[a] == Lognormal)
-                {
-                    spots[a] = fwd * exp(myDrifts[i][a] + myStds[i][a] * cw);
-                }
-                else if (myDynamics[a] == Normal)
-                {
-                    spots[a] = fwd + myStds[i][a] * cw;
-                }
-                else if (myDynamics[a] == Surnormal)
-                {
-                    spots[a] = (fwd + myAlphas[a]) * exp(myDrifts[i][a] + myStds[i][a] * cw) - myAlphas[a];
-                }
-                else    //  Subnormal
-                {
-                    spots[a] = (fwd - myAlphas[a]) * exp(myDrifts[i][a] - myStds[i][a] * cw) + myAlphas[a];
-                }
+				switch(myDynamics[a])
+				{
+				case Lognormal:
+					spots[a] = fwd * exp(myDrifts[i][a] + myStds[i][a] * cw);
+					break;
+				case Normal:
+					spots[a] = fwd + myStds[i][a] * cw;
+					break;
+				case Surnormal:
+					spots[a] = (fwd + myAlphas[a]) * exp(myDrifts[i][a] + myStds[i][a] * cw) - myAlphas[a];
+					break;
+				case Subnormal:
+				default:
+					spots[a] = (fwd - myAlphas[a]) * exp(myDrifts[i][a] + myStds[i][a] * cw) + myAlphas[a];				
+					break;
+				}
             }
 
             fillScen(idx, spots, path[idx], (*myDefline)[idx]);
