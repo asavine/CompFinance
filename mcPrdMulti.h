@@ -177,3 +177,101 @@ public:
         }
 	}
 };
+
+template <class T>
+class Baskets : public Product<T>
+{
+	//	Assets and weights
+	size_t					myNumAssets;
+	vector<string>			myAssetNames;
+	vector<double>			myWeights;
+
+	//	Timeline
+	Time					myMaturity;
+	//  Vector of strikes 
+	vector<double>			myStrikes;
+	
+	vector<Time>			myTimeline;
+	vector<SampleDef>       myDefline;
+	vector<string>          myLabels;
+
+public:
+
+	//  Constructor: store data and build timeline
+	Baskets(const vector<string>& assets, const vector<double> weights, const Time maturity, const vector<double>& strikes) :
+		myNumAssets(assets.size()), myAssetNames(assets), myWeights(weights), myMaturity(maturity), myStrikes(strikes),
+		myTimeline(1, maturity), myDefline(1)
+	{
+		const size_t n = strikes.size();
+
+		//  Defline = num and spot(t) = forward(t,t) on maturity for all assets
+		myDefline[0].numeraire = true;
+		myDefline[0].forwardMats = vector<vector<Time>>(myNumAssets, { maturity });
+
+		//  Identify the payoffs
+		myLabels.resize(strikes.size());
+		for (const double strike : strikes)
+		{
+			ostringstream ost;
+			ost.precision(2);
+			ost << fixed;
+			ost << "basket strike " << strike;
+			myLabels.push_back(ost.str());
+		}
+	}
+
+	//  access to weights, maturity and  strikes
+	const vector<double>& weights() const
+	{
+		return myWeights;
+	}
+
+	Time maturity() const
+	{
+		return myMaturity;
+	}
+
+	const vector<double>& strikes() const
+	{
+		return myStrikes;
+	}
+
+	//  Virtual copy constructor
+	unique_ptr<Product<T>> clone() const override
+	{
+		return make_unique<Baskets<T>>(*this);
+	}
+
+	//  Timeline
+	const vector<Time>& timeline() const override
+	{
+		return myTimeline;
+	}
+
+	//  Defline
+	const vector<SampleDef>& defline() const override
+	{
+		return myDefline;
+	}
+
+	//  Labels
+	const vector<string>& payoffLabels() const override
+	{
+		return myLabels;
+	}
+
+	//  Payoffs, maturity major
+	void payoffs(
+		//  path, one entry per time step 
+		const Scenario<T>&          path,
+		//  pre-allocated space for resulting payoffs
+		vector<T>&                  payoffs)
+		const override
+	{
+		T basket = inner_product(myWeights.begin(), myWeights.end(), path[0].forwards.begin(),
+			multiply<T>, [](const double weight, const vector<T>& fwds) { return weight * fwds[0]; });
+
+		transform(myStrikes.begin(), myStrikes.end(), payoffs.begin(),
+			[&basket, num = path[0].numeraire](const double k) {return max(basket - k, 0) / num; });
+	}
+};
