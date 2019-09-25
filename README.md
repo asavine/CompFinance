@@ -23,6 +23,8 @@ Finally, we provide a pre-built xlComp.xll (to run xlComp.xll, readers may need 
 
 The code is entirely written in standard C++, and compiles on Visual Studio 2017 out of the box, without any dependency to a third party library.
 
+The branch 'AADBook' is frozen and reflects the code in the book as published. The master branch may evolve. Other branches contain specific implementations based on the library. For example, the 'MutliAssets' branch contains developments to extend the library to support multiple underlying assets, like basket options or autocalls. They will eventually merge into Master but not AADBook.
+
 # Introduction to back-propagation and automatic differentiation (AAD) in machine learning in finance (Antoine Savine, 2018-2019)
 
 In addition to the companion code for the book, the repo contains the slides and material for the workshop titled "Introduction to back-propagation and automatic differentiation (AAD) in machine learning in finance." This is a softer introduction to some of the themes covered in the book, which also introduces deep learning and its application to derivatives finance, and establishes parallels between the back-propagation algorithm, at the core of deep learning, and AAD. This parallel, in turn, provides further intuition into the mechanics of AAD. 
