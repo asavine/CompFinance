@@ -143,7 +143,7 @@ extern "C" __declspec(dllexport)
     FP12*               atms,
     FP12*               skews,
 	double				discRate,
-    double              repoRate,
+    FP12*               repoSpreads,
     FP12*               divDates,
     FP12*               divs,
     FP12*               correl,
@@ -165,6 +165,7 @@ extern "C" __declspec(dllexport)
 
 	//	Check dimensions
     if (	spots->rows * spots->columns != vnumassets
+        ||  repoSpreads->rows * repoSpreads->columns != vnumassets
 		||	atms->rows * atms->columns != vnumassets
 		||	skews->rows * skews->columns != vnumassets
 		||	divs->rows != divDates->rows || divs->columns != vnumassets || divDates->columns != 1
@@ -176,6 +177,7 @@ extern "C" __declspec(dllexport)
     //  Unpack
 
     vector<double> vspots = to_vector(spots);
+    vector<double> vspreads = to_vector(repoSpreads);
     vector<double> vatms = to_vector(atms);
     vector<double> vskews = to_vector(skews);
 
@@ -185,7 +187,7 @@ extern "C" __declspec(dllexport)
     matrix<double> vcorrel = to_matrix(correl);
 
     //  Call and return
-	putDisplaced(vassets, vspots, vatms, vskews, discRate, repoRate, vdivtimes, vdivs, vcorrel, lambda, id);
+	putDisplaced(vassets, vspots, vatms, vskews, discRate, vspreads, vdivtimes, vdivs, vcorrel, lambda, id);
 
     return TempStr12(id);
 }
@@ -411,7 +413,7 @@ LPXLOPER12 xPutMultiStats(
             {
                 //  Check
                 if (i > 0 && fixs[i] <= fixs[i-1]) return TempErr12(xlerrNA);
-                if (fixs[i] < fwds[i]) return TempErr12(xlerrNA);
+                if (fixs[i] > fwds[i]) return TempErr12(xlerrNA);
 
                 //  Set
                 vfix.push_back(fixs[i]);
@@ -422,6 +424,69 @@ LPXLOPER12 xPutMultiStats(
 
     //  Call and return
     putMultiStats(vassets, vfix, vfwd, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xPutBaskets(
+    LPXLOPER12          assets,
+    FP12*               weights,
+    double              maturity,
+    FP12*               strikes,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    vector<string> vassets = to_strVector(assets);
+    //  Make sure we have assets
+    if (vassets.empty()) return TempErr12(xlerrNA);
+
+    //  Maturity
+    if (maturity <= 0) return TempErr12(xlerrNA);
+
+    //  Weights and strikes
+    vector<double> vweights = to_vector(weights);
+    vector<double> vstrikes = to_vector(strikes);
+    if (vweights.empty() || vstrikes.empty()) TempErr12(xlerrNA);
+
+    //  Call and return
+    putBaskets(vassets, vweights, maturity, vstrikes, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xPutAutocall(
+    LPXLOPER12          assets,
+    double              maturity,
+    double              periods,
+    double              ko,
+    double              strike,
+    double              cpn,
+    double              smooth,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    vector<string> vassets = to_strVector(assets);
+    //  Make sure we have assets
+    if (vassets.empty()) return TempErr12(xlerrNA);
+
+    //  Maturity
+    if (maturity <= 0) return TempErr12(xlerrNA);
+    if (int(periods + EPS) <= 0) return TempErr12(xlerrNA);
+
+    //  Call and return
+    putAutocall(vassets, maturity, int(periods + EPS), ko, strike, cpn, smooth, id);
 
     return TempStr12(id);
 }
@@ -1178,9 +1243,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutDLM"),
-        (LPXLOPER12)TempStr12(L"QQK%K%K%BBK%K%K%BQ"),
+        (LPXLOPER12)TempStr12(L"QQK%K%K%BK%K%K%K%BQ"),
         (LPXLOPER12)TempStr12(L"xPutDLM"),
-        (LPXLOPER12)TempStr12(L"assets, spots, atms, skews, DiscRate, RepoRate, divDates, divs, correl, lambda, id"),
+        (LPXLOPER12)TempStr12(L"assets, spots, atms, skews, DiscRate, RepoSpreads, divDates, divs, correl, lambda, id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -1265,6 +1330,30 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"QQK%K%Q"),
         (LPXLOPER12)TempStr12(L"xPutMultiStats"),
         (LPXLOPER12)TempStr12(L"assets, fixingDates, fwdDates, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a ~product to compute expectations and covariances in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutBaskets"),
+        (LPXLOPER12)TempStr12(L"QQK%BK%Q"),
+        (LPXLOPER12)TempStr12(L"xPutBaskets"),
+        (LPXLOPER12)TempStr12(L"assets, weights, maturity, strikes, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a ~product to compute expectations and covariances in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutAutocall"),
+        (LPXLOPER12)TempStr12(L"QQBBBBBBQ"),
+        (LPXLOPER12)TempStr12(L"xPutAutocall"),
+        (LPXLOPER12)TempStr12(L"assets, maturity, periods, ko, strike, cpn, smooth, id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

@@ -1,32 +1,3 @@
-
-/*
-
-- finalize and recode a, b <-> ATM, skew, rem equations in comments, will ref text
-check
-
-- check initialized model, a, b and choldc
-check
-
-- upgrade engine to multiple, named, assets, update all models and products, check adequation of model and product in engine
-check
-
-- reg tests
-check
-
-- Mdl, correl, skew, test product
-
-- Autocalls
-
-- Test, test, test
-
-- Risks
-
-- Rem public data members, comments, test functions etc.
-
-*/
-
-
-
 /*
 Written by Antoine Savine in 2019
 
@@ -76,7 +47,7 @@ class MultiDisplaced : public Model<T>
     
 	//  Constant rate 
     T                   myDiscRate;
-    T                   myRepoRate;
+    vector<T>           myRepoRates;
 
 	//	Spots
 	vector<T>			mySpots;
@@ -151,7 +122,7 @@ public:
     MultiDisplaced(
 		const vector<string>&   assets,
         const U                 discRate,
-        const U                 repoRate,
+        const vector<U>&        repoSpreads,
         const vector<U>&        spots,
 		const vector<Time>&	    divDates,
 		const matrix<U>&	    divs,
@@ -162,7 +133,6 @@ public:
             myNumAssets(assets.size()),
             myAssetNames(assets),
             myDiscRate(discRate),
-            myRepoRate(repoRate),
 			myDivDates(divDates),
 			myDivs(divs),
 			myLambda(lambda)
@@ -171,7 +141,9 @@ public:
         size_t numAssets = assets.size();
 		mySpots.resize(numAssets);
 		copy(spots.begin(), spots.end(), mySpots.begin());
-		myAtms.resize(numAssets);
+        myRepoRates.resize(numAssets);
+        transform(repoSpreads.begin(), repoSpreads.end(), myRepoRates.begin(), [discRate](const U& spr) {return discRate - spr; });
+        myAtms.resize(numAssets);
 		copy(atms.begin(), atms.end(), myAtms.begin());
 		mySkews.resize(numAssets);
 		copy(skews.begin(), skews.end(), mySkews.begin());
@@ -180,18 +152,22 @@ public:
 				
         //  Set parameter labels once 
 
-		size_t numParams = 2 + numAssets + numAssets * divDates.size() + numAssets + numAssets + numAssets * (numAssets - 1) / 2 + 1;
+		size_t numParams = 1 + 2 * numAssets + numAssets * divDates.size() + numAssets + numAssets + numAssets * (numAssets - 1) / 2 + 1;
 		myParameters.resize(numParams);
 		myParameterLabels.resize(numParams);
 
         myParameterLabels[0] = "disc rate";
-        myParameterLabels[1] = "repo rate";
-
-		size_t paramNum = 2;
+		size_t paramNum = 1;
 
 		for (size_t i = 0; i < numAssets; ++i)
 		{
 			myParameterLabels[paramNum] = string("spot ") + myAssetNames[i];
+			++paramNum;
+		}
+
+        for (size_t i = 0; i < numAssets; ++i)
+		{
+			myParameterLabels[paramNum] = string("repo rate ") + myAssetNames[i];
 			++paramNum;
 		}
 		
@@ -239,7 +215,6 @@ private:
     void setParamPointers()
     {
         myParameters[0] = &myDiscRate;
-        myParameters[1] = &myRepoRate;
 
 		size_t paramNum = 1;
 
@@ -249,7 +224,13 @@ private:
 			++paramNum;
 		}
 		
-		for (size_t i = 0; i < myDivDates.size(); ++i)
+		for (size_t i = 0; i < myNumAssets; ++i)
+		{
+			myParameters[paramNum] = & myRepoRates[i];
+			++paramNum;
+		}
+
+        for (size_t i = 0; i < myDivDates.size(); ++i)
 		{
 			for (size_t j = 0; j < myNumAssets; ++j)
 			{
@@ -449,7 +430,7 @@ private:
         }
 
         //  Forward factor
-        return divProd * exp(myRepoRate * dt);
+        return divProd * exp(myRepoRates[asset] * dt);
     }
 
     //  Compute forward factors for all assets
@@ -476,7 +457,7 @@ private:
             }
 
             //  Forward factor
-            fwdFacts[a] = divProd * exp(myRepoRate * dt);
+            fwdFacts[a] = divProd * exp(myRepoRates[a] * dt);
         }
     }
 
@@ -656,10 +637,7 @@ public:
     {
         //  Temporaries
         static thread_local vector<T> spots;
-        if (spots.size() < myNumAssets)
-        {
-            spots.resize(myNumAssets);
-        }
+        spots.resize(myNumAssets);
 
         //  Today
 

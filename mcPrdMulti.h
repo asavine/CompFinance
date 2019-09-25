@@ -209,7 +209,7 @@ public:
 		myDefline[0].forwardMats = vector<vector<Time>>(myNumAssets, { maturity });
 
 		//  Identify the payoffs
-		myLabels.resize(strikes.size());
+		myLabels.reserve(strikes.size());
 		for (const double strike : strikes)
 		{
 			ostringstream ost;
@@ -219,6 +219,16 @@ public:
 			myLabels.push_back(ost.str());
 		}
 	}
+
+    const size_t numAssets() const override
+	{
+		return myNumAssets;
+	}
+
+    const vector<string>& assetNames() const override
+    {
+        return myAssetNames;
+    }
 
 	//  access to weights, maturity and  strikes
 	const vector<double>& weights() const
@@ -268,10 +278,171 @@ public:
 		vector<T>&                  payoffs)
 		const override
 	{
-		T basket = inner_product(myWeights.begin(), myWeights.end(), path[0].forwards.begin(),
-			multiply<T>, [](const double weight, const vector<T>& fwds) { return weight * fwds[0]; });
+		T basket = inner_product(myWeights.begin(), myWeights.end(), path[0].forwards.begin(), T(0.0),
+			plus<T>(), [](const double weight, const vector<T>& fwds) { return weight * fwds[0]; });
 
 		transform(myStrikes.begin(), myStrikes.end(), payoffs.begin(),
-			[&basket, num = path[0].numeraire](const double k) {return max(basket - k, 0) / num; });
+			[&basket, num = path[0].numeraire](const double k) {return max(basket - k, 0.0) / num; });
+	}
+};
+
+template <class T>
+class Autocall : public Product<T>
+{
+	//	Assets and weights
+	size_t					myNumAssets;
+	vector<string>			myAssetNames;
+
+	//	Timeline
+	Time					myMaturity;
+    int                     myNumPeriods;
+	
+    //  Barriers
+	double                  myKO;
+    double                  myStrike;
+    double                  myCpn;
+	
+    double                  mySmooth;
+
+	vector<Time>			myTimeline;
+	vector<SampleDef>       myDefline;
+	vector<string>          myLabels;
+
+public:
+
+	//  Constructor: store data and build timeline
+	Autocall(const vector<string>& assets, const Time maturity, const int periods, const double ko, const double strike, const double cpn, const double smooth) :
+		myNumAssets(assets.size()), myAssetNames(assets), myMaturity(maturity), myNumPeriods(periods), myKO(ko), myStrike(strike), myCpn(cpn), mySmooth(max(smooth, EPS)),
+        myTimeline(periods + 1), myDefline(periods + 1), myLabels(1)
+	{
+        //  Timeline and defline
+        
+        //  Today
+        Time time = systemTime;
+        int step = 0;
+        myTimeline[step] = time;
+        myDefline[step].numeraire = false;
+		myDefline[step].forwardMats = vector<vector<Time>>(myNumAssets, { time });  //  spot(t) = forward(t,t) on maturity for all assets
+
+        //  Periods
+        const double dt = maturity / periods;
+        for (step=1; step<=periods; ++step)
+        {
+            time += dt;
+            myTimeline[step] = time;
+            myDefline[step].numeraire = true;
+		    myDefline[step].forwardMats = vector<vector<Time>>(myNumAssets, { time });  //  spot(t) = forward(t,t) on maturity for all assets
+        }
+
+		//  Identify the payoff
+		myLabels[0] = "autocall strike " + to_string(int(100 * myStrike + EPS)) 
+            + " KO " +  to_string(int(100 * myKO + EPS)) 
+            + " CPN " + to_string(int(100 * myCpn + EPS)) + " "
+            + to_string(periods) + " periods of " + to_string(int(12 * maturity / periods + EPS)) + "m";
+	}
+
+    const size_t numAssets() const override
+	{
+		return myNumAssets;
+	}
+
+    const vector<string>& assetNames() const override
+    {
+        return myAssetNames;
+    }
+
+	//  access to maturity, strike, KO and cpn
+
+	Time maturity() const { return myMaturity; }
+	double strike() const { return myStrike; }
+	double ko() const { return myKO; }
+	double cpn() const { return myCpn; }
+
+	//  Virtual copy constructor
+	unique_ptr<Product<T>> clone() const override
+	{
+		return make_unique<Autocall<T>>(*this);
+	}
+
+	//  Timeline
+	const vector<Time>& timeline() const override
+	{
+		return myTimeline;
+	}
+
+	//  Defline
+	const vector<SampleDef>& defline() const override
+	{
+		return myDefline;
+	}
+
+	//  Labels
+	const vector<string>& payoffLabels() const override
+	{
+		return myLabels;
+	}
+
+	//  Payoff
+	void payoffs(
+		//  path, one entry per time step 
+		const Scenario<T>&          path,
+		//  pre-allocated space for resulting payoffs
+		vector<T>&                  payoffs)
+		const override
+	{
+        //  Temporaries
+        static thread_local vector<T> refs;
+        static thread_local vector<T> perfs;
+
+        refs.resize(myNumAssets);
+        perfs.resize(myNumAssets);
+
+        //  Today
+        {
+            int step = 0;
+            auto& state = path[step];
+            transform(state.forwards.begin(), state.forwards.end(), refs.begin(), [](const vector<T>& fwds) { return fwds[0]; });
+        }
+
+        //  Periods
+        const double dt = myMaturity / myNumPeriods;
+        T notionalAlive(1.0);
+        payoffs[0] = 0.0;
+        for (int step=1; step<myNumPeriods; ++step)
+        {
+            auto& state = path[step];
+            transform(state.forwards.begin(), state.forwards.end(), refs.begin(), perfs.begin(), [](const vector<T>& fwds, const T ref) { return fwds[0] / ref; });
+            T worst = *min_element(perfs.begin(), perfs.end());
+
+            //  receive cpn
+            payoffs[0] += notionalAlive * myCpn * dt / state.numeraire;
+
+            //  apply ko smoothly
+            T notionalSurviving = notionalAlive * min(1.0, max(0.0, (myKO + mySmooth - worst) / 2 / mySmooth));
+            T notionalDead = notionalAlive - notionalSurviving;
+
+            //  receive redemption on dead notional
+            payoffs[0] += notionalDead / state.numeraire;
+
+            //  continue with the rest
+            notionalAlive = notionalSurviving;
+        }
+
+        //  last
+        {
+            int step = myNumPeriods;
+            auto& state = path[step];
+            transform(state.forwards.begin(), state.forwards.end(), refs.begin(), perfs.begin(), [](const vector<T>& fwds, const T ref) { return fwds[0] / ref; });
+            T worst = *min_element(perfs.begin(), perfs.end());
+
+            //  receive cpn
+            payoffs[0] += notionalAlive * myCpn * dt / state.numeraire;
+
+            //  receive redemption
+            payoffs[0] += notionalAlive / state.numeraire;
+
+            // pay put
+            payoffs[0] -= notionalAlive * max(myStrike - worst, 0.0) / myStrike / state.numeraire;        
+        }
 	}
 };

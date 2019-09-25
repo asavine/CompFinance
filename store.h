@@ -78,7 +78,7 @@ void putDisplaced(
     const vector<double>&   atms,
     const vector<double>&   skews,
     const double&           discRate,
-    const double&           repoRate,
+    const vector<double>&   repoSpreads,
     const vector<Time>&		divDates,
     const matrix<double>&   divs,
 	const matrix<double>&	correl,
@@ -87,9 +87,9 @@ void putDisplaced(
 {
     //  We create 2 models, one for valuation and one for risk
     unique_ptr<Model<double>> mdl = make_unique<MultiDisplaced<double>>(
-        assets, discRate, repoRate, spots, divDates, divs, atms, skews, correl, lambda);
+        assets, discRate, repoSpreads, spots, divDates, divs, atms, skews, correl, lambda);
     unique_ptr<Model<Number>> riskMdl = make_unique<MultiDisplaced<Number>>(
-        assets, discRate, repoRate, spots, divDates, divs, atms, skews, correl, lambda);
+        assets, discRate, repoSpreads, spots, divDates, divs, atms, skews, correl, lambda);
 
     //  And move them into the map
     modelStore[store] = make_pair(move(mdl), move(riskMdl));
@@ -215,6 +215,39 @@ void putMultiStats(
     //  We create 2 products, one for valuation and one for risk
     unique_ptr<Product<double>> prd = make_unique<MultiStats<double>>(assets, fixDates, fwdDates);
     unique_ptr<Product<Number>> riskPrd = make_unique<MultiStats<Number>>(assets, fixDates, fwdDates);
+
+    //  And move them into the map
+    productStore[store] = make_pair(move(prd), move(riskPrd));
+}
+
+void putBaskets(
+    const vector<string>&   assets,
+    const vector<double>&   weights,
+    const Time              maturity,
+    const vector<double>    strikes,
+    const string&           store)
+{
+    //  We create 2 products, one for valuation and one for risk
+    unique_ptr<Product<double>> prd = make_unique<Baskets<double>>(assets, weights, maturity, strikes);
+    unique_ptr<Product<Number>> riskPrd = make_unique<Baskets<Number>>(assets, weights, maturity, strikes);
+
+    //  And move them into the map
+    productStore[store] = make_pair(move(prd), move(riskPrd));
+}
+
+void putAutocall(
+    const vector<string>&   assets,
+    const Time              maturity,
+    const int               periods,
+    const double            ko,
+    const double            strike,
+    const double            cpn,
+    const double            smooth,
+    const string&           store)
+{
+    //  We create 2 products, one for valuation and one for risk
+    unique_ptr<Product<double>> prd = make_unique<Autocall<double>>(assets, maturity, periods, ko, strike, cpn, smooth);
+    unique_ptr<Product<Number>> riskPrd = make_unique<Autocall<Number>>(assets, maturity, periods, ko, strike, cpn, smooth);
 
     //  And move them into the map
     productStore[store] = make_pair(move(prd), move(riskPrd));
