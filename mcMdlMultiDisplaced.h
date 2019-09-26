@@ -497,6 +497,16 @@ public:
             }
 		}
 
+		//	Rebuild correl matrix for lower triangular
+		for(size_t i = 0; i < myCorrel.rows(); ++i)
+		{
+			myCorrel[i][i] = 1.0;
+			for (size_t j = i; j < myCorrel.cols(); ++j)
+			{
+				myCorrel[i][j] = myCorrel[j][i];
+			}
+		}
+
 		//	Apply lambda shift to correl
 		transform(myCorrel.begin(), myCorrel.end(), myUsedCorrel.begin(),
 			[&](const T& rawCorr) { return myLambda * (1.0 - rawCorr) + rawCorr; });
@@ -636,8 +646,8 @@ public:
             const override
     {
         //  Temporaries
-        static thread_local vector<T> spots;
-        spots.resize(myNumAssets);
+		static thread_local vector<T> spots;
+		spots.resize(myNumAssets);
 
         //  Today
 
