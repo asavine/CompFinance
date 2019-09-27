@@ -47,6 +47,7 @@ class MultiDisplaced : public Model<T>
     
 	//  Constant rate 
     T                   myDiscRate;
+    vector<T>           myRepoSpreads;
     vector<T>           myRepoRates;
 
 	//	Spots
@@ -141,8 +142,8 @@ public:
         size_t numAssets = assets.size();
 		mySpots.resize(numAssets);
 		copy(spots.begin(), spots.end(), mySpots.begin());
-        myRepoRates.resize(numAssets);
-        transform(repoSpreads.begin(), repoSpreads.end(), myRepoRates.begin(), [discRate](const U& spr) {return discRate - spr; });
+        myRepoSpreads.resize(numAssets);
+		copy(repoSpreads.begin(), repoSpreads.end(), myRepoSpreads.begin());
         myAtms.resize(numAssets);
 		copy(atms.begin(), atms.end(), myAtms.begin());
 		mySkews.resize(numAssets);
@@ -167,7 +168,7 @@ public:
 
         for (size_t i = 0; i < numAssets; ++i)
 		{
-			myParameterLabels[paramNum] = string("repo rate ") + myAssetNames[i];
+			myParameterLabels[paramNum] = string("repo spread ") + myAssetNames[i];
 			++paramNum;
 		}
 		
@@ -226,7 +227,7 @@ private:
 		
 		for (size_t i = 0; i < myNumAssets; ++i)
 		{
-			myParameters[paramNum] = & myRepoRates[i];
+			myParameters[paramNum] = & myRepoSpreads[i];
 			++paramNum;
 		}
 
@@ -285,6 +286,11 @@ public:
 	const vector<T>& spots() const
     {
         return mySpots;
+    }
+
+	const vector<T>& repoSpreads() const
+    {
+        return myRepoSpreads;
     }
 
 	const vector<Time>& divDates() const
@@ -356,6 +362,8 @@ public:
         const vector<SampleDef>&    defline) 
             override
     {
+		myRepoRates.resize(myNumAssets);
+
 		myAlphas.resize(myNumAssets);
 		myBetas.resize(myNumAssets);
         myDynamics.resize(myNumAssets);
@@ -468,6 +476,8 @@ public:
         const vector<SampleDef>&    defline) 
             override
     {
+		transform(myRepoSpreads.begin(), myRepoSpreads.end(), myRepoRates.begin(), [=](const T& spread) {return myDiscRate - spread; });
+
 		//	Find alphas and betas out of ATMs and skews, see https://www.researchgate.net/publication/335146739_Displaced_Lognormal_Models
  
 		for (size_t a=0; a<myNumAssets; ++a)

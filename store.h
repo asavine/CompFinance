@@ -147,15 +147,16 @@ void putBarrier(
     const Time              maturity,
     const double            monitorFreq,
     const double            smooth,
+	const bool				callPut,	//	false: call, true: put
     const string&           store)
 {
     const double smoothFactor = smooth <= 0 ? EPS : smooth;
 
     //  We create 2 products, one for valuation and one for risk
     unique_ptr<Product<double>> prd = make_unique<UOC<double>>(
-        strike, barrier, maturity, monitorFreq, smoothFactor);
+        strike, barrier, maturity, monitorFreq, smoothFactor, callPut);
     unique_ptr<Product<Number>> riskPrd = make_unique<UOC<Number>>(
-        strike, barrier, maturity, monitorFreq, smoothFactor);
+        strike, barrier, maturity, monitorFreq, smoothFactor, callPut);
 
     //  And move them into the map
     productStore[store] = make_pair(move(prd), move(riskPrd));
@@ -237,6 +238,7 @@ void putBaskets(
 
 void putAutocall(
     const vector<string>&   assets,
+	const vector<double>&	refs,
     const Time              maturity,
     const int               periods,
     const double            ko,
@@ -246,8 +248,8 @@ void putAutocall(
     const string&           store)
 {
     //  We create 2 products, one for valuation and one for risk
-    unique_ptr<Product<double>> prd = make_unique<Autocall<double>>(assets, maturity, periods, ko, strike, cpn, smooth);
-    unique_ptr<Product<Number>> riskPrd = make_unique<Autocall<Number>>(assets, maturity, periods, ko, strike, cpn, smooth);
+    unique_ptr<Product<double>> prd = make_unique<Autocall<double>>(assets, refs, maturity, periods, ko, strike, cpn, smooth);
+    unique_ptr<Product<Number>> riskPrd = make_unique<Autocall<Number>>(assets, refs, maturity, periods, ko, strike, cpn, smooth);
 
     //  And move them into the map
     productStore[store] = make_pair(move(prd), move(riskPrd));
