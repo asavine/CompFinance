@@ -1,5 +1,3 @@
-# CompFinance
-# Antoine Savine
 # Companion code for "Modern Computational Finance: AAD and Parallel Simulations" (Antoine Savine, Wiley, 2018)
 
 ![Screenshot](back.jpg)
