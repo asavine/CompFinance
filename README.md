@@ -2,6 +2,8 @@
 # Antoine Savine
 # Companion code for "Modern Computational Finance: AAD and Parallel Simulations" (Antoine Savine, Wiley, 2018)
 
+![Screenshot](back.jpg)
+
 This is the professional implementation in C++ of the book Modern Computational Finance: AAD and Parallel Simulations by Antoine Savine. The code is freely available to anyone. Any person who purchased a copy of the book is authorized to use, modify and distribute the code for any application, as long as the credits remain on the top of the files.
 
 In this repository, readers will find:
@@ -25,10 +27,11 @@ The code is entirely written in standard C++, and compiles on Visual Studio 2017
 
 The branch 'AADBook' is frozen and reflects the code in the book as published. The master branch may evolve. Other branches contain specific implementations based on the library. For example, the 'MutliAssets' branch contains developments to extend the library to support multiple underlying assets, like basket options or autocalls. They will eventually merge into Master but not AADBook.
 
-# Introduction to back-propagation and automatic differentiation (AAD) in machine learning in finance (Antoine Savine, 2018-2019)
+# Comp Fin Lecture
+# Computational Finance and Machine Learning in Finance
 
-In addition to the companion code for the book, the repo contains the slides and material for the workshop titled "Introduction to back-propagation and automatic differentiation (AAD) in machine learning in finance." This is a softer introduction to some of the themes covered in the book, which also introduces deep learning and its application to derivatives finance, and establishes parallels between the back-propagation algorithm, at the core of deep learning, and AAD. This parallel, in turn, provides further intuition into the mechanics of AAD. 
+The repo 'CompFinLecture' contains the slides and material for the lectures based on the book. This is a softer introduction to some of the themes covered in the book, which also introduces deep learning and its application to derivatives finance, and establishes parallels between the back-propagation algorithm, at the core of deep learning, and AAD. This parallel, in turn, provides further intuition into the mechanics of AAD. 
 
-The workshop is  delivered in 2018-2019 at Copenhagen University, Aarhus University, Kings College London and WBS 2019. The slides are freely available in the repo: Intro2AADinMachineLearningAndFinance.pdf. The supplementary material is available in the "Workshop" folder. 
+These lectures are delivered as courses or workshops at Copenhagen University, Aarhus University and Kings College London. The lecture notes, C++ code and TensorFlow notebooks are freely available in the 'CompFinLectures' repo. 
 
-The workshop demonstrates AAD and its application to finance with "toy code", which is particularly easy to understand and reproduce, but is not efficient or scalable to professional standard, and not suitable for production. The code is gathered in the file "toyCode.h". The main code (all the other C++ files), on the contrary, is efficient, compliant with professional C++ development standards and designed to scale to production.
+The lectures demonstrate AAD and its application to finance with "toy code", which is particularly easy to understand and reproduce, but is not efficient or scalable to professional standard, and not suitable for production. The code in this repo ('CompFinance'), on the contrary, is efficient, compliant with professional C++ development standards and designed to scale to production.
