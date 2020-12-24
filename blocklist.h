@@ -125,6 +125,11 @@ public:
         //  Advance next
         ++next_space;
 
+        if (next_space == last_space)
+        {
+            nextblock();
+        }
+
         //  Return
         return emplaced;
     }
@@ -143,6 +148,11 @@ public:
 
         //  Advance next
         ++next_space;
+
+        if (next_space == last_space)
+        {
+            nextblock();
+        }
 
         //  Return
         return &*old_next;
@@ -196,10 +206,10 @@ public:
     void setmark()
     {
         marked_block = cur_block;
-        if (next_space == cur_block->begin())
-            marked_space = next_space;
-        else
+        if (next_space == cur_block->end())
             marked_space = std::prev(next_space);
+        else
+            marked_space = next_space;
     }
 
     //  Rewind to mark
