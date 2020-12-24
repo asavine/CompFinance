@@ -206,10 +206,7 @@ public:
     void setmark()
     {
         marked_block = cur_block;
-        if (next_space == cur_block->end())
-            marked_space = std::prev(next_space);
-        else
-            marked_space = next_space;
+        marked_space = next_space;
     }
 
     //  Rewind to mark
