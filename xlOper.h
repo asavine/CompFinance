@@ -231,6 +231,18 @@ LPXLOPER12 from_labelsAndNumbers(const vector<string>& labels, const vector<doub
     return oper;
 }
 
+LPXLOPER12 from_matrix(const matrix<double>& mat)
+{
+    const size_t n = mat.rows(), m = mat.cols();
+    if (n == 0 || m == 0) return TempErr12(xlerrNA);
+
+    LPXLOPER12 oper = TempXLOPER12();
+    resize(oper, n, m);
+    for (size_t i = 0; i < n; ++i)  for (size_t j = 0; j < m; ++j) setNum(oper, mat[i][j], i, j);
+
+    return oper;
+}
+
 LPXLOPER12 from_labelledMatrix(const vector<string>& rowLabels, const vector<string>& colLabels, const matrix<double>& mat)
 {
     const size_t n = rowLabels.size(), m = colLabels.size();

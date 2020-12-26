@@ -1208,6 +1208,41 @@ LPXLOPER12 xToyDupireBarrierMcRisks(
 	return results;
 }
 
+extern "C" __declspec(dllexport)
+LPXLOPER12 xSobolPoints(
+    double              numPoints,
+    double              dimension,
+    double              anti,
+    double              skip)
+{
+    FreeAllTempMemory();
+
+    if (numPoints <= 0.0 || dimension <= 0.0) return TempErr12(xlerrNA);
+
+    auto rng = make_unique<Sobol>();
+    rng->init(int(dimension));
+    rng->skipTo((unsigned)skip);
+
+    vector<double> pt((int) dimension);
+    matrix<double> pts((int) numPoints, (int) dimension);
+
+    int i = 0;
+    while (i < numPoints)
+    {
+        rng->nextU(pt);
+        copy(pt.begin(), pt.end(), pts[i]);
+        ++i;
+
+        if (i < numPoints && anti > 0.5)
+        {
+            for (double& xi : pt) xi = 1 - xi;
+            copy(pt.begin(), pt.end(), pts[i]);
+            ++i;
+        }
+    }
+
+	return from_matrix(pts);
+}
 
 //	Registers
 
@@ -1539,6 +1574,18 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L"Toy Dupire Barrier MC AAD risks"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xSobolPoints"),
+        (LPXLOPER12)TempStr12(L"QBBBB"),
+        (LPXLOPER12)TempStr12(L"xSobolPoints"),
+        (LPXLOPER12)TempStr12(L"numPoints, dimension, [antithetic], [skip]"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Visualization of Sobol points"),
         (LPXLOPER12)TempStr12(L""));
 
 	/* Free the XLL filename */
