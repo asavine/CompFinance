@@ -295,6 +295,7 @@ LPXLOPER12 xPutBarrier(
     double              maturity,
     double              monitorFreq,
     double              smoothing,
+	LPXLOPER12			xcallput,
     LPXLOPER12          xid)
 {
     FreeAllTempMemory();
@@ -304,8 +305,12 @@ LPXLOPER12 xPutBarrier(
     //  Make sure we have an id
     if (id.empty()) return TempErr12(xlerrNA);
 
+	//	Call or put?
+	const string cpStr = getString(xcallput);
+	bool callPut = !cpStr.empty() && (cpStr[0] == 'p' || cpStr[0] == 'P');
+
     //  Call and return
-    putBarrier(strike, barrier, maturity, monitorFreq, smoothing, id);
+    putBarrier(strike, barrier, maturity, monitorFreq, smoothing, callPut, id);
 
     return TempStr12(id);
 }
@@ -463,6 +468,7 @@ LPXLOPER12 xPutBaskets(
 extern "C" __declspec(dllexport)
 LPXLOPER12 xPutAutocall(
     LPXLOPER12          assets,
+	FP12*				refs,
     double              maturity,
     double              periods,
     double              ko,
@@ -478,15 +484,18 @@ LPXLOPER12 xPutAutocall(
     if (id.empty()) return TempErr12(xlerrNA);
 
     vector<string> vassets = to_strVector(assets);
-    //  Make sure we have assets
+	vector<double> vrefs = to_vector(refs);
+
+    //  Make sure we have assets and dimensions are consistent
     if (vassets.empty()) return TempErr12(xlerrNA);
+	if (vassets.size() != vrefs.size()) return TempErr12(xlerrNA);
 
     //  Maturity
     if (maturity <= 0) return TempErr12(xlerrNA);
     if (int(periods + EPS) <= 0) return TempErr12(xlerrNA);
 
     //  Call and return
-    putAutocall(vassets, maturity, int(periods + EPS), ko, strike, cpn, smooth, id);
+    putAutocall(vassets, vrefs, maturity, int(periods + EPS), ko, strike, cpn, smooth, id);
 
     return TempStr12(id);
 }
@@ -1326,9 +1335,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutBarrier"),
-        (LPXLOPER12)TempStr12(L"QBBBBBQ"),
+        (LPXLOPER12)TempStr12(L"QBBBBBQQ"),
         (LPXLOPER12)TempStr12(L"xPutBarrier"),
-        (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, [smoothingFactor], id"),
+        (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, [smoothingFactor], [CallPut], id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -1386,9 +1395,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutAutocall"),
-        (LPXLOPER12)TempStr12(L"QQBBBBBBQ"),
+        (LPXLOPER12)TempStr12(L"QQK%BBBBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutAutocall"),
-        (LPXLOPER12)TempStr12(L"assets, maturity, periods, ko, strike, cpn, smooth, id"),
+        (LPXLOPER12)TempStr12(L"assets, refSpots, maturity, periods, ko, strike, cpn, smooth, id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),

@@ -297,6 +297,9 @@ class Autocall : public Product<T>
 	Time					myMaturity;
     int                     myNumPeriods;
 	
+	//	References
+	vector<double>			myRefs;
+
     //  Barriers
 	double                  myKO;
     double                  myStrike;
@@ -311,22 +314,16 @@ class Autocall : public Product<T>
 public:
 
 	//  Constructor: store data and build timeline
-	Autocall(const vector<string>& assets, const Time maturity, const int periods, const double ko, const double strike, const double cpn, const double smooth) :
-		myNumAssets(assets.size()), myAssetNames(assets), myMaturity(maturity), myNumPeriods(periods), myKO(ko), myStrike(strike), myCpn(cpn), mySmooth(max(smooth, EPS)),
-        myTimeline(periods + 1), myDefline(periods + 1), myLabels(1)
+	Autocall(const vector<string>& assets, const vector<double> refs, const Time maturity, const int periods, const double ko, const double strike, const double cpn, const double smooth) :
+		myNumAssets(assets.size()), myAssetNames(assets), myRefs(refs), myMaturity(maturity), myNumPeriods(periods), myKO(ko), myStrike(strike), myCpn(cpn), mySmooth(max(smooth, EPS)),
+        myTimeline(periods), myDefline(periods), myLabels(1)
 	{
         //  Timeline and defline
         
-        //  Today
-        Time time = systemTime;
-        int step = 0;
-        myTimeline[step] = time;
-        myDefline[step].numeraire = false;
-		myDefline[step].forwardMats = vector<vector<Time>>(myNumAssets, { time });  //  spot(t) = forward(t,t) on maturity for all assets
-
         //  Periods
+        Time time = systemTime;
         const double dt = maturity / periods;
-        for (step=1; step<=periods; ++step)
+        for (size_t step=0; step<periods; ++step)
         {
             time += dt;
             myTimeline[step] = time;
@@ -350,6 +347,11 @@ public:
     {
         return myAssetNames;
     }
+
+	const vector<double>& refs() const
+	{
+		return myRefs;
+	}
 
 	//  access to maturity, strike, KO and cpn
 
@@ -391,27 +393,17 @@ public:
 		const override
 	{
         //  Temporaries
-        static thread_local vector<T> refs;
         static thread_local vector<T> perfs;
-
-        refs.resize(myNumAssets);
         perfs.resize(myNumAssets);
-
-        //  Today
-        {
-            int step = 0;
-            auto& state = path[step];
-            transform(state.forwards.begin(), state.forwards.end(), refs.begin(), [](const vector<T>& fwds) { return fwds[0]; });
-        }
 
         //  Periods
         const double dt = myMaturity / myNumPeriods;
         T notionalAlive(1.0);
         payoffs[0] = 0.0;
-        for (int step=1; step<myNumPeriods; ++step)
+        for (int step=0; step<myNumPeriods-1; ++step)
         {
             auto& state = path[step];
-            transform(state.forwards.begin(), state.forwards.end(), refs.begin(), perfs.begin(), [](const vector<T>& fwds, const T ref) { return fwds[0] / ref; });
+            transform(state.forwards.begin(), state.forwards.end(), myRefs.begin(), perfs.begin(), [](const vector<T>& fwds, const double ref) { return fwds[0] / ref; });
             T worst = *min_element(perfs.begin(), perfs.end());
 
             //  receive cpn
@@ -430,9 +422,9 @@ public:
 
         //  last
         {
-            int step = myNumPeriods;
+            int step = myNumPeriods-1;
             auto& state = path[step];
-            transform(state.forwards.begin(), state.forwards.end(), refs.begin(), perfs.begin(), [](const vector<T>& fwds, const T ref) { return fwds[0] / ref; });
+            transform(state.forwards.begin(), state.forwards.end(), myRefs.begin(), perfs.begin(), [](const vector<T>& fwds, const double ref) { return fwds[0] / ref; });
             T worst = *min_element(perfs.begin(), perfs.end());
 
             //  receive cpn

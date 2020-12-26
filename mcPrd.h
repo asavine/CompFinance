@@ -128,8 +128,10 @@ public:
 template <class T>
 class UOC : public Product<T>
 {
+	bool				myCallPut;	//	false = call, true = put
+
     double              myStrike;
-    double              myBarrier;
+    double              myBarrier;	//	note = always up and out for now
     Time                myMaturity;
     
     double              mySmooth;
@@ -148,8 +150,10 @@ public:
         const double    barrier, 
         const Time      maturity, 
         const Time      monitorFreq,
-        const double    smooth)
-        : myStrike(strike), 
+        const double    smooth,
+		const bool		callPut = false)	//	false = call, true = put
+        : myCallPut(callPut),
+		myStrike(strike), 
         myBarrier(barrier), 
         myMaturity(maturity),
         mySmooth(smooth),
@@ -194,7 +198,7 @@ public:
         ostringstream ost;
         ost.precision(2);
         ost << fixed;
-        ost << "call " << myMaturity << " " << myStrike ;
+        ost << (myCallPut? "put ": "call ") << myMaturity << " " << myStrike ;
         myLabels[1] = ost.str();
 
         ost << " up and out "
@@ -270,7 +274,15 @@ public:
 
         //  Payoff
         const auto finalSpot = path.back().forwards.front().front();
-        const auto euro = max(finalSpot - myStrike, 0.0) / path.back().numeraire;     
+		T euro;
+		if (myCallPut)
+		{
+			euro = max(myStrike - finalSpot, 0.0) / path.back().numeraire;
+		}
+		else
+		{
+			euro = max(finalSpot - myStrike, 0.0) / path.back().numeraire;     		
+		}
         payoffs[0] = alive * euro;                                    
         payoffs[1] = euro;
     }
