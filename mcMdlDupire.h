@@ -227,7 +227,7 @@ private:
     //  Helper function, fills a sample given the spot
     inline static void fillScen(const T& spot, Sample<T>& scen)
     {
-        fill(scen.forwards.begin(), scen.forwards.end(), spot);
+        fill(scen.forwards.front().begin(), scen.forwards.front().end(), spot);
     }
 
 public:
