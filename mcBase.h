@@ -47,9 +47,6 @@ struct SampleDef
     //  need numeraire?
     bool            numeraire = true;
 
-    vector<Time>    forwardMats;
-    vector<Time>    discountMats;
-
     struct RateDef
     {
         Time    start;
@@ -60,7 +57,11 @@ struct SampleDef
             start(s), end(e), curve(c) {};
     };
 
+    vector<Time>    discountMats;
     vector<RateDef> liborDefs;
+
+    //  multi-asset: forwardMats[a] = maturities for asset a
+    vector<vector<Time>>        forwardMats;
 };
 
 //  Sample = simulated value
@@ -69,25 +70,30 @@ template <class T>
 struct Sample
 {
     T           numeraire;
-    vector<T>   forwards;
     vector<T>   discounts;
     vector<T>   libors;
+
+    //  multi-asset: forwardMats[a][t] = forward for asset a, maturity t
+    vector<vector<T>>   forwards;
 
     //  Allocate given SampleDef
     void allocate(const SampleDef& data)
     {
-        forwards.resize(data.forwardMats.size());
         discounts.resize(data.discountMats.size());
         libors.resize(data.liborDefs.size());
+
+        forwards.resize(data.forwardMats.size());
+        for (size_t a = 0; a < forwards.size(); ++a) forwards[a].resize(data.forwardMats[a].size());
     }
 
     //  Initialize defaults
     void initialize()
     {
         numeraire = T(1.0);
-		fill(forwards.begin(), forwards.end(), T(100.0));
         fill(discounts.begin(), discounts.end(), T(1.0));
         fill(libors.begin(), libors.end(), T(0.0));
+
+		for (auto& forward: forwards) fill(forward.begin(), forward.end(), T(100.0));
     }
 };
 
@@ -116,12 +122,18 @@ inline void initializePath(Scenario<T>& path)
 template <class T>
 class Product
 {
+    inline static const vector<string> defaultAssetNames = { "spot" };
+
 public:
 
     //  Access to the product timeline
     //      along with the sample definitions (defline)
     virtual const vector<Time>& timeline() const = 0;
     virtual const vector<SampleDef>& defline() const = 0;
+
+    //  Number and names of underlying assets, default = 1 and "spot"
+    virtual const size_t numAssets() const { return 1; }
+    virtual const vector<string>& assetNames() const { return defaultAssetNames; }
 
     //  Labels of all payoffs in the product
     virtual const vector<string>& payoffLabels() const = 0;
@@ -145,7 +157,13 @@ public:
 template <class T>
 class Model
 {
+    inline static const vector<string> defaultAssetNames = { "spot" };
+
 public:
+
+    //  Number and names of underlying assets, default = 1 and "spot"
+    virtual const size_t numAssets() const { return 1; }
+    virtual const vector<string>& assetNames() const { return defaultAssetNames; }
 
     //  Initialize with product timeline
     virtual void allocate(
@@ -230,6 +248,17 @@ public:
 //  Template algorithms
 //  ===================
 
+//  Check compatibility of model and product
+//  At the moment, only check that assets are the samein both cases
+//  May be easily extended in the future
+template <class T>
+inline bool checkCompatiblity(
+    const Product<T>&      prd,
+    const Model<T>&        mdl)
+{
+    return prd.assetNames() == mdl.assetNames();
+}
+
 //  Serial valuation, chapter 6
 
 //	MC simulator: free function that conducts simulations 
@@ -241,6 +270,8 @@ inline vector<vector<double>> mcSimul(
     const RNG&                  rng,			            
     const size_t                nPath)                      
 {
+    if (!checkCompatiblity(prd, mdl)) throw runtime_error("Model and product are not compatible");
+
     //  Work with copies of the model and RNG
     //      which are modified when we set up the simulation
     //  Copies are OK at high level
@@ -286,6 +317,8 @@ inline vector<vector<double>> mcParallelSimul(
     const RNG&                  rng,
     const size_t                nPath)
 {
+    if (!checkCompatiblity(prd, mdl)) throw runtime_error("Model and product are not compatible");
+
     auto cMdl = mdl.clone();
 
     const size_t nPay = prd.payoffLabels().size();
@@ -400,6 +433,8 @@ mcSimulAAD(
     const size_t            nPath,
     const F&                aggFun = defaultAggregator)
 {
+    if (!checkCompatiblity(prd, mdl)) throw runtime_error("Model and product are not compatible");
+
     //  Work with copies of the model and RNG
     //      which are modified when we set up the simulation
     //  Copies are OK at high level
@@ -535,6 +570,8 @@ mcParallelSimulAAD(
     const size_t            nPath,
     const F&                aggFun = defaultAggregator)
 {
+    if (!checkCompatiblity(prd, mdl)) throw runtime_error("Model and product are not compatible");
+
     const size_t nPay = prd.payoffLabels().size();
     const size_t nParam = mdl.numParams();
 
@@ -742,6 +779,8 @@ mcSimulAADMulti(
 	const RNG&              rng,
 	const size_t            nPath)
 {
+    if (!checkCompatiblity(prd, mdl)) throw runtime_error("Model and product are not compatible");
+
 	auto cMdl = mdl.clone();
 	auto cRng = rng.clone();
 
@@ -823,6 +862,8 @@ mcParallelSimulAADMulti(
 	const RNG& rng,
 	const size_t            nPath)
 {
+    if (!checkCompatiblity(prd, mdl)) throw runtime_error("Model and product are not compatible");
+
 	const size_t nPay = prd.payoffLabels().size();
 	const size_t nParam = mdl.numParams();
 

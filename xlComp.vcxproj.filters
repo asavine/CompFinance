@@ -98,6 +98,15 @@
     <ClInclude Include="toyCode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="mcMdlMultiDisplaced.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="choldc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mcPrdMulti.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="xlcall.cpp">
