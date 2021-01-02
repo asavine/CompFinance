@@ -258,11 +258,11 @@ public:
 			}
 
 			//  Forward factors
-			const size_t pFF = defline[i].forwardMats.size();
+			const size_t pFF = defline[i].forwardMats.front().size();
 			for (size_t j = 0; j < pFF; ++j)
 			{
 				myForwardFactors[i][j] =
-					exp(mu * (defline[i].forwardMats[j] - productTimeline[i]));
+					exp(mu * (defline[i].forwardMats.front()[j] - productTimeline[i]));
 			}
 
 			//  Libors
@@ -299,7 +299,7 @@ private:
         }
         
         transform(myForwardFactors[idx].begin(), myForwardFactors[idx].end(), 
-            scen.forwards.begin(), 
+            scen.forwards.front().begin(), 
             [&spot](const T& ff)
             {
                 return spot * ff;

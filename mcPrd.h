@@ -54,12 +54,14 @@ public:
 
         //  Defline
         myDefline.resize(1);   //  only exercise date
+        SampleDef& sampleDef = myDefline.front();
+
         //  Numeraire needed
-        myDefline[0].numeraire = true;
+        sampleDef.numeraire = true;
         //  Forward to settlement needed at exercise
-        myDefline[0].forwardMats.push_back(settlementDate);
+        sampleDef.forwardMats.push_back({ settlementDate });
         //  Discount to settlement needed at exercise
-        myDefline[0].discountMats.push_back(settlementDate);
+        sampleDef.discountMats.push_back(settlementDate);
 
         //  Identify the product
         ostringstream ost;
@@ -115,17 +117,21 @@ public:
         vector<T>&                  payoffs)
             const override
     {
-        payoffs[0] = max(path[0].forwards[0] - myStrike, 0.0)
-            * path[0].discounts[0]
-            / path[0].numeraire; 
+        const auto& sample = path.front();
+        const auto spot = sample.forwards.front().front();
+        payoffs.front() = max(spot - myStrike, 0.0)
+            * sample.discounts.front()
+            / sample.numeraire; 
     }
 };
 
 template <class T>
 class UOC : public Product<T>
 {
+	bool				myCallPut;	//	false = call, true = put
+
     double              myStrike;
-    double              myBarrier;
+    double              myBarrier;	//	note = always up and out for now
     Time                myMaturity;
     
     double              mySmooth;
@@ -144,8 +150,10 @@ public:
         const double    barrier, 
         const Time      maturity, 
         const Time      monitorFreq,
-        const double    smooth)
-        : myStrike(strike), 
+        const double    smooth,
+		const bool		callPut = false)	//	false = call, true = put
+        : myCallPut(callPut),
+		myStrike(strike), 
         myBarrier(barrier), 
         myMaturity(maturity),
         mySmooth(smooth),
@@ -179,7 +187,7 @@ public:
             myDefline[i].numeraire = false;
 
             //  spot(t) = forward (t, t) needed on every step
-            myDefline[i].forwardMats.push_back(myTimeline[i]);
+            myDefline[i].forwardMats.push_back({ myTimeline[i] });
         }
         //  Numeraire needed only on last step
         myDefline.back().numeraire = true;
@@ -190,7 +198,7 @@ public:
         ostringstream ost;
         ost.precision(2);
         ost << fixed;
-        ost << "call " << myMaturity << " " << myStrike ;
+        ost << (myCallPut? "put ": "call ") << myMaturity << " " << myStrike ;
         myLabels[1] = ost.str();
 
         ost << " up and out "
@@ -236,9 +244,10 @@ public:
 
         //  We apply a smoothing factor of x% of the spot both ways
         //  untemplated
-        const double smooth = double(path[0].forwards[0] * mySmooth),
+        const double smooth = double(path.front().forwards.front().front() * mySmooth),
             twoSmooth = 2 * smooth,
-            barSmooth = myBarrier + smooth;
+            barSmooth = myBarrier + smooth,
+            minusSmooth = myBarrier - smooth;
 
         //  We start alive
         T alive(1.0);
@@ -246,24 +255,36 @@ public:
         //  Go through path, update alive status
         for (const auto& sample: path)
         {
+            //  First asset, first maturity
+            const auto spot = sample.forwards.front().front();
+
             //  Breached
-            if (sample.forwards[0] > barSmooth)
+            if (spot > barSmooth)
             {
                 alive = T(0.0);
                 break;
             }
 
             //  Semi-breached: apply smoothing
-            if (sample.forwards[0] > myBarrier - smooth)
+            else if (spot > minusSmooth)
             {
-                alive *= (barSmooth - sample.forwards[0]) / twoSmooth;
+                alive *= (barSmooth - spot) / twoSmooth;
             }
         }
 
         //  Payoff
-        payoffs[1] = max(path.back().forwards[0] - myStrike, 0.0) 
-                        / path.back().numeraire;
-        payoffs[0] = alive * payoffs[1];
+        const auto finalSpot = path.back().forwards.front().front();
+		T euro;
+		if (myCallPut)
+		{
+			euro = max(myStrike - finalSpot, 0.0) / path.back().numeraire;
+		}
+		else
+		{
+			euro = max(finalSpot - myStrike, 0.0) / path.back().numeraire;     		
+		}
+        payoffs[0] = alive * euro;                                    
+        payoffs[1] = euro;
     }
 };
 
@@ -297,7 +318,7 @@ public:
 		for (size_t i = 0; i < n; ++i)
 		{
 			myDefline[i].numeraire = true;
-			myDefline[i].forwardMats.push_back(myMaturities[i]);
+            myDefline[i].forwardMats.push_back({ myMaturities[i] });
 		}
 
 		//  Identify the payoffs
@@ -366,7 +387,7 @@ public:
 				myStrikes[i].begin(),
 				myStrikes[i].end(),
 				payoffIt,
-				[spot = path[i].forwards[0], num = path[i].numeraire]
+				[spot = path[i].forwards.front().front(), num = path[i].numeraire]
 				(const double& k)
 				{
 					return max(spot - k, 0.0) / num;
@@ -444,7 +465,7 @@ public:
         for (size_t i = 0; i < n; ++i)
         {
             //  spot(Ti) = forward (Ti, Ti) needed on every step
-            myDefline[i].forwardMats.push_back(myTimeline[i]);
+            myDefline[i].forwardMats.push_back({ myTimeline[i] });
 
             //  libor(Ti, Ti+1) and discount (Ti, Ti+1) needed 
             //      on every step but last
@@ -503,18 +524,18 @@ public:
 
         //  We apply a smoothing factor of x% of the spot both ways
         //  untemplated
-        const double smooth = double(path[0].forwards[0] * mySmooth),
+        const double smooth = double(path.front().forwards.front().front() * mySmooth),
             twoSmooth = 2 * smooth;
 
         //  Period by period
         const size_t n = path.size() - 1;
-        payoffs[0] = 0;
+        payoffs.front() = 0;
         for (size_t i = 0; i < n; ++i)
         {
             const auto& start = path[i];
             const auto& end = path[i + 1];
 
-            const T s0 = start.forwards[0], s1 = end.forwards[0];
+            const T s0 = start.forwards.front().front(), s1 = end.forwards.front().front();
 
             //  Is asset performance positive?
 
@@ -541,13 +562,14 @@ public:
 
             //  ~smoothing
 
-            payoffs[0] += 
-                digital             //  contingency
-                * ( start.libors[0] //  libor(Ti, Ti+1)
-                + myCpn)            //  + coupon
-                * myDt[i]           //  day count / 365
-                / end.numeraire;    //  paid at Ti+1
+            payoffs.front() += 
+                digital                     //  contingency
+                * ( start.libors.front()    //  libor(Ti, Ti+1)
+                + myCpn)                    //  + coupon
+                * myDt[i]                   //  day count / 365
+                / end.numeraire;            //  paid at Ti+1
         }
-        payoffs[0] += 1.0 / path.back().numeraire;  //  redemption at maturity
+        payoffs.front() += 1.0 / path.back().numeraire;  //  redemption at maturity
     }
 };
+

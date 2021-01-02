@@ -313,7 +313,6 @@ public:
 
     iterator end()
     {
-        auto last_block = prev(data.end());
         return iterator(cur_block, next_space,
             cur_block->begin(), cur_block->end());
     }

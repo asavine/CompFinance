@@ -136,6 +136,137 @@ LPXLOPER12 xPutBlackScholes(
 }
 
 extern "C" __declspec(dllexport)
+ LPXLOPER12 xPutDLM(
+    //  model parameters
+	LPXLOPER12          assets,
+    FP12*               spots,
+    FP12*               atms,
+    FP12*               skews,
+	double				discRate,
+    FP12*               repoSpreads,
+    FP12*               divDates,
+    FP12*               divs,
+    FP12*               correl,
+    double              lambda,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    //  Assets
+    vector<string> vassets = to_strVector(assets);
+    if (vassets.empty()) return TempErr12(xlerrNA);
+    for (const auto& asset : vassets) if (asset.empty()) return TempErr12(xlerrNA);
+	const size_t vnumassets = vassets.size();
+
+	//	Check dimensions
+    if (	spots->rows * spots->columns != vnumassets
+        ||  repoSpreads->rows * repoSpreads->columns != vnumassets
+		||	atms->rows * atms->columns != vnumassets
+		||	skews->rows * skews->columns != vnumassets
+		||	divs->rows != divDates->rows || divs->columns != vnumassets || divDates->columns != 1
+		||	correl->rows != vnumassets || correl->columns != vnumassets) 
+    {
+        return TempErr12(xlerrNA);
+    }
+
+    //  Unpack
+
+    vector<double> vspots = to_vector(spots);
+    vector<double> vspreads = to_vector(repoSpreads);
+    vector<double> vatms = to_vector(atms);
+    vector<double> vskews = to_vector(skews);
+
+    vector<double> vdivtimes = to_vector(divDates);
+    matrix<double> vdivs = to_matrix(divs);
+
+    matrix<double> vcorrel = to_matrix(correl);
+
+    //  Call and return
+	putDisplaced(vassets, vspots, vatms, vskews, discRate, vspreads, vdivtimes, vdivs, vcorrel, lambda, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xViewDLM(
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    try
+    {
+        Model<double>* mdl = const_cast<Model<double>*>(getModel<double>(id));
+        //  Make sure we have a model
+        if (!mdl) return TempErr12(xlerrNA);
+        MultiDisplaced<double>* dlm = dynamic_cast<MultiDisplaced<double>*>(mdl);
+        //  Make sure it is a DLM
+        if (!dlm) return TempErr12(xlerrNA);
+
+		//	Initialize it
+		vector<Time> timeline = { 1.0 };
+		vector<SampleDef> defline(1);
+		defline[0].numeraire = false;
+		defline[0].discountMats = {};
+		defline[0].liborDefs = {};
+		defline[0].forwardMats = vector<vector<Time>>(dlm->numAssets(), { 1.0 });
+
+		dlm->allocate(timeline, defline);
+		dlm->init(timeline, defline);
+
+        const size_t n = dlm->numAssets() + 1, m = 4;
+
+        LPXLOPER12 oper = TempXLOPER12();
+        resize(oper, n, m);
+
+        setString(oper, "dynamics", 0, 1);
+        setString(oper, "alpha", 0, 2);
+        setString(oper, "beta", 0, 3);
+
+        for (size_t i = 0; i < dlm->numAssets(); ++i)
+        {
+            setString(oper, dlm->assetNames()[i], i + 1, 0);
+            
+            switch(dlm->dynamics()[i])
+            {
+            case 0:
+                setString(oper, "lognormal", i + 1, 1);
+                break;
+            case 1:
+                setString(oper, "normal", i + 1, 1);
+                break;
+            case 2:
+                setString(oper, "surnormal", i + 1, 1);
+                break;
+            case 3:
+                setString(oper, "subnormal", i + 1, 1);
+                break;
+            default:
+                setString(oper, "invalid", i + 1, 1);
+                break;
+            }
+            
+            setNum(oper, dlm->alphas()[i], i + 1, 2);
+            setNum(oper, dlm->betas()[i], i + 1, 3);
+        }
+
+        return oper;
+    }
+    catch (const exception&)
+    {
+        return TempErr12(xlerrNA);
+    }
+}
+
+extern "C" __declspec(dllexport)
  LPXLOPER12 xPutEuropean(
     double              strike,
     double              exerciseDate,
@@ -164,6 +295,7 @@ LPXLOPER12 xPutBarrier(
     double              maturity,
     double              monitorFreq,
     double              smoothing,
+	LPXLOPER12			xcallput,
     LPXLOPER12          xid)
 {
     FreeAllTempMemory();
@@ -173,8 +305,12 @@ LPXLOPER12 xPutBarrier(
     //  Make sure we have an id
     if (id.empty()) return TempErr12(xlerrNA);
 
+	//	Call or put?
+	const string cpStr = getString(xcallput);
+	bool callPut = !cpStr.empty() && (cpStr[0] == 'p' || cpStr[0] == 'P');
+
     //  Call and return
-    putBarrier(strike, barrier, maturity, monitorFreq, smoothing, id);
+    putBarrier(strike, barrier, maturity, monitorFreq, smoothing, callPut, id);
 
     return TempStr12(id);
 }
@@ -243,6 +379,123 @@ LPXLOPER12 xPutEuropeans(
 
     //  Call and return
     putEuropeans(vmats, vstrikes, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xPutMultiStats(
+    LPXLOPER12          assets,
+    FP12*               fix,
+    FP12*               fwd,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    vector<string> vassets = to_strVector(assets);
+    //  Make sure we have assets
+    if (vassets.empty()) return TempErr12(xlerrNA);
+
+    //  Fixing and fwd dates, removing blanks and zeros (not today)
+    vector<Time> vfix;
+    vector<Time> vfwd;
+    {
+        size_t rows = fix->rows;
+        size_t cols = fix->columns;
+        
+        if (fwd->rows * fwd->columns != rows * cols) return TempErr12(xlerrNA);
+        
+        Time* fixs = fix->array;
+        Time* fwds = fwd->array;
+
+        for (size_t i = 0; i < cols * rows; ++i)
+        {
+            if (fixs[i] > EPS && fwds[i] > EPS)
+            {
+                //  Check
+                if (i > 0 && fixs[i] <= fixs[i-1]) return TempErr12(xlerrNA);
+                if (fixs[i] > fwds[i]) return TempErr12(xlerrNA);
+
+                //  Set
+                vfix.push_back(fixs[i]);
+                vfwd.push_back(fwds[i]);
+            }
+        }
+    }
+
+    //  Call and return
+    putMultiStats(vassets, vfix, vfwd, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xPutBaskets(
+    LPXLOPER12          assets,
+    FP12*               weights,
+    double              maturity,
+    FP12*               strikes,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    vector<string> vassets = to_strVector(assets);
+    //  Make sure we have assets
+    if (vassets.empty()) return TempErr12(xlerrNA);
+
+    //  Maturity
+    if (maturity <= 0) return TempErr12(xlerrNA);
+
+    //  Weights and strikes
+    vector<double> vweights = to_vector(weights);
+    vector<double> vstrikes = to_vector(strikes);
+    if (vweights.empty() || vstrikes.empty()) TempErr12(xlerrNA);
+
+    //  Call and return
+    putBaskets(vassets, vweights, maturity, vstrikes, id);
+
+    return TempStr12(id);
+}
+
+extern "C" __declspec(dllexport)
+LPXLOPER12 xPutAutocall(
+    LPXLOPER12          assets,
+	FP12*				refs,
+    double              maturity,
+    double              periods,
+    double              ko,
+    double              strike,
+    double              cpn,
+    double              smooth,
+    LPXLOPER12          xid)
+{
+    FreeAllTempMemory();
+
+    const string id = getString(xid);
+    //  Make sure we have an id
+    if (id.empty()) return TempErr12(xlerrNA);
+
+    vector<string> vassets = to_strVector(assets);
+	vector<double> vrefs = to_vector(refs);
+
+    //  Make sure we have assets and dimensions are consistent
+    if (vassets.empty()) return TempErr12(xlerrNA);
+	if (vassets.size() != vrefs.size()) return TempErr12(xlerrNA);
+
+    //  Maturity
+    if (maturity <= 0) return TempErr12(xlerrNA);
+    if (int(periods + EPS) <= 0) return TempErr12(xlerrNA);
+
+    //  Call and return
+    putAutocall(vassets, vrefs, maturity, int(periods + EPS), ko, strike, cpn, smooth, id);
 
     return TempStr12(id);
 }
@@ -964,6 +1217,41 @@ LPXLOPER12 xToyDupireBarrierMcRisks(
 	return results;
 }
 
+extern "C" __declspec(dllexport)
+LPXLOPER12 xSobolPoints(
+    double              numPoints,
+    double              dimension,
+    double              anti,
+    double              skip)
+{
+    FreeAllTempMemory();
+
+    if (numPoints <= 0.0 || dimension <= 0.0) return TempErr12(xlerrNA);
+
+    auto rng = make_unique<Sobol>();
+    rng->init(int(dimension));
+    rng->skipTo((unsigned)skip);
+
+    vector<double> pt((int) dimension);
+    matrix<double> pts((int) numPoints, (int) dimension);
+
+    int i = 0;
+    while (i < numPoints)
+    {
+        rng->nextU(pt);
+        copy(pt.begin(), pt.end(), pts[i]);
+        ++i;
+
+        if (i < numPoints && anti > 0.5)
+        {
+            for (double& xi : pt) xi = 1 - xi;
+            copy(pt.begin(), pt.end(), pts[i]);
+            ++i;
+        }
+    }
+
+	return from_matrix(pts);
+}
 
 //	Registers
 
@@ -998,6 +1286,30 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutDLM"),
+        (LPXLOPER12)TempStr12(L"QQK%K%K%BK%K%K%K%BQ"),
+        (LPXLOPER12)TempStr12(L"xPutDLM"),
+        (LPXLOPER12)TempStr12(L"assets, spots, atms, skews, DiscRate, RepoSpreads, divDates, divs, correl, lambda, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a Multi-DLM in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xViewDLM"),
+        (LPXLOPER12)TempStr12(L"QQ"),
+        (LPXLOPER12)TempStr12(L"xViewDLM"),
+        (LPXLOPER12)TempStr12(L"id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Displays the assets dynamics, alpha and beta, for debug and info"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutDupire"),
         (LPXLOPER12)TempStr12(L"QBK%K%K%BQ"),
         (LPXLOPER12)TempStr12(L"xPutDupire"),
@@ -1009,7 +1321,7 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"Initializes a Dupire in memory"),
         (LPXLOPER12)TempStr12(L""));
 
-    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+	Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutEuropean"),
         (LPXLOPER12)TempStr12(L"QBBBQ"),
         (LPXLOPER12)TempStr12(L"xPutEuropean"),
@@ -1023,9 +1335,9 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
         (LPXLOPER12)TempStr12(L"xPutBarrier"),
-        (LPXLOPER12)TempStr12(L"QBBBBBQ"),
+        (LPXLOPER12)TempStr12(L"QBBBBBQQ"),
         (LPXLOPER12)TempStr12(L"xPutBarrier"),
-        (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, [smoothingFactor], id"),
+        (LPXLOPER12)TempStr12(L"strike, barrier, maturity, monitoringFreq, [smoothingFactor], [CallPut], id"),
         (LPXLOPER12)TempStr12(L"1"),
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
@@ -1054,7 +1366,43 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
-        (LPXLOPER12)TempStr12(L"Initializes a collection of European call in memory"),
+        (LPXLOPER12)TempStr12(L"Initializes a collection of European calls in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutMultiStats"),
+        (LPXLOPER12)TempStr12(L"QQK%K%Q"),
+        (LPXLOPER12)TempStr12(L"xPutMultiStats"),
+        (LPXLOPER12)TempStr12(L"assets, fixingDates, fwdDates, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a ~product to compute expectations and covariances in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutBaskets"),
+        (LPXLOPER12)TempStr12(L"QQK%BK%Q"),
+        (LPXLOPER12)TempStr12(L"xPutBaskets"),
+        (LPXLOPER12)TempStr12(L"assets, weights, maturity, strikes, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a ~product to compute expectations and covariances in memory"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xPutAutocall"),
+        (LPXLOPER12)TempStr12(L"QQK%BBBBBBQ"),
+        (LPXLOPER12)TempStr12(L"xPutAutocall"),
+        (LPXLOPER12)TempStr12(L"assets, refSpots, maturity, periods, ko, strike, cpn, smooth, id"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Initializes a ~product to compute expectations and covariances in memory"),
         (LPXLOPER12)TempStr12(L""));
 
     Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
@@ -1235,6 +1583,18 @@ extern "C" __declspec(dllexport) int xlAutoOpen(void)
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L""),
         (LPXLOPER12)TempStr12(L"Toy Dupire Barrier MC AAD risks"),
+        (LPXLOPER12)TempStr12(L""));
+
+    Excel12f(xlfRegister, 0, 11, (LPXLOPER12)&xDLL,
+        (LPXLOPER12)TempStr12(L"xSobolPoints"),
+        (LPXLOPER12)TempStr12(L"QBBBB"),
+        (LPXLOPER12)TempStr12(L"xSobolPoints"),
+        (LPXLOPER12)TempStr12(L"numPoints, dimension, [antithetic], [skip]"),
+        (LPXLOPER12)TempStr12(L"1"),
+        (LPXLOPER12)TempStr12(L"myOwnCppFunctions"),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L""),
+        (LPXLOPER12)TempStr12(L"Visualization of Sobol points"),
         (LPXLOPER12)TempStr12(L""));
 
 	/* Free the XLL filename */
