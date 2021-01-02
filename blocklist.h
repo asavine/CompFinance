@@ -125,11 +125,6 @@ public:
         //  Advance next
         ++next_space;
 
-        if (next_space == last_space)
-        {
-            nextblock();
-        }
-
         //  Return
         return emplaced;
     }
@@ -148,11 +143,6 @@ public:
 
         //  Advance next
         ++next_space;
-
-        if (next_space == last_space)
-        {
-            nextblock();
-        }
 
         //  Return
         return &*old_next;
@@ -205,6 +195,11 @@ public:
     //  Set mark
     void setmark()
     {
+        if (next_space == last_space)
+        {
+            nextblock();
+        }
+        
         marked_block = cur_block;
         marked_space = next_space;
     }
