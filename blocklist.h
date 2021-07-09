@@ -195,6 +195,11 @@ public:
     //  Set mark
     void setmark()
     {
+        if (next_space == last_space)
+        {
+            nextblock();
+        }
+        
         marked_block = cur_block;
         marked_space = next_space;
     }
