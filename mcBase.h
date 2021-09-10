@@ -309,7 +309,7 @@ inline vector<vector<double>> mcSimul(
 
 //  Parallel valuation, chapter 7
 
-#define BATCHSIZE 64
+#define BATCHSIZE size_t{64}
 //	Parallel equivalent of mcSimul()
 inline vector<vector<double>> mcParallelSimul(
     const Product<double>&      prd,

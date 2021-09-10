@@ -280,7 +280,7 @@ public:
 
     const T rate() const
     {
-        return myRate;
+        return myDiscRate;
     }
 
 	const vector<T>& spots() const

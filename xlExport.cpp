@@ -17,6 +17,7 @@ As long as this comment is preserved at the top of the file
 //  Excel export wrappers to functions in main.h
 
 #pragma warning(disable:4996)
+#pragma warning(disable:4267)
 
 #include "ThreadPool.h"
 #include "main.h"
@@ -881,7 +882,7 @@ LPXLOPER12 xDisplayRisk(
 
     RiskReports* results;
     const string riskId = getString(riskid);
-    auto& it = riskStore.find(riskId);
+    auto it = riskStore.find(riskId);
     if (it == riskStore.end()) return TempErr12(xlerrNA);
     else results = &it->second;
 

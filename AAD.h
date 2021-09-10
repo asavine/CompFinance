@@ -16,6 +16,8 @@ As long as this comment is preserved at the top of the file
 
 #pragma once
 
+#include <memory>
+
 //  So we can instrument Gaussians like standard math functions
 #include "gaussians.h"
 

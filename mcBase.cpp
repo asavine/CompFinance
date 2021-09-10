@@ -14,6 +14,8 @@ Wiley, 2018
 As long as this comment is preserved at the top of the file
 */
 
+#pragma warning(disable:4267)
+
 #include "mcBase.h"
 
 //  Static
