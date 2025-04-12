@@ -19,11 +19,12 @@ As long as this comment is preserved at the top of the file
 //  Thread pool of chapter 3
 
 #include <future>
+#include <chrono>
 #include <thread>
 #include "ConcurrentQueue.h"
 
 using namespace std;
-
+using namespace std::chrono_literals;
 typedef packaged_task<bool(void)> Task;
 typedef future<bool> TaskHandle;
 
@@ -153,6 +154,7 @@ public:
 		//	Check if the future is ready without blocking
 		//	The only syntax C++11 provides for that is
 		//	wait 0 seconds and return status
+		
 		while (f.wait_for(0s) != future_status::ready)
 		{
 			//	Non blocking
