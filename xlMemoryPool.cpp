@@ -43,7 +43,7 @@ MemoryPool::~MemoryPool(void)
 
 void MemoryPool::ClearPool(void)
 {
-	delete [] m_rgchMemBlock;
+	delete[] m_rgchMemBlock;
 }
 
 //
@@ -52,7 +52,7 @@ void MemoryPool::ClearPool(void)
 // is not allowed, this method will return 0. Can be called
 // and used exactly as malloc().
 //
-LPSTR MemoryPool::GetTempMemory(int cBytes)
+LPSTR MemoryPool::GetTempMemory(size_t cBytes)
 {
 	LPSTR lpMemory;
 
@@ -62,7 +62,7 @@ LPSTR MemoryPool::GetTempMemory(int cBytes)
 	}
 	else
 	{
-		lpMemory = (LPSTR) m_rgchMemBlock + m_ichOffsetMemBlock;
+		lpMemory = (LPSTR)m_rgchMemBlock + m_ichOffsetMemBlock;
 		m_ichOffsetMemBlock += cBytes;
 
 		return lpMemory;

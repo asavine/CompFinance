@@ -192,7 +192,7 @@
     <ClInclude Include="xlframework.h" />
     <ClInclude Include="gaussians.h" />
     <ClInclude Include="matrix.h" />
-    <ClInclude Include="xlmemorymanager.h" />
+    <ClInclude Include="xlMemorymanager.h" />
     <ClInclude Include="xlMemoryPool.h" />
     <ClInclude Include="store.h" />
     <ClInclude Include="ThreadPool.h" />
@@ -204,6 +204,7 @@
     <ClCompile Include="AAD.cpp" />
     <ClCompile Include="sobol.cpp" />
     <ClCompile Include="mcBase.cpp" />
+    <ClCompile Include="xlframework.c" />
     <ClCompile Include="xlMemoryManager.cpp" />
     <ClCompile Include="xlMemoryPool.cpp" />
     <ClCompile Include="ThreadPool.cpp" />

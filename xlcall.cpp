@@ -1,18 +1,17 @@
 /*
 **  Microsoft Excel Developer's Toolkit
-**  Version 12.0
+**  Version 14.0
 **
-**  File:           INCLUDE\XLCALL.CPP
-**  Description:    Code file for Excel 2007 callbacks
+**  File:           SRC\XLCALL.CPP
+**  Description:    Code file for Excel callbacks
 **  Platform:       Microsoft Windows
 **
-**  This file defines the entry points 
-**  which are used in the Microsoft Excel 2007 C API.
+**  This file defines the entry points
+**  which are used in the Microsoft Excel C API.
 **
 */
 
 #ifndef _WINDOWS_
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
 
@@ -29,7 +28,7 @@
 #define cxloper12Max 255
 #define EXCEL12ENTRYPT "MdCallBack12"
 
-typedef int (PASCAL *EXCEL12PROC) (int xlfn, int coper, LPXLOPER12 *rgpxloper12, LPXLOPER12 xloper12Res);
+typedef int (PASCAL* EXCEL12PROC) (int xlfn, int coper, LPXLOPER12* rgpxloper12, LPXLOPER12 xloper12Res);
 
 HMODULE hmodule;
 EXCEL12PROC pexcel12;
@@ -41,19 +40,37 @@ __forceinline void FetchExcel12EntryPt(void)
 		hmodule = GetModuleHandle(NULL);
 		if (hmodule != NULL)
 		{
-			pexcel12 = (EXCEL12PROC) GetProcAddress(hmodule, EXCEL12ENTRYPT);
+			pexcel12 = (EXCEL12PROC)GetProcAddress(hmodule, EXCEL12ENTRYPT);
 		}
+	}
+}
+
+/*
+** This function explicitly sets EXCEL12ENTRYPT.
+**
+** If the XLL is loaded not by Excel.exe, but by a HPC cluster container DLL,
+** then GetModuleHandle(NULL) would return the process EXE module handle.
+** In that case GetProcAddress would fail, since the process EXE doesn't
+** export EXCEL12ENTRYPT ( since it's not Excel.exe).
+**
+** First try to fetch the known good entry point,
+** then set the passed in address.
+*/
+#ifdef __cplusplus
+extern "C"
+#endif	
+__declspec(dllexport)
+void pascal SetExcel12EntryPt(EXCEL12PROC pexcel12New)
+{
+	FetchExcel12EntryPt();
+	if (pexcel12 == NULL)
+	{
+		pexcel12 = pexcel12New;
 	}
 }
 
 int _cdecl Excel12(int xlfn, LPXLOPER12 operRes, int count, ...)
 {
-
-#ifdef _WIN64
-	
-	return(xlretFailed);
-
-#else
 
 	LPXLOPER12 rgxloper12[cxloper12Max];
 	va_list ap;
@@ -68,10 +85,10 @@ int _cdecl Excel12(int xlfn, LPXLOPER12 operRes, int count, ...)
 	else
 	{
 		mdRet = xlretInvCount;
-		if ((count >= 0)  && (count <= cxloper12Max))
+		if ((count >= 0) && (count <= cxloper12Max))
 		{
 			va_start(ap, count);
-			for (ioper = 0; ioper < count ; ioper++)
+			for (ioper = 0; ioper < count; ioper++)
 			{
 				rgxloper12[ioper] = va_arg(ap, LPXLOPER12);
 			}
@@ -80,17 +97,11 @@ int _cdecl Excel12(int xlfn, LPXLOPER12 operRes, int count, ...)
 		}
 	}
 	return(mdRet);
-	
-#endif
+
 }
 
 int pascal Excel12v(int xlfn, LPXLOPER12 operRes, int count, LPXLOPER12 opers[])
 {
-#ifdef _WIN64
-	
-	return(xlretFailed);
-
-#else
 
 	int mdRet;
 
@@ -105,5 +116,4 @@ int pascal Excel12v(int xlfn, LPXLOPER12 operRes, int count, LPXLOPER12 opers[])
 	}
 	return(mdRet);
 
-#endif
 }
