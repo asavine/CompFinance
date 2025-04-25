@@ -1,0 +1,11 @@
+#pragma once
+#ifndef FDM_WORLD_LIB_EXCEL_SDK_API
+#define FDM_WORLD_LIB_EXCEL_SDK_API
+
+#include "./includes/xlMemoryManager.h"  // IWYU pragma: keep
+#include "./includes/xlMemoryPool.h"     // IWYU pragma: keep
+// #include "./includes/xlOper.h"          // IWYU pragma: keep
+#include "./includes/xlcall.h"       // IWYU pragma: keep
+#include "./includes/xlframework.h"  // IWYU pragma: keep
+
+#endif  // FDM_WORLD_LIB_EXCEL_SDK_API

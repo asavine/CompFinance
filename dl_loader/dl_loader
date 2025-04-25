@@ -1,0 +1,16 @@
+#pragma once
+
+#ifndef DL_LOADER_INCLUDES
+#define DL_LOADER_INCLUDES
+
+#ifdef WIN32
+#include "./windows/DLLoader.hpp"
+#elif defined(__linux__) || defined(__APPLE__)
+#include "./linux/DLLoader.hpp"
+#else
+#endif
+
+#include "./IDLLoader.hpp"
+#include "./library_names.hpp"
+
+#endif  // DL_LOADER_INCLUDES

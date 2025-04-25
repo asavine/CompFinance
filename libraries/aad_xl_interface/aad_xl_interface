@@ -1,0 +1,7 @@
+#pragma once
+#ifndef FDM_WORLD_LIB_XL_INTERFACE
+#define FDM_WORLD_LIB_XL_INTERFACE
+
+#include "./includes/xlOper.h"  // IWYU pragma: keep
+
+#endif  // FDM_WORLD_LIB_XL_INTERFACE

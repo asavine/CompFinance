@@ -1,0 +1,8 @@
+#ifndef AAD_LIBRARY
+#define AAD_LIBRARY
+
+#include "./includes/AAD.h"         // IWYU pragma: keep
+#include "./includes/ThreadPool.h"  // IWYU pragma: keep
+#include "./includes/mcBase.h"      // IWYU pragma: keep
+
+#endif  // AAD_LIBRARY

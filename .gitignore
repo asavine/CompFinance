@@ -310,10 +310,15 @@ $RECYCLE.BIN/
 *.*.*.bak
 *.*.*.*.bak
 *.*.*.*.*.bak
-*.txt
+
 *.db
 *.opendb
 *.*.opendb
 *.*.*.opendb
 *.*.*.*.opendb
 
+build
+out
+.cache
+.vscode
+build_v*
